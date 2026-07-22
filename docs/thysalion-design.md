@@ -637,6 +637,23 @@ interior is a few hundred. Probes update round-robin under a fixed per-frame
 dispatch budget, biased towards probes near dynamic lights and recent voxel
 edits.
 
+Published figures ground the budget. The reference DDGI configuration — 8 192
+probes (32 × 8 × 32) at 64 rays per probe, 8 × 8 irradiance and 16 × 16 depth
+texels — costs 2.6 ms of diffuse GI per frame on an RTX 2080 Ti at 1080p
+([Majercik et al. 2019](https://jcgt.org/published/0008/02/01/), Table 2).
+Software ray generation does not break this: SDF-DDGI reports 1.67 ms total on
+the same GPU and under 5 ms on a laptop-class GTX 970M with a sphere-traced
+software pipeline ([Hu et al. 2020](https://arxiv.org/abs/2007.14394)), and
+non-uniform probe tracing against a sparse voxel octree ran 30–53% faster than
+its hardware-free predecessor on a GTX 1060
+([Wang et al. 2019](https://doi.org/10.1145/3306131.3317024)). Probe sleeping
+alone saves 28–54% of update cost in production scenes
+([Majercik et al. 2020](https://arxiv.org/abs/2009.10796)). Thysalion's worst
+case carries roughly 0.4× the reference probe count with a cheaper per-ray
+primitive (grid DDA against a resident 3-D texture), so a 2 ms tier 2 budget on
+mid-range hardware is conservative; the hysteresis default follows the
+published range (α ≈ 0.95).
+
 An illustrative WGSL kernel sketch for the probe-ray DDA march:
 
 ```wgsl
