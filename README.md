@@ -81,6 +81,8 @@ ______________________________________________________________________
   rationale
 - [Decision records](docs/contents.md) — ADRs 001–004 for the load-bearing
   choices
+- [Roadmap](docs/roadmap.md) — capability-demo spikes and integration
+  milestones
 - [Users' guide](docs/users-guide.md) — build and test commands
 - [Developers' guide](docs/developers-guide.md) — contributing workflow
 
