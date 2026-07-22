@@ -214,19 +214,28 @@ Alternatives rejected:
 implements incremental view maintenance with a formally specified,
 machine-checked semantics: any relational query becomes an incremental circuit
 whose per-step cost tracks the size of the change, not of the database
-([Budiu et al. 2023](https://www.vldb.org/pvldb/vol16/p1601-budiu.pdf);
-[Budiu et al. 2024](https://doi.org/10.1145/3665252.3665271)).
-Steps are deterministic and transaction-ordered, which delivers G2 directly. A
+([Budiu et al. 2023](https://www.vldb.org/pvldb/vol16/p1601-budiu.pdf)). Steps
+are deterministic and transaction-ordered, which delivers G2 directly. A
 published survey commissioned for this design found **no prior published use of
 an IVM or differential-dataflow engine as a game's rules engine at interactive
 tick rates** — the closest published result is a dataflow decomposition used
 for engine parallelization
-([Gajinov et al. 2014](https://doi.org/10.1109/SBAC-PAD.2014.21)). The design
-therefore treats DBSP-as-rules-engine as its principal novel risk and bounds
-it: the circuit's scope is limited to the rule classes it demonstrably fits
-(§10.2), with imperative escape hatches recorded per rule class (§10.3).
-Archetype-ECS scheduling semantics are informal enough that published work
-warns against resting determinism claims on them
+([Gajinov et al. 2014](https://doi.org/10.1109/SBAC-PAD.2014.21)). Two
+adjacent bodies of evidence support the bet without settling it. Declarative
+rule systems have driven playable games before — LUDOCORE modelled game rules
+in the event calculus and supported "play as real-time, graphical games"
+([Smith et al. 2010](https://doi.org/10.1109/ITW.2010.5593368)) — but without
+incremental maintenance. And DBSP's per-step latency is documented at
+millisecond scale in production: Feldera exposes a `dbsp_step_latency_seconds`
+histogram and reports a customer pipeline of 217 join operators over 250
+million rows sustaining roughly 200 ms incremental updates on one machine
+([Feldera](https://www.feldera.com/overview)) — far heavier than any game
+tick's workload, though not a game benchmark. The design therefore treats
+DBSP-as-rules-engine as its principal novel risk and bounds it: the circuit's
+scope is limited to the rule classes it demonstrably fits (§10.2), with
+imperative escape hatches recorded per rule class (§10.3). Archetype-ECS
+scheduling semantics are informal enough that published work warns against
+resting determinism claims on them
 ([Tasnim & Zhao 2026](https://doi.org/10.1145/3748522.3779910)); placing
 determinism authority in the circuit rather than in ECS system order is a
 deliberate consequence.
@@ -1089,6 +1098,11 @@ _Table 7: deferred decisions and re-opening criteria._
 - Gajinov et al. _A Case Study of Hybrid Dataflow and Shared-Memory
   Programming Models._ SBAC-PAD, 2014.
   <https://doi.org/10.1109/SBAC-PAD.2014.21>
+- Smith, Nelson, Mateas. _LUDOCORE: A logical game engine for modeling
+  videogames._ IEEE CIG, 2010. <https://doi.org/10.1109/ITW.2010.5593368>
+- Feldera overview and latency documentation.
+  <https://www.feldera.com/overview>,
+  <https://docs.feldera.com/pipelines/latency/>
 - Tasnim, Zhao. _The Essence of Entity Component System._ SAC, 2026.
   <https://doi.org/10.1145/3748522.3779910>
 - Salem, Beyer, Cochrane, Lindsay. _How to roll a join: asynchronous
