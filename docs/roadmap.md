@@ -499,10 +499,11 @@ thysalion-design.md §12.3 and §14 (I3, I6).
 - [ ] 8.2.1. Implement the save archive and the load-time circuit
   rebuild.
   - Requires 4.1.2 and 5.1.1.
-  - Versioned archive with content hashes; refusal on mismatch; fields at
-    reduced precision.
+  - Versioned archive with content hashes; refusal on mismatch; field
+    planes bit-exact in their fixed-point format (design §10.5).
   - Success: the I3 property holds on scripted sessions — save, load, and
-    N ticks equal N ticks direct — asserted in CI.
+    N ticks equal N ticks direct — including fixtures saved with field
+    values one unit below gameplay thresholds, asserted in CI.
 - [ ] 8.2.2. Implement the cross-store referential integrity sweep.
   - Requires 8.2.1.
   - Validation at load, scene transition, and save per I6.

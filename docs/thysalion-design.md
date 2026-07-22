@@ -156,9 +156,10 @@ codified sharp edges Thysalion adopts as rules:
 - The ECS is the sole state authority; the circuit is the sole logic
   authority. Bevy systems are thin, stateless data marshals.
 - DBSP input Z-sets persist across steps: every frame must retract the
-  prior snapshot before pushing the new one, and clear input handles after
-  applying outputs. Retraction discipline is verified, not assumed (invariant
-  I2, §14).
+  prior snapshot before pushing the new one, and clear input handles after a
+  successful apply (Thysalion tightens lille's unconditional clearing — see
+  §6.2 rule 4). Retraction discipline is verified, not assumed (invariant I2,
+  §14).
 - The circuit is not `Send`; it lives in a non-send resource and
   constrains scheduling. Tests that touch it serialize.
 - Stateful search does not belong in the circuit. A* pathfinding runs as
@@ -383,11 +384,12 @@ sequenceDiagram
     alt step succeeds
         C->>Ap: output Z-sets (positions, damage, spread)
         Ap->>ECS: write components, emit events
+        Ap->>C: clear input handles
     else step fails
         C-->>Ap: error event
         Ap->>ECS: no writes — prior values retained
+        Ap->>C: retain input batch for retry
     end
-    Ap->>C: clear input handles
     R->>ECS: read-only view for meshing and lighting
 ```
 
@@ -403,7 +405,13 @@ Ordering rules, all inherited from lille and enforced by Bevy system sets:
 3. Apply systems write only records the circuit emitted; a failed step
    writes nothing (the error surfaces as a diagnostic event) so the ECS never
    holds a half-applied tick.
-4. Input handles are cleared after apply, every tick, without exception.
+4. Input handles are cleared only after a successful step. A failed
+   step's batch is retained: the extract systems' `Added`/`Changed`/
+   `RemovedComponents` filters have already consumed those change events and
+   will not re-emit them, so dropping the batch would leave the circuit
+   permanently stale. Because deltas are Z-sets, the retained batch composes
+   additively with the next tick's deltas, and the retry step evaluates both
+   together.
 5. Knowledge-plane traffic (SPARQL queries and updates) runs outside the
    tick sequence, on events, from dedicated systems (§11.6).
 
@@ -806,8 +814,18 @@ discrete-spread class is by observability:
 The coupling contract: field kernels raise discrete _threshold-crossing events_
 (heat above ignition point at voxel v) which enter the circuit as inputs;
 circuit decisions (voxel v now burning) flow back as field boundary conditions.
-Fields are non-authoritative and reconstructible; saves persist only the
-circuit-side discrete state plus field snapshots at reduced precision (§12.3).
+
+Because threshold crossings feed authoritative circuit state, field values near
+a threshold cannot tolerate lossy persistence: a quantized heat value restored
+one unit low would fire an ignition on a different tick and diverge the circuit
+and knowledge planes. Fields therefore use integer fixed-point representations
+(16 bits per channel) as their runtime format, updated by order-independent
+stencil kernels — no atomics, no scheduling-dependent accumulation — so field
+evolution is deterministic and a snapshot of the fixed-point values is
+bit-exact by construction. Threshold comparisons execute on the same
+fixed-point values the snapshot stores, so a restored session reproduces every
+pending crossing on the same tick (I3, §14). Saves persist the circuit-side
+discrete state plus the exact field planes (§12.3).
 
 ### 10.6. State-growth budget
 
@@ -984,7 +1002,8 @@ A save is one atomic archive containing:
    identity and clock;
 2. the knowledge plane: TriG serialization of all graphs except the
    static ontology;
-3. material-field snapshots at reduced precision;
+3. material-field snapshots, bit-exact in their fixed-point runtime
+   format (§10.5);
 4. the save-format version and content hashes of the scene assets in use.
 
 The circuit is not serialized. On load, the engine rebuilds the circuit from
@@ -999,16 +1018,16 @@ DBSP's internal checkpoint format. Save correctness is invariant I3 (§14).
 Each plane degrades independently; no single-subsystem failure aborts the
 session.
 
-| Failure                                                          | Detection                                  | Response                                                                                                                                                                                                   |
-| ---------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Circuit step error                                               | `step()` returns an error                  | Apply phase writes nothing; error event logged with tick and input digest; next tick retries with fresh deltas. Two consecutive failures pause the simulation and surface a player-visible fault dialogue. |
-| Extract/apply identity miss (record for unknown `SimId`)         | Apply-phase lookup miss                    | Record dropped and counted; counter is a release-blocking diagnostic (indicates retraction-discipline breach, I2).                                                                                         |
-| Shader/pipeline compilation failure                              | Pass plugin init                           | The pass disables itself; lighting falls back one tier (tier 2 → tier 1 ambient; fog → radial-blur fallback; §9).                                                                                          |
-| Probe budget overrun                                             | Frame-time telemetry                       | Round-robin window shrinks; hysteresis widens; visual latency of GI increases, correctness unaffected.                                                                                                     |
-| Scene asset validation failure                                   | Load-time validation (§7.3, §11.5)         | Load rejected with diagnostic; previous scene remains active.                                                                                                                                              |
-| Knowledge query malformed at runtime                             | SPARQL parse/execution error               | Storylet excluded from candidates and logged; dialogue proceeds with remaining options.                                                                                                                    |
-| Save archive fails validation (version or content-hash mismatch) | Load-time check                            | Load refused with explicit reason; no partial restore.                                                                                                                                                     |
-| Material-field NaN/overflow                                      | Per-dispatch clamp + debug validation pass | Field values clamped to physical range; counter logged.                                                                                                                                                    |
+| Failure                                                          | Detection                                  | Response                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Circuit step error                                               | `step()` returns an error                  | Apply phase writes nothing; error event logged with tick and input digest; the input batch is retained (§6.2 rule 4) and the next tick's step evaluates it together with the new deltas. Two consecutive failures pause the simulation and surface a player-visible fault dialogue. |
+| Extract/apply identity miss (record for unknown `SimId`)         | Apply-phase lookup miss                    | Record dropped and counted; counter is a release-blocking diagnostic (indicates retraction-discipline breach, I2).                                                                                                                                                                  |
+| Shader/pipeline compilation failure                              | Pass plugin init                           | The pass disables itself; lighting falls back one tier (tier 2 → tier 1 ambient; fog → radial-blur fallback; §9).                                                                                                                                                                   |
+| Probe budget overrun                                             | Frame-time telemetry                       | Round-robin window shrinks; hysteresis widens; visual latency of GI increases, correctness unaffected.                                                                                                                                                                              |
+| Scene asset validation failure                                   | Load-time validation (§7.3, §11.5)         | Load rejected with diagnostic; previous scene remains active.                                                                                                                                                                                                                       |
+| Knowledge query malformed at runtime                             | SPARQL parse/execution error               | Storylet excluded from candidates and logged; dialogue proceeds with remaining options.                                                                                                                                                                                             |
+| Save archive fails validation (version or content-hash mismatch) | Load-time check                            | Load refused with explicit reason; no partial restore.                                                                                                                                                                                                                              |
+| Material-field NaN/overflow                                      | Per-dispatch clamp + debug validation pass | Field values clamped to physical range; counter logged.                                                                                                                                                                                                                             |
 
 _Table 6: failure modes and responses per subsystem._
 
@@ -1023,8 +1042,10 @@ enumerated here; the items below are design-level commitments.
   Method: property-based test (`proptest`) generating random input scenarios,
   comparing consolidated outputs across two circuit instances and across a
   serialize/rebuild cycle; a replay harness re-executes recorded play sessions
-  in CI. Gap: determinism of GPU material fields is _not_ claimed (fields are
-  non-authoritative, §10.5); the invariant covers the circuit boundary only.
+  in CI. Gap: cross-GPU reproducibility of field evolution rests on the fields'
+  integer fixed-point kernels (§10.5) rather than on this invariant's harness;
+  the property tests cover the circuit boundary, and field determinism is
+  asserted separately by GPU/CPU parity fixtures.
 - **I2 — Retraction soundness.** After an entity's despawn tick, no
   circuit output at any later tick references its `SimId`. Method:
   property-based test over randomized spawn/act/despawn interleavings; the
@@ -1033,10 +1054,12 @@ enumerated here; the items below are design-level commitments.
   trace growth is I7's subject.
 - **I3 — Save round-trip equivalence.** Save at tick T, load, and step N
   ticks yields circuit outputs and knowledge-graph state identical to stepping
-  the original session N ticks past T (fields excluded, reduced precision
-  accepted). Method: behavioural test on scripted sessions across scene
-  boundaries; runs in the release gate. Gap: relies on I1; asset-hash
-  mismatches are refused rather than reconciled.
+  the original session N ticks past T, including the threshold-crossing events
+  raised by material fields (their fixed-point snapshots are bit-exact, §10.5).
+  Method: behavioural test on scripted sessions across scene boundaries, with
+  fixtures holding field values one unit below gameplay thresholds at the save
+  point; runs in the release gate. Gap: relies on I1; asset-hash mismatches are
+  refused rather than reconciled.
 - **I4 — Light-field convergence.** After any finite edit sequence, the
   incremental flood-fill state equals a from-scratch recomputation of the same
   grid. Method: property-based test (random edit sequences on small grids, CPU
