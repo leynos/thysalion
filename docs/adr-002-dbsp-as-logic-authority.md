@@ -66,13 +66,14 @@ _Table 1: comparison of logic-engine options._
 
 ## Decision outcome
 
-Option A, with option B's mechanisms retained exactly where DBSP is known to
-fit poorly (design §10.3). The determinism and incremental-cost arguments are
-structural, not incidental, and the lille experience converts much of the
-novelty risk into known engineering discipline (retraction hygiene, non-send
-scheduling, input clearing). The novelty that remains is bounded by the
-rule-class table (design Table 3): every class has a conventional fallback
-implementation path if it proves unworkable in the circuit.
+The decision is Option A, with Option B's mechanisms retained exactly where
+DBSP is known to fit poorly (design §10.3). The determinism and
+incremental-cost arguments are structural, not incidental, and the lille
+experience converts much of the novelty risk into known engineering discipline
+(retraction hygiene, non-send scheduling, input clearing). The novelty that
+remains is bounded by the rule-class table (design Table 3): every class has a
+conventional fallback implementation path if it proves unworkable in the
+circuit.
 
 ## Known risks and limitations
 

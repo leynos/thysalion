@@ -18,8 +18,8 @@ ______________________________________________________________________
   are derived facts, not scripted events. Rules are expressed once, as
   incremental views over the world, and stay correct as the world changes.
 - **Deterministic by construction.** The [DBSP](https://docs.rs/dbsp)
-  circuit that derives all game state is reproducible tick for tick — replays
-  and honest saves come with the architecture.
+  circuit that computes all derived game state is reproducible tick for tick —
+  replays and honest saves come with the architecture.
 - **NPCs with beliefs, not flags.** Each character holds a named RDF graph
   of what they think is true. It can be wrong. Gossip, lies, and stale news are
   first-class citizens of an [oxigraph](https://docs.rs/oxigraph) store.
@@ -42,7 +42,7 @@ and test scaffolding works today:
 ```bash
 git clone git@github.com:leynos/thysalion.git
 cd thysalion
-make test    # cargo test --workspace
+make test    # prefers cargo nextest run, falls back to cargo test
 make lint    # clippy, warnings denied
 ```
 

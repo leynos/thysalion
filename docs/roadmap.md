@@ -8,7 +8,7 @@ units.
 
 The shape is a sea urchin, not a layer cake. Phase 1 builds a small shared core
 — the urchin's body — and every subsequent spike phase (2–5, 7, 8) radiates
-independently from it, each culminating in an **executable capability
+independently of it, each culminating in an **executable capability
 demonstration**: a runnable binary that trials one cluster of concepts
 (presentation, lighting, simulation, knowledge, saves) without waiting on a
 full game. Spike phases 2–5 depend only on phase 1 and may proceed in any order
@@ -455,8 +455,10 @@ meet the published cost envelope on target hardware. See thysalion-design.md
   - Requires 7.1.2.
   - Published defaults (α ≈ 0.95); off/asleep/awake classification; edit-
     and light-biased scheduling.
-  - Success: the district fixture stays within the 2 ms tier 2 budget on
-    the reference mid-range GPU, measured in `demo-gi`.
+  - Success: the district fixture stays within the 2 ms tier 2 budget
+    under the design §9.3 reference baseline (RTX 3060, 1080p, default
+    preset, 95th-percentile over a 10 s window after 5 s warm-up),
+    measured in `demo-gi`.
 - [ ] 7.2.2. Extend the lighting E2E matrix to three presets.
   - Requires 7.2.1 and 6.3.1.
   - Success: the nine-way preset × weather matrix of the design runs
@@ -499,11 +501,17 @@ thysalion-design.md §12.3 and §14 (I3, I6).
 - [ ] 8.2.1. Implement the save archive and the load-time circuit
   rebuild.
   - Requires 4.1.2 and 5.1.1.
-  - Versioned archive with content hashes; refusal on mismatch; field
-    planes bit-exact in their fixed-point format (design §10.5).
+  - Versioned archive with content hashes covering the scene assets, the
+    static ontology, the storylet definitions, and the derivation rules;
+    refusal on mismatch; field planes bit-exact in their fixed-point
+    format (design §10.5).
   - Success: the I3 property holds on scripted sessions — save, load, and
     N ticks equal N ticks direct — including fixtures saved with field
-    values one unit below gameplay thresholds, asserted in CI.
+    values one unit below gameplay thresholds, asserted in CI; a fixture
+    mutating the ontology or a storylet between save and load is refused
+    at load; and a fixture that saves mid-horizon — with a live horizon-
+    limited event and a pending cooldown — verifies identical expiry ticks
+    and derived outputs after load.
 - [ ] 8.2.2. Implement the cross-store referential integrity sweep.
   - Requires 8.2.1.
   - Validation at load, scene transition, and save per I6.

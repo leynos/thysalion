@@ -660,7 +660,10 @@ alone saves 28–54% of update cost in production scenes
 case carries roughly 0.4× the reference probe count with a cheaper per-ray
 primitive (grid DDA against a resident 3-D texture), so a 2 ms tier 2 budget on
 mid-range hardware is conservative; the hysteresis default follows the
-published range (α ≈ 0.95).
+published range (α ≈ 0.95). The budget's reference baseline is a GeForce RTX
+3060 (12 GB) at 1920 × 1080 on the default preset, reporting 95th-percentile
+per-frame tier 2 GPU time over a 10-second measurement window after a 5-second
+warm-up, with the driver version recorded alongside each measurement.
 
 An illustrative WGSL kernel sketch for the probe-ray DDA march:
 
@@ -1004,30 +1007,38 @@ A save is one atomic archive containing:
    static ontology;
 3. material-field snapshots, bit-exact in their fixed-point runtime
    format (§10.5);
-4. the save-format version and content hashes of the scene assets in use.
+4. the transient event ledger: horizon-limited event records and pending
+   in-circuit retractions (cooldowns, expiries) with their remaining ticks;
+5. the save-format version and content hashes of every immutable input in
+   use: scene assets, the static ontology graph, the storylet definitions, and
+   the load-time derivation rule list. Load refuses any mismatch.
 
 The circuit is not serialized. On load, the engine rebuilds the circuit from
-scratch and replays the extract phase from the restored ECS and knowledge state
-— legal because every circuit relation derives from the other stores'
-authoritative state. This trades load-time recomputation (bounded: one scene's
-worth of extraction and one convergence step) for complete independence from
-DBSP's internal checkpoint format. Save correctness is invariant I3 (§14).
+scratch and replays the extract phase from the restored ECS and knowledge
+state. Persistent circuit relations derive from the restored stores; transient
+relations — the §10.6 horizon-limited events and cooldown state — are restored
+by replaying the saved event ledger into the circuit's inputs with their
+remaining horizons. This serializes the engine's own record types, preserving
+independence from DBSP's checkpoint format. This trades load-time recomputation
+(bounded: one scene's worth of extraction and one convergence step) for
+complete independence from DBSP's internal checkpoint format. Save correctness
+is invariant I3 (§14).
 
 ## 13. Failure modes and degradation
 
 Each plane degrades independently; no single-subsystem failure aborts the
 session.
 
-| Failure                                                          | Detection                                  | Response                                                                                                                                                                                                                                                                            |
-| ---------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Circuit step error                                               | `step()` returns an error                  | Apply phase writes nothing; error event logged with tick and input digest; the input batch is retained (§6.2 rule 4) and the next tick's step evaluates it together with the new deltas. Two consecutive failures pause the simulation and surface a player-visible fault dialogue. |
-| Extract/apply identity miss (record for unknown `SimId`)         | Apply-phase lookup miss                    | Record dropped and counted; counter is a release-blocking diagnostic (indicates retraction-discipline breach, I2).                                                                                                                                                                  |
-| Shader/pipeline compilation failure                              | Pass plugin init                           | The pass disables itself; lighting falls back one tier (tier 2 → tier 1 ambient; fog → radial-blur fallback; §9).                                                                                                                                                                   |
-| Probe budget overrun                                             | Frame-time telemetry                       | Round-robin window shrinks; hysteresis widens; visual latency of GI increases, correctness unaffected.                                                                                                                                                                              |
-| Scene asset validation failure                                   | Load-time validation (§7.3, §11.5)         | Load rejected with diagnostic; previous scene remains active.                                                                                                                                                                                                                       |
-| Knowledge query malformed at runtime                             | SPARQL parse/execution error               | Storylet excluded from candidates and logged; dialogue proceeds with remaining options.                                                                                                                                                                                             |
-| Save archive fails validation (version or content-hash mismatch) | Load-time check                            | Load refused with explicit reason; no partial restore.                                                                                                                                                                                                                              |
-| Material-field NaN/overflow                                      | Per-dispatch clamp + debug validation pass | Field values clamped to physical range; counter logged.                                                                                                                                                                                                                             |
+| Failure                                                          | Detection                                                                                  | Response                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Circuit step error                                               | `step()` returns an error                                                                  | Apply phase writes nothing; error event logged with tick and input digest; the input batch is retained (§6.2 rule 4) and the next tick's step evaluates it together with the new deltas. Two consecutive failures pause the simulation and surface a player-visible fault dialogue. |
+| Extract/apply identity miss (record for unknown `SimId`)         | Apply-phase lookup miss                                                                    | Record dropped and counted; counter is a release-blocking diagnostic (indicates retraction-discipline breach, I2).                                                                                                                                                                  |
+| Shader/pipeline compilation failure                              | Pass plugin init                                                                           | The pass disables itself; lighting falls back one tier (tier 2 → tier 1 ambient; fog → radial-blur fallback; §9).                                                                                                                                                                   |
+| Probe budget overrun                                             | Frame-time telemetry                                                                       | Round-robin window shrinks; hysteresis widens; visual latency of GI increases, correctness unaffected.                                                                                                                                                                              |
+| Scene asset validation failure                                   | Load-time validation (§7.3, §11.5)                                                         | Load rejected with diagnostic; previous scene remains active.                                                                                                                                                                                                                       |
+| Knowledge query malformed at runtime                             | SPARQL parse/execution error                                                               | Storylet excluded from candidates and logged; dialogue proceeds with remaining options.                                                                                                                                                                                             |
+| Save archive fails validation (version or content-hash mismatch) | Load-time check                                                                            | Load refused with explicit reason; no partial restore.                                                                                                                                                                                                                              |
+| Material-field range/overflow                                    | Saturating fixed-point arithmetic + integer range validation pass; GPU/CPU parity fixtures | Field values saturate at representation bounds; out-of-range writes counted and logged.                                                                                                                                                                                             |
 
 _Table 6: failure modes and responses per subsystem._
 
