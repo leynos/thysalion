@@ -3,7 +3,7 @@
 //! directional light, and hands everything else — camera, input,
 //! overlay, screenshots — to the shared demo harness.
 //!
-//! Run with `make demo` (or `cargo run --bin demo-empty`). Key bindings
+//! Run with `make demo` (or `cargo run -p thysalion-demos --bin demo-empty`). Key bindings
 //! are defined in `thysalion_harness::input::KEY_BINDINGS`.
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 #![cfg_attr(coverage_nightly, coverage(off))]

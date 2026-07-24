@@ -67,7 +67,7 @@ typecheck: ## Type-check without building
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
 
 demo: ## Run a capability demonstration binary (DEMO=empty by default)
-	$(CARGO) run --bin demo-$(DEMO)
+	$(CARGO) run -p thysalion-demos --bin demo-$(DEMO)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) +nightly fmt --all
