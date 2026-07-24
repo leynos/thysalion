@@ -84,10 +84,12 @@ escalation, not workarounds.
 - Scope: if the change grows beyond roughly 30 files or 2,500 net lines
   (excluding `Cargo.lock` and generated snapshots), stop and escalate.
 - Dependencies: the approved new dependency set is `bevy` (0.19, with a
-  curated feature list — see Stage A), and dev-dependencies `rstest` and
-  `cap-std`/`camino` where tests touch the filesystem. Any further external
-  dependency (for example `leafwing-input-manager`, `bevy_panorbit_camera`,
-  `insta`, `rstest-bdd` for this step) requires escalation before adoption.
+  curated feature list — see Stage A), and dev-dependencies `rstest`,
+  `rstest-bdd` 0.6.0-beta3 (with `rstest-bdd-macros` and `rstest-bdd-harness`
+  at the same version), and `cap-std`/`camino` where tests touch the
+  filesystem. Any further external dependency (for example
+  `leafwing-input-manager`, `bevy_panorbit_camera`, `insta`) requires
+  escalation before adoption.
 - Interfaces: renaming the root package `thysalion`, or changing the
   release artefact name consumed by `.github/workflows/release.yml` and the
   `[package.metadata.binstall]` template, requires escalation.
@@ -291,11 +293,21 @@ escalation, not workarounds.
   tests compile live in `presentation` and `harness` (which Stage C2 fills),
   not in the plane stubs. Date/Author: 2026-07-24, per design review (viability
   lens).
-- Decision: this step tests with `rstest` only; `rstest-bdd` is deferred
-  until a step has genuine Gherkin-shaped behaviour (candidate: scene loading
-  diagnostics in 1.2). AGENTS.md asks for behavioural tests "where applicable";
-  a camera-state transition table is not it. Date/Author: 2026-07-24, per
-  design review (viability lens).
+- Decision: behavioural tests use `rstest-bdd` 0.6.0-beta3 with its
+  extensible harness support: a small in-repo Bevy harness adapter (implementing
+  `rstest_bdd_harness::HarnessAdapter` with `type Context = bevy::app::App`)
+  builds the `MinimalPlugins` app with `HarnessCorePlugin` before steps run,
+  and step functions borrow the app via the reserved
+  `#[from(rstest_bdd_harness_context)]` fixture. The adapter lives in the
+  harness crate's test support (`crates/harness/tests/support/`) for now;
+  roadmap step 1.3.1 (headless Bevy CI scaffolding) is the natural point to
+  promote it to a shared test-support crate. Unit-level mathematics (quadrant,
+  zoom, input mapping) stays plain `rstest`. Rationale: user direction
+  supersedes the earlier deferral; the adapter pattern follows the "third-party
+  harness adapter cookbook" in the rstest-bdd users' guide (which sketches
+  exactly this Bevy case), and it gives the headless behavioural test a Gherkin
+  specification that 1.3's CI scaffolding inherits. Date/Author: 2026-07-24,
+  user direction.
 - Decision: red states are assertion failures, not compile failures. Stage
   C1 creates the contract types with `todo!()` bodies so Stage B tests compile
   and fail meaningfully; the red state exists only in the working tree between
@@ -365,6 +377,11 @@ observability), [developers-guide.md](../developers-guide.md) (local workflow,
 tooling prerequisites),
 [documentation-style-guide.md](../documentation-style-guide.md), and
 [reliable-testing-in-rust-via-dependency-injection.md](../reliable-testing-in-rust-via-dependency-injection.md).
+For the behavioural-test harness, the authoritative reference is the
+rstest-bdd users' guide, §"Third-party harness adapter cookbook" (local
+checkout: `../rstest-bdd/docs/users-guide.md` relative to the repository's
+parent directory; also published with the crate), together with its ADR-005
+(harness adapter crates) and ADR-007 (harness context injection).
 
 ## Plan of work
 
@@ -397,6 +414,12 @@ machine's installed headers are exactly what hid the CI risk.
    graph. This proves manifest resolution only — the cross toolchain path is
    exercised for real at the next tag; the workflow-shape test in Stage C1 is
    the standing guard.
+5. BDD harness adapter: confirm `rstest-bdd` 0.6.0-beta3's harness contract
+   compiles against Bevy 0.19 — a `HarnessAdapter` with
+   `type Context = bevy::app::App` whose `run` builds a `MinimalPlugins` app
+   and calls `request.run(app)`, plus one step borrowing
+   `#[from(rstest_bdd_harness_context)] app: &mut App`. (The cookbook's example
+   targets an older Bevy; this spike proves the pairing.)
 
 Go/no-go: if any spike fails, stop and revise this plan before touching the
 tree.
@@ -414,10 +437,34 @@ the red state, and it exists only in the working tree.
   bounds; the orthographic scale for a zoom level is monotonic.
 - `crates/harness/src/input.rs` unit tests (rstest): each bound key maps
   to the intended `HarnessAction`; unbound keys map to nothing.
-- `crates/harness/tests/headless.rs` (rstest): building a `MinimalPlugins`
-  app with `HarnessCorePlugin`, writing a rotate message, and stepping
-  `app.update()` moves the camera rig state to the next quadrant; the harness
-  diagnostic paths are registered in the `DiagnosticsStore` after an update.
+- `crates/harness/tests/headless.rs` (rstest-bdd 0.6.0-beta3): the headless
+  behavioural specification, run through the in-repo Bevy harness adapter
+  (`crates/harness/tests/support/bevy_harness.rs`, implementing
+  `HarnessAdapter` with `type Context = bevy::app::App`; its `run` builds the
+  `MinimalPlugins` app with `HarnessCorePlugin` and passes it to
+  `request.run(app)`). Step functions borrow the app via
+  `#[from(rstest_bdd_harness_context)]`. Scenarios bind with
+  `#[scenario(path = "tests/features/harness.feature", harness = BevyHarness)]`.
+  The feature file `crates/harness/tests/features/harness.feature`:
+
+  ```gherkin
+  Feature: Demo harness headless core
+
+    Scenario: Rotating advances one quadrant
+      Given a headless harness app in the north-east quadrant
+      When a rotate-left action is sent and the app updates
+      Then the camera rig is in the north-west quadrant
+
+    Scenario: Diagnostics are registered
+      Given a headless harness app in the north-east quadrant
+      When the app updates
+      Then the harness diagnostic paths are registered
+  ```
+
+  (Quadrant naming in steps follows `Quadrant::next()`'s documented cyclic
+  order; adjust the expected quadrant if the documented order differs at
+  implementation time, keeping the feature and the `next()` contract in
+  lock-step.)
 
 ### Stage C1: workspace conversion (task 1.1.1)
 
@@ -428,10 +475,11 @@ Root `Cargo.toml`:
 - Move the `[lints.*]` tables to `[workspace.lints.*]`; the root package
   and every member adopt `[lints] workspace = true`.
 - Add `[workspace.dependencies]` entries for `bevy` (0.19,
-  `default-features = false`, the Stage A feature list) and `rstest`, so member
-  crates inherit one pinned version. Members must not declare passthrough
-  features onto Bevy without weighing that `make` gates run `--all-features`
-  (note recorded in ADR-005).
+  `default-features = false`, the Stage A feature list), `rstest`, and the
+  `rstest-bdd` 0.6.0-beta3 family (`rstest-bdd`, `rstest-bdd-macros`,
+  `rstest-bdd-harness`), so member crates inherit one pinned version. Members
+  must not declare passthrough features onto Bevy without weighing that `make`
+  gates run `--all-features` (note recorded in ADR-005).
 - Add `[workspace.package]` keys (edition, license, repository) inherited
   by members.
 - The root package keeps its binstall metadata and stub binary; its
@@ -602,8 +650,10 @@ Go/no-go: Stage B tests pass; the manual verification script in
   two-plugin contract and the headless/windowed boundary (including the
   coverage boundary), `HarnessConfig` construction, the binding table
   reference, how to add a new demo binary (including the per-demo feature/
-  `required-features` convention), the tick-time seam, and the screenshot
-  one-frame-lag caveat.
+  `required-features` convention), the behavioural-test convention (the
+  rstest-bdd Bevy harness adapter, where the feature files live, and how steps
+  borrow the app context), the tick-time seam, and the screenshot one-frame-lag
+  caveat.
 - Extend `docs/users-guide.md` with a task-oriented "Running the demos"
   section: `make demo`, the key bindings (referencing the same table), the
   overlay, screenshots.
@@ -666,13 +716,17 @@ skeleton (empty plane crates included, proven by clippy running with
 
 Task 1.1.2 acceptance, automated:
 `cargo test -p thysalion-harness -p thysalion-presentation` passes, including
-the headless behavioural test that steps a `MinimalPlugins` app with
-`HarnessCorePlugin` through a rotate message and observes the quadrant change
-and registered diagnostic paths.
+the rstest-bdd scenarios of `crates/harness/tests/features/harness.feature` run
+through the Bevy harness adapter: a `MinimalPlugins` app with
+`HarnessCorePlugin` steps through a rotate message and the quadrant change and
+registered diagnostic paths are observed.
 
 Red-green-refactor evidence to record in `Artefacts and notes`: the Stage B
 test command failing with assertion errors before Stage C2 (with the failure
-text), the same command passing after, and the post-refactor gate run.
+text) — for the BDD scenarios, the runner command
+`cargo test -p thysalion-harness --test headless` failing on the Then steps
+before implementation — the same commands passing after, and the post-refactor
+gate run.
 
 Task 1.1.2 acceptance, manual (developer machine with a display):
 
@@ -726,6 +780,10 @@ measurement, and the manual verification screenshot reference.
   `ButtonInput<KeyCode>`, `AccumulatedMouseScroll`, and `Messages<T>`/
   `MessageReader<T>`.
 - `rstest` (workspace dev-dependency) per AGENTS.md testing policy;
+  `rstest-bdd`, `rstest-bdd-macros`, and `rstest-bdd-harness` at
+  `"0.6.0-beta3"` (workspace dev-dependencies) for the behavioural
+  specification, using the extensible harness support (`HarnessAdapter`/
+  `ScenarioRunRequest` and the reserved `rstest_bdd_harness_context` fixture);
   `cap-std`/`camino` for the screenshot directory handling per AGENTS.md
   filesystem policy.
 - The types named in Stage C2 (`HarnessCorePlugin`, `DemoHarnessPlugin`,
@@ -759,3 +817,21 @@ skill/document signposting was extended. Why: confirmed review findings (two
 structural, three contract, two operational blockers among them). Effect on
 remaining work: Stage A grew two spikes (clean-container feature list, lint
 enumeration); Stages B–D are otherwise unchanged in sequence.
+
+## Revision note (2026-07-24, second)
+
+What changed: the earlier decision to defer `rstest-bdd` was reversed on user
+direction. The headless behavioural test is now an rstest-bdd 0.6.0-beta3
+specification (`crates/harness/tests/features/harness.feature`, embedded in
+Stage B) run through an in-repo Bevy harness adapter that uses the crate's
+extensible harness support (`HarnessAdapter` with
+`type Context = bevy::app::App`, steps borrowing the app via the reserved
+`rstest_bdd_harness_context` fixture), following the third-party harness
+adapter cookbook in the rstest-bdd users' guide. The `rstest-bdd` family joined
+the approved dependency set and `[workspace.dependencies]`; Stage A gained a
+spike proving the adapter compiles against Bevy 0.19; the developers' guide
+section now documents the behavioural-test convention. Why: user requirement to
+standardize behavioural testing on rstest-bdd from the outset, seeding roadmap
+1.3.1's headless CI scaffolding. Effect on remaining work: Stage B's headless
+test is authored as feature file plus steps plus adapter; unit-level
+mathematics remains plain rstest; no other stage changes.
