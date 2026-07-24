@@ -197,10 +197,14 @@ escalation, not workarounds.
   repository-layout rewrite, developers'/users' guide sections, contents,
   design back-reference, roadmap 1.1.1/1.1.2 ticked); retrospective recorded
   below.
-- [ ] Post-delivery: manual windowed verification by a human (rotation
-  feel, zoom bounds, F3 overlay values, F12 screenshot artefact) and the first
-  CI run on the pull request (Whitaker install path, warm-cache duration
-  against the 30-minute tolerance).
+- [x] (2026-07-24 23:25Z) Post-delivery CI evidence: both pull-request
+  CI runs green (13 m 28 s on the code push, 4 m 24 s warm cache on the docs
+  push — see Artefacts); the docs-milestone CodeRabbit review also returned
+  zero findings.
+- [x] (2026-07-24 23:35Z) Manual verification, rotation: the
+  maintainer ran the windowed demo and confirmed quadrant rotation looks good.
+- [ ] Post-delivery: remaining manual verification (zoom bounds, F3
+  overlay values, F12 screenshot artefact).
 
 ## Surprises & discoveries
 
@@ -921,8 +925,14 @@ ignored before any manual run (Commit 2, first edit).
   `overlay.rs`; Whitaker `no-unwrap-or-else-panic` in `workflow_shape.rs`
   (resolved with `.expect(...)` inside `#[test]` functions — combining `?` with
   `assert!` trips `panic_in_result_fn`).
-- Still to record: the first warm-cache CI duration and the manual
-  verification screenshot reference.
+- CodeRabbit agent reviews: code milestone (2026-07-24, 39 files) and
+  docs milestone (2026-07-24, 41 files) both completed with zero findings.
+- CI durations on the pull request: first Bevy-bearing run (code
+  milestone push) 13 minutes 28 seconds; warm-cache run (docs milestone push) 4
+  minutes 24 seconds — both well inside the 30-minute tolerance, and the
+  Whitaker 0.2.7 installer path worked in CI unmodified.
+- Still to record: the manual verification screenshot reference (needs
+  a human at a display; see the post-delivery item in Progress).
 
 ## Interfaces and dependencies
 
