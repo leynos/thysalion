@@ -33,8 +33,12 @@ The repository stores binary reference assets — currently the concept art in
 `references/` — as [Git LFS](https://git-lfs.com/) attachments, tracked by the
 `references/*.png` rule in `.gitattributes`. Install `git-lfs` and run
 `git lfs install` before cloning (or run `git lfs pull` after a clone made
-without it), otherwise the tracked files check out as small text pointer stubs
+without it); otherwise the tracked files check out as small text pointer stubs
 rather than images.
+
+The tracking pattern is case-sensitive: `references/*.png` does not match
+uppercase `.PNG` files. Add a matching rule before accepting uppercase
+reference assets, or rename them to the lowercase extension.
 
 When adding a new binary asset type, add a matching `git lfs track` rule to
 `.gitattributes` in the same commit as the first asset, and confirm the staged
