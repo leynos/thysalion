@@ -6,13 +6,14 @@ schema = 1
 stems = []
 
 [words]
-accepted = ["Flavored", "mold"]
+accepted = ["Flavored", "mold", "LOD"]
 
 [words.corrections]
 
 [patterns]
 ignore = [
   'Center \| Microsoft Learn',
+  'game engine for modeling',
 ]
 
 [files]

@@ -1,16 +1,16 @@
 # Developer Guide
 
-This guide explains the contributor workflow for the generated
-Thysalion project.
+This guide explains the contributor workflow for the generated Thysalion
+project.
 
 ## Local Workflow
 
 Use `make all` as the public entrypoint for formatting, linting, and tests.
 `make lint` runs rustdoc, Clippy, and Whitaker. `make test` prefers
 `cargo nextest run` and falls back to `cargo test` when cargo-nextest is not
-available. `make audit` derives the Rust workspace root with
-`cargo metadata`, logs workspace member manifests, and runs `cargo audit` once
-from the workspace root. `make coverage` uses `cargo llvm-cov` with `lld`.
+available. `make audit` derives the Rust workspace root with `cargo metadata`,
+logs workspace member manifests, and runs `cargo audit` once from the workspace
+root. `make coverage` uses `cargo llvm-cov` with `lld`.
 
 GitHub Actions Act validation lives in `.github/workflows/act-validation.yml`.
 The main `.github/workflows/ci.yml` workflow deliberately does not run
@@ -27,6 +27,23 @@ LLVM-compatible linker behaviour.
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
 
+## Binary assets and Git LFS
+
+The repository stores binary reference assets — currently the concept art in
+`references/` — as [Git LFS](https://git-lfs.com/) attachments, tracked by the
+`references/*.png` rule in `.gitattributes`. Install `git-lfs` and run
+`git lfs install` before cloning (or run `git lfs pull` after a clone made
+without it); otherwise the tracked files check out as small text pointer stubs
+rather than images.
+
+The tracking pattern is case-sensitive: `references/*.png` does not match
+uppercase `.PNG` files. Add a matching rule before accepting uppercase
+reference assets, or rename them to the lowercase extension.
+
+When adding a new binary asset type, add a matching `git lfs track` rule to
+`.gitattributes` in the same commit as the first asset, and confirm the staged
+file is a pointer with `git lfs ls-files` before pushing.
+
 ## Spelling policy
 
 Markdown uses en-GB-oxendict spelling enforced by the pinned `typos` release.
@@ -37,23 +54,23 @@ regenerate the tracked configuration, and check maintained prose.
 
 ### Security audit ignores
 
-Security audit jobs may set `CARGO_AUDIT_IGNORES` for narrowly scoped
-RustSec advisories that affect unused or tooling-only dependency paths. Keep
-each ignore tied to a documented runtime impact analysis, and remove it when
-the affected dependency leaves the graph or the project starts using the
-advised runtime path.
+Security audit jobs may set `CARGO_AUDIT_IGNORES` for narrowly scoped RustSec
+advisories that affect unused or tooling-only dependency paths. Keep each
+ignore tied to a documented runtime impact analysis, and remove it when the
+affected dependency leaves the graph or the project starts using the advised
+runtime path.
 
 ## Workflow pins and Dependabot
 
-Dependabot owns the upgrade of GitHub Actions and reusable workflows,
-including calls into `leynos/shared-actions`. Contract tests that assert a
-caller's exact commit SHA create a lockstep dependency: every time Dependabot
-opens a bump PR, the test fails until a human edits the pinned constant to
-match. That defeats the purpose of automated dependency updates and turns a
-routine bump into a manual chore.
+Dependabot owns the upgrade of GitHub Actions and reusable workflows, including
+calls into `leynos/shared-actions`. Contract tests that assert a caller's exact
+commit SHA create a lockstep dependency: every time Dependabot opens a bump PR,
+the test fails until a human edits the pinned constant to match. That defeats
+the purpose of automated dependency updates and turns a routine bump into a
+manual chore.
 
-Contract tests may still verify the *shape* of a reusable-workflow caller.
-They must not verify the specific SHA value.
+Contract tests may still verify the *shape* of a reusable-workflow caller. They
+must not verify the specific SHA value.
 
 - Do assert the workflow references the correct reusable workflow path.
 - Do assert the ref is pinned to a full 40-character commit SHA, not a

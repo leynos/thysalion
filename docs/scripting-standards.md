@@ -36,8 +36,8 @@ as a default.
   `#!/usr/bin/env -S uv run --script` followed by the metadata block shown in
   the example below. The `--script` flag is required: `uv run python` executes
   the interpreter directly and ignores the inline metadata block, so a script
-  invoked that way fails at import time on any machine without its
-  dependencies preinstalled.
+  invoked that way fails at import time on any machine without its dependencies
+  preinstalled.
 - External processes are invoked via [`plumbum`](https://plumbum.readthedocs.io)
   to provide structured command execution rather than ad‑hoc shell strings.
 - File‑system interactions use `pathlib.Path`. Higher‑level operations (for
