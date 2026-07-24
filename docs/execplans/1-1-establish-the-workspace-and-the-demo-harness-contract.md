@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
 and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -168,15 +168,99 @@ escalation, not workarounds.
 
 ## Progress
 
-- [ ] Stage A: verification spikes and dependency pinning.
-- [ ] Stage B: red tests for the harness contract.
-- [ ] Stage C1: workspace conversion (task 1.1.1).
-- [ ] Stage C2: harness crates and `demo-empty` (task 1.1.2).
-- [ ] Stage D: documentation, ADR, refactor, and gates.
+- [x] (2026-07-24 19:00Z) Stage A: all five spikes complete. Lint reality
+  including Whitaker (after the toolchain upgrade); Message and screenshot
+  idioms compile; `-p thysalion` scoping proven (Bevy never compiled);
+  rstest-bdd Bevy harness adapter green; clean-container `cargo check` *and*
+  `cargo test` pass with the curated feature list and **zero additional system
+  packages** — the feature trim eliminates the system-dependency risk entirely,
+  so no workflow package installs are needed.
+- [x] (2026-07-24 19:40Z) Stages B–D file authoring complete in the
+  working tree (workspace manifests, six member crates, camera contract,
+  harness two-plugin implementation, demo-empty, BDD suite and adapter,
+  Makefile and workflow updates, ADR-005, repository-layout rewrite, guide
+  sections, design §6.1 back-reference). The host then refused to spawn
+  processes (`posix_spawn` EIO) until a session restart, so validation followed
+  later.
+- [x] (2026-07-24 20:40Z) Stages B–C validated after host recovery:
+  `tests/stub.rs` deleted; fix cycle recorded in `Surprises & discoveries`
+  (coverage attribute gating, `DirectionalLight` field rename, six lint
+  findings, headless input expiry); `make check-fmt`, `make lint` (rustdoc,
+  Clippy, Whitaker), `make test` (38/38), and `make spelling` all green. Logs:
+  `/tmp/lint-thysalion-1-1.out`, `/tmp/test-thysalion-1-1.out`.
+- [x] (2026-07-24 22:30Z) Stage C1/C2 delivery complete: code committed
+  (`c7888ab` workspace + harness, `f6a4f0c` demo launch scoping) and pushed;
+  windowed smoke run under WSLg confirmed the window opens and renders via
+  software Vulkan without panicking; CodeRabbit agent review of the full branch
+  (39 files) returned **zero findings**.
+- [x] (2026-07-24 22:45Z) Stage D delivery: docs committed (ADR-005,
+  repository-layout rewrite, developers'/users' guide sections, contents,
+  design back-reference, roadmap 1.1.1/1.1.2 ticked); retrospective recorded
+  below.
+- [ ] Post-delivery: manual windowed verification by a human (rotation
+  feel, zoom bounds, F3 overlay values, F12 screenshot artefact) and the first
+  CI run on the pull request (Whitaker install path, warm-cache duration
+  against the 30-minute tolerance).
 
 ## Surprises & discoveries
 
-- Observation: none yet.
+- Observation: Bevy 0.19 reworked its feature model. `default` is now the
+  umbrella set `["2d", "3d", "ui", "audio"]`, and the `2d`/`3d`/`ui` umbrellas
+  all pull `default_platform`, which hard-includes `bevy_gilrs` (libudev) and
+  `wayland`. Evidence: `cargo metadata` feature tables for bevy 0.19.0. Impact:
+  avoiding the gamepad/audio system dependencies requires composing
+  fine-grained features (`default_app`, `common_api`, `bevy_render`,
+  `bevy_pbr`, …) rather than subtracting from an umbrella; the curated list in
+  `Interfaces and dependencies` reflects this.
+- Observation: the development host (WSL2) itself lacks
+  `wayland-client` headers, so the `wayland` feature fails to build even
+  locally. Evidence: `wayland-sys` build-script failure in the Stage A spike.
+  Impact: the harness ships X11-only windowing (`x11` feature; WSLg serves it
+  via XWayland, and CI never runs windowed); `wayland` can be revisited when a
+  target platform needs it.
+- Observation: Whitaker's installed lint suite was built for
+  `nightly-2025-09-18` (rustc 1.92), which cannot compile Bevy 0.19 (requires
+  rustc ≥ 1.95), so `make lint` would fail on any Bevy-dependent member
+  regardless of code quality. Evidence: Whitaker run failed with "bevy@0.19.0
+  requires rustc 1.95.0". Impact: upgraded locally to whitaker-installer 0.2.7
+  plus the rolling lint suite built for `nightly-2026-05-28` (the repository's
+  pinned toolchain) and cargo-dylint 6.0.1 (sha256-verified from the Whitaker
+  rolling release; cargo-dylint 5.0.0's driver does not compile against the new
+  nightly). `ci.yml` must bump `WHITAKER_INSTALLER_VERSION` to 0.2.7, drop the
+  removed `--cranelift` flag, and roll the Whitaker cache key.
+- Observation: `MinimalPlugins` provides no input resources, so a
+  headless app running the input-reading system fails Bevy's system-param
+  validation (`ButtonInput<KeyCode>` and `AccumulatedMouseScroll` missing).
+  Evidence: first BDD spike run panicked with "Resource does not exist". Impact:
+  `HarnessCorePlugin` initializes those resources itself; this also lets
+  headless tests inject synthetic key presses.
+- Observation: `#[coverage(off)]` is still feature-gated on the pinned
+  nightly. Evidence: E0658 on the harness windowed modules. Impact: the
+  attribute is applied as `#[cfg_attr(coverage_nightly, coverage(off))]` with
+  `#![cfg_attr(coverage_nightly, feature(coverage_attribute))]` — the canonical
+  cargo-llvm-cov pattern — plus an `unexpected_cfgs` check-cfg entry in the
+  workspace lints; the Makefile's `--ignore-filename-regex` remains as belt and
+  braces for coverage runs that do not set the cfg.
+- Observation: Bevy 0.19 renamed `DirectionalLight::shadows_enabled` to
+  `shadow_maps_enabled` (with a separate `contact_shadows_enabled`). Evidence:
+  E0560 in `demo-empty`; field list in bevy_light 0.19 source. Impact: one-line
+  fix; migration guides lag the release.
+- Observation: initializing input resources is necessary but not
+  sufficient for headless input: without `InputPlugin`, nothing expires
+  `just_pressed`/`just_released` between frames, so one synthetic press fired
+  on every subsequent update (the rig rotated twice). Evidence: the
+  `synthetic_key_press_drives_the_rig` scenario failed with
+  `left: SouthWest, right: SouthEast`. Impact: `HarnessCorePlugin` adds a
+  `Last`-schedule `clear_synthetic_input` system when `InputPlugin` is absent,
+  giving synthetic input one-shot semantics; roadmap 1.3's CI scaffolding
+  inherits this behaviour.
+- Observation: the empirical lint-allowance set is smaller than feared:
+  `float_arithmetic` (crate-level `#![expect]` in graphics crates) and
+  `needless_pass_by_value` (per-system `#[expect]`) suffice; the other feared
+  lints are satisfiable directly (`#[must_use]`, `const fn`, documentation).
+  Whitaker additionally requires `//!` docs on *every* module, including
+  `#[cfg(test)]` modules. Evidence: Stage A lint spike passes clippy and
+  Whitaker cleanly with only those two expects.
 
 ## Decision log
 
@@ -308,6 +392,19 @@ escalation, not workarounds.
   exactly this Bevy case), and it gives the headless behavioural test a Gherkin
   specification that 1.3's CI scaffolding inherits. Date/Author: 2026-07-24,
   user direction.
+- Decision: windowing is X11-only for this step (`x11` feature, no
+  `wayland`). Rationale: the `wayland` feature needs `libwayland-dev` at build
+  time on every machine and CI runner, the development host (WSL2) lacks it,
+  WSLg serves X11 clients via XWayland, and CI never runs the windowed path.
+  Revisit when a deployment target requires native Wayland. Date/Author:
+  2026-07-24, Stage A finding.
+- Decision: upgrade Whitaker to installer 0.2.7 with the rolling lint
+  suite for `nightly-2026-05-28` and cargo-dylint 6.0.1, locally and in
+  `ci.yml` (version bump, drop the removed `--cranelift` flag, roll the cache
+  key). Rationale: the previous suite's `nightly-2025-09-18` toolchain cannot
+  compile Bevy 0.19 (rustc ≥ 1.95 required), which would fail `make lint`
+  unconditionally; the rolling suite matches the repository's pinned toolchain
+  exactly. Date/Author: 2026-07-24, Stage A finding.
 - Decision: red states are assertion failures, not compile failures. Stage
   C1 creates the contract types with `todo!()` bodies so Stage B tests compile
   and fail meaningfully; the red state exists only in the working tree between
@@ -318,7 +415,48 @@ escalation, not workarounds.
 
 ## Outcomes & retrospective
 
-To be completed at the end of implementation.
+Delivered (2026-07-24): roadmap tasks 1.1.1 and 1.1.2 are complete. The
+repository is now a six-member Cargo workspace with the root package as
+composition root; the four plane crates are documented stubs with their
+authority rows; `thysalion-presentation` owns the pure camera contract
+(`Quadrant`, `ZoomBounds`); `thysalion-harness` ships the two-plugin contract
+(`HarnessCorePlugin` headless-safe, `DemoHarnessPlugin` windowed); and
+`demo-empty` opens a window, renders a lit ground plane, and reports
+diagnostics. Thirty-eight tests pass, including four rstest-bdd scenarios
+driving the harness through the Bevy adapter, and all deterministic gates plus
+a zero-finding CodeRabbit review cleared both milestones.
+
+What worked well:
+
+- Stage A spikes earned their keep: every one of them changed the plan
+  (curated Bevy features removed the system-package risk outright; the Whitaker
+  toolchain incompatibility was found before, not after, the workspace
+  conversion; release `-p` scoping was proven without ever compiling Bevy for a
+  foreign target).
+- The red test phase caught a real defect that review had not predicted:
+  without `InputPlugin`, synthetic key presses never expire, so one press
+  rotated the rig twice. The fix (`clear_synthetic_input` in `Last`) is now
+  part of the headless contract.
+- The six-expert design review moved structural decisions (Quadrant's
+  home, the dependency sink, the composition root) out of the implementation
+  loop entirely; implementation surfaced no structural rework.
+
+What cost time:
+
+- The strict lint set required several fix cycles (`shadow_reuse`,
+  `format_push_string`, `missing_const_for_fn`, Whitaker's
+  `no-unwrap-or-else-panic` interacting badly with `panic_in_result_fn` in
+  tests). The lint-reality spike covered the production idioms but not the test
+  idioms; future plans should lint a representative *test* file in the spike
+  too.
+- A mid-session host failure (`posix_spawn` EIO) split authoring from
+  validation; the plan's file-by-file progress notes made resumption cheap,
+  which vindicates the "update the living sections frequently" discipline.
+
+Left open (tracked in Progress): human verification of the windowed demo's feel
+and the F12 screenshot artefact, and the first CI run's warm-cache duration.
+Neither blocks roadmap 1.2, which builds on the scene contract rather than the
+harness chrome.
 
 ## Context and orientation
 
@@ -763,10 +901,28 @@ ignored before any manual run (Commit 2, first edit).
 
 ## Artefacts and notes
 
-To be filled during implementation: Stage A spike transcripts (feature list,
-lint allowance enumeration, message and screenshot idioms, release scoping),
-the red and green test transcripts, the first warm-cache CI duration
-measurement, and the manual verification screenshot reference.
+- Stage A: the spike crate compiled `cargo check --all-targets` and passed
+  `cargo test` in a clean `rust:latest` container with the curated feature list
+  and no extra system packages; `cargo build -p thysalion` in a mock workspace
+  finished in two seconds without ever compiling Bevy.
+- Red-green evidence: the honest red observed after host recovery was the
+  `synthetic_key_press_drives_the_rig` scenario failing with
+  `left: SouthWest, right: SouthEast` — a genuine defect (without `InputPlugin`,
+  `just_pressed` never expires, so one synthetic press rotated twice). Green
+  after adding the `clear_synthetic_input` end-of-frame system: 38/38 tests pass
+  (`/tmp/test-thysalion-1-1.out`). The remaining Stage B tests were authored
+  before any implementation ran but their individual red states were not
+  captured, because the authoring session lost its host before `cargo` could
+  execute; this is recorded rather than reconstructed.
+- Lint fix cycle (one failure class per plan tolerance, six findings):
+  rustdoc private-item link in `rig.rs`; `missing_const_for_fn` on
+  `ZoomBounds::clamp`; `shadow_reuse` in `workflow_shape.rs` and `config.rs`;
+  `format_push_string` and an unfulfilled `float_arithmetic` expectation in
+  `overlay.rs`; Whitaker `no-unwrap-or-else-panic` in `workflow_shape.rs`
+  (resolved with `.expect(...)` inside `#[test]` functions — combining `?` with
+  `assert!` trips `panic_in_result_fn`).
+- Still to record: the first warm-cache CI duration and the manual
+  verification screenshot reference.
 
 ## Interfaces and dependencies
 

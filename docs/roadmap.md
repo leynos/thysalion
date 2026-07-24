@@ -36,12 +36,12 @@ later spike ships one without reinventing scaffolding. Its outcome fixes the
 crate layout and the harness API that all demos share. See thysalion-design.md
 §6.1 and §4.
 
-- [ ] 1.1.1. Create the workspace crate layout for the four planes.
+- [x] 1.1.1. Create the workspace crate layout for the four planes.
   - Crates for world/scene data, simulation, knowledge, presentation, and
     a `demos` crate hosting one binary per capability demonstration.
   - Success: `make test` and `make lint` pass on the empty skeleton, and
     the layout is recorded in repository-layout.md.
-- [ ] 1.1.2. Implement the shared demo harness.
+- [x] 1.1.2. Implement the shared demo harness.
   - Isometric camera with four yaw quadrants and zoom, input mapping, a
     diagnostics overlay (frame time, tick time, counters), and a
     screenshot key for visual review.

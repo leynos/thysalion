@@ -27,6 +27,70 @@ LLVM-compatible linker behaviour.
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
 
+## Demo harness
+
+Every capability demonstration binary in `crates/demos` builds on the shared
+harness in `crates/harness` (`thysalion-harness`). The harness is a two-plugin
+contract, decided in [ADR 005](adr-005-workspace-crate-layout.md):
+
+- `HarnessCorePlugin` is headless-safe: camera-rig state (`RigState`),
+  input mapping, and diagnostics registration. It runs under `MinimalPlugins`
+  with no window or graphics processing unit — this is what tests and the
+  future continuous-integration scaffolding (roadmap step 1.3) consume. The
+  core initializes the input resources it reads, so headless tests can inject
+  synthetic key presses.
+- `DemoHarnessPlugin` adds the windowed half: the orthographic-isometric
+  camera entity (four yaw quadrants with a smooth settle, bounded zoom), the
+  diagnostics overlay, and screenshot capture. It registers the core itself;
+  demos add only `DemoHarnessPlugin`.
+
+Configuration is supplied through `HarnessConfig::new(slug)` plus chainable
+`with_*` methods. The struct is `#[non_exhaustive]`: new fields arrive with
+defaults and never break existing demos. The `slug` names screenshot files; the
+window title is presentation-only.
+
+Harness systems run in the public `HarnessSet` system sets (`Core`, then
+`Windowed`) in the `Update` schedule; order demo systems relative to those sets
+rather than naming harness system functions.
+
+Key bindings live in one place — `thysalion_harness::input::KEY_BINDINGS` (plus
+`SCREENSHOT_KEY`, which fires on release) — and both guides reference that
+table rather than duplicating it. `HarnessAction` is a buffered Bevy *message*
+(multiple readers per frame) and is `#[non_exhaustive]`; match with a wildcard
+arm.
+
+Diagnostics flow through Bevy's `DiagnosticsStore` under the typed paths in
+`thysalion_harness::diagnostics`. The `TICK_TIME` path (`thysalion/tick_time`)
+is the seam the simulation plane writes from phase 4 (via the composition
+root); the overlay shows `tick: n/a` until a measurement exists. Later counters
+(for example design §10.6's per-operator trace sizes) register additional paths
+the same way.
+
+To add a new demo: create `crates/demos/src/bin/demo-<name>.rs`, declare any
+heavy dependencies `optional = true` behind a `demo-<name>` feature with
+`required-features` on the `[[bin]]`, build a `HarnessConfig`, add
+`DemoHarnessPlugin`, and spawn the demo's own content. Run it with
+`make demo DEMO=<name>`.
+
+### Headless testing and the coverage boundary
+
+Behavioural tests use `rstest-bdd` (0.6.0-beta3) with a Bevy harness adapter
+(`crates/harness/tests/headless/support.rs`) that builds a `MinimalPlugins` app
+with `HarnessCorePlugin` and hands it to steps via the reserved
+`rstest_bdd_harness_context` fixture. Feature files live in
+`crates/harness/tests/features/`. Unit-level mathematics uses plain `rstest`.
+
+The windowed modules (camera, overlay, screenshot) and demo binaries cannot
+execute in continuous integration; they carry `#[coverage(off)]` and the
+Makefile's coverage target mirrors the same boundary with an ignore pattern. Do
+not count new windowed code against the coverage ratchet — keep logic testable
+headless and leave only thin windowed shims excluded.
+
+Screenshots (`F12`, on key release) save to
+`screenshots/<slug>-<timestamp>.png` (git-ignored). Bevy screenshots can lag
+the camera by one frame (bevyengine/bevy issue 18230); let the view settle
+before capturing.
+
 ## Binary assets and Git LFS
 
 The repository stores binary reference assets — currently the concept art in

@@ -38,3 +38,34 @@ The generated `Makefile` exposes these public targets:
 
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
+
+- `make demo` runs a capability demonstration binary (`DEMO=empty` by
+  default, so `make demo DEMO=empty` and `make demo` are equivalent).
+
+## Running the demos
+
+Thysalion ships one runnable demonstration binary per capability spike. The
+first is `demo-empty`: it opens a window, renders a ground plane from the
+isometric camera, and reports live diagnostics.
+
+```sh
+make demo            # runs demo-empty
+make demo DEMO=empty # explicit form; later demos use their own names
+```
+
+Inside any demo:
+
+- `Q` and `E` rotate the view anticlockwise and clockwise through the
+  four camera quadrants; the camera settles smoothly rather than snapping.
+- `+`/`-` or the mouse wheel zoom in and out within the demo's bounds.
+- `F3` shows or hides the diagnostics overlay (frames per second, frame
+  time, and simulation tick time once a simulation exists — until then it reads
+  `tick: n/a`).
+- `F12` (on release) saves a screenshot to
+  `screenshots/<demo>-<timestamp>.png` and logs the absolute path. Screenshots
+  capture the settled view; immediately after a camera move the image can trail
+  the screen by one frame, so pause briefly before capturing.
+
+The binding table is defined once in the harness source
+(`thysalion_harness::input::KEY_BINDINGS`); if this list ever disagrees with
+the code, the code wins and this guide needs updating.
