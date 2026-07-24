@@ -80,7 +80,11 @@ jobs:
           # Build release artifacts without repository-local linker flags,
           # including mold rustflags from .cargo/config.toml.
           RUSTFLAGS: ""
-        run: cross +stable build --release --target ${{ matrix.target }}
+        # -p thysalion is load-bearing: demo crates (thysalion-demos and the
+        # Bevy-dependent harness) must never enter the release build graph —
+        # they do not cross-compile for these targets. A workflow-shape test
+        # (tests/workflow_shape.rs) asserts this flag stays present.
+        run: cross +stable build --release -p thysalion --target ${{ matrix.target }}
       - name: Prepare artifact
         run: |
           mkdir -p artifacts/${{ matrix.os }}-${{ matrix.arch }}

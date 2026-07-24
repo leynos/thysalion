@@ -6,3 +6,6 @@ __pycache__/
 # Untracked cache of the estate-wide en-GB-oxendict dictionary.
 .typos-oxendict-base.json
 .typos-oxendict-base.toml
+
+# Demo-harness screenshot captures (F12 in any demo binary).
+screenshots/

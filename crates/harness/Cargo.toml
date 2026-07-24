@@ -1,0 +1,22 @@
+[package]
+name = "thysalion-harness"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Thysalion demo harness: shared scaffolding for capability demonstrations"
+
+[dependencies]
+bevy = { workspace = true }
+camino = { workspace = true }
+cap-std = { workspace = true }
+thysalion-presentation = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+rstest-bdd = { workspace = true }
+rstest-bdd-harness = { workspace = true }
+rstest-bdd-macros = { workspace = true }
+
+[lints]
+workspace = true

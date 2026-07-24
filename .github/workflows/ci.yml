@@ -14,7 +14,10 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      WHITAKER_INSTALLER_VERSION: '0.2.6'
+      # 0.2.7 ships the lint suite built for the repository's pinned
+      # toolchain (nightly-2026-05-28); older suites cannot compile Bevy 0.19
+      # (rustc >= 1.95 required). 0.2.7 also removed the --cranelift flag.
+      WHITAKER_INSTALLER_VERSION: '0.2.7'
     steps:
       - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
         with:
@@ -79,7 +82,7 @@ jobs:
             cargo binstall --no-confirm --locked \
               whitaker-installer@"${WHITAKER_INSTALLER_VERSION}"
           fi
-          whitaker-installer --cranelift
+          whitaker-installer
           echo "Whitaker binary: $(command -v whitaker || true)"
       - name: Audit dependencies
         run: make audit

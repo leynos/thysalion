@@ -1,0 +1,12 @@
+[package]
+name = "thysalion-world"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Thysalion state plane: voxel grid, scene documents, and palettes"
+
+[dependencies]
+
+[lints]
+workspace = true
