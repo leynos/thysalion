@@ -27,6 +27,19 @@ LLVM-compatible linker behaviour.
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
 
+## Binary assets and Git LFS
+
+The repository stores binary reference assets — currently the concept art in
+`references/` — as [Git LFS](https://git-lfs.com/) attachments, tracked by the
+`references/*.png` rule in `.gitattributes`. Install `git-lfs` and run
+`git lfs install` before cloning (or run `git lfs pull` after a clone made
+without it), otherwise the tracked files check out as small text pointer stubs
+rather than images.
+
+When adding a new binary asset type, add a matching `git lfs track` rule to
+`.gitattributes` in the same commit as the first asset, and confirm the staged
+file is a pointer with `git lfs ls-files` before pushing.
+
 ## Spelling policy
 
 Markdown uses en-GB-oxendict spelling enforced by the pinned `typos` release.
