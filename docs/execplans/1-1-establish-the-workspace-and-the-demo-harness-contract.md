@@ -203,8 +203,14 @@ escalation, not workarounds.
   zero findings.
 - [x] (2026-07-24 23:35Z) Manual verification, rotation: the
   maintainer ran the windowed demo and confirmed quadrant rotation looks good.
-- [ ] Post-delivery: remaining manual verification (zoom bounds, F3
-  overlay values, F12 screenshot artefact).
+- [x] (2026-07-24 23:45Z) Manual verification, overlay and screenshot:
+  the maintainer pressed F12 in the windowed demo and
+  `screenshots/demo-empty-1784931927.png` landed on disk. The capture shows the
+  isometric ground-plane diamond with the F3 overlay reading "14 fps, 70.91
+  ms/frame, tick: n/a" — 14 fps is the expected llvmpipe software-rendering
+  rate, and "tick: n/a" is correct because `TICK_TIME` is registered but
+  nothing measures into it until the simulation plane exists.
+- [ ] Post-delivery: remaining manual verification (zoom bounds).
 
 ## Surprises & discoveries
 
@@ -931,8 +937,11 @@ ignored before any manual run (Commit 2, first edit).
   milestone push) 13 minutes 28 seconds; warm-cache run (docs milestone push) 4
   minutes 24 seconds — both well inside the 30-minute tolerance, and the
   Whitaker 0.2.7 installer path worked in CI unmodified.
-- Still to record: the manual verification screenshot reference (needs
-  a human at a display; see the post-delivery item in Progress).
+- Manual verification screenshot:
+  `screenshots/demo-empty-1784931927.png` (untracked; `screenshots/` is
+  git-ignored), captured by the maintainer with F12 on 2026-07-24. Isometric
+  ground-plane diamond with the F3 overlay showing live frame diagnostics under
+  llvmpipe software rendering.
 
 ## Interfaces and dependencies
 
