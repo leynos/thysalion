@@ -661,9 +661,11 @@ case carries roughly 0.4× the reference probe count with a cheaper per-ray
 primitive (grid DDA against a resident 3-D texture), so a 2 ms tier 2 budget on
 mid-range hardware is conservative; the hysteresis default follows the
 published range (α ≈ 0.95). The budget's reference baseline is a GeForce RTX
-3060 (12 GB) at 1920 × 1080 on the default preset, reporting 95th-percentile
-per-frame tier 2 GPU time over a 10-second measurement window after a 5-second
-warm-up, with the driver version recorded alongside each measurement.
+3060 (12 GB) on NVIDIA driver 591.59 (R590 production branch) at 1920 × 1080 on
+the default preset, reporting 95th-percentile per-frame tier 2 GPU time over a
+10-second measurement window after a 5-second warm-up. Benchmark output records
+the driver actually in use, so any drift from the pinned baseline is visible in
+the measurements.
 
 An illustrative WGSL kernel sketch for the probe-ray DDA march:
 

@@ -456,9 +456,9 @@ meet the published cost envelope on target hardware. See thysalion-design.md
   - Published defaults (α ≈ 0.95); off/asleep/awake classification; edit-
     and light-biased scheduling.
   - Success: the district fixture stays within the 2 ms tier 2 budget
-    under the design §9.3 reference baseline (RTX 3060, 1080p, default
-    preset, 95th-percentile over a 10 s window after 5 s warm-up),
-    measured in `demo-gi`.
+    under the design §9.3 reference baseline (RTX 3060, NVIDIA driver
+    591.59, 1080p, default preset, 95th-percentile over a 10 s window
+    after 5 s warm-up), measured in `demo-gi`.
 - [ ] 7.2.2. Extend the lighting E2E matrix to three presets.
   - Requires 7.2.1 and 6.3.1.
   - Success: the nine-way preset × weather matrix of the design runs
