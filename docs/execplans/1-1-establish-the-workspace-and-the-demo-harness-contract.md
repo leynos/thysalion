@@ -27,7 +27,8 @@ shared core every later capability spike builds on:
    plane, and reports diagnostics, with the harness API documented in the
    [developers' guide](../developers-guide.md).
 
-After this change, a contributor can run `cargo run --bin demo-empty`, see a
+After this change, a contributor can run `make demo`
+(`cargo run -p thysalion-demos --features demo-empty --bin demo-empty`), see a
 window showing a ground plane from the isometric camera, rotate the view
 through the four yaw quadrants, zoom within bounds, read live frame diagnostics
 in an overlay, and press a key to save a screenshot to disk. A maintainer can
@@ -223,6 +224,17 @@ escalation, not workarounds.
   zoom-bounds check explicitly. One suggestion declined with a reply: "an
   rstest-bdd" is correct because the letter r is pronounced with a leading
   vowel sound.
+- [x] (2026-07-25) CodeRabbit PR review round 2 (7 comments) actioned:
+  the windowed camera module's `float_arithmetic` expectation narrowed to the
+  three arithmetic functions; the screenshot system now spawns one capture per
+  queued action instead of coalescing; the per-demo feature convention is now
+  real (`demo-empty = []` feature, `required-features` on the binary, and
+  `make demo` passes `--features demo-$(DEMO)`); demo run commands in the
+  ExecPlan and binary docs are workspace-qualified; the retrospective's
+  open-items list trimmed to the zoom-bounds check; the users' guide names
+  `SCREENSHOT_KEY` alongside `KEY_BINDINGS`; screenshot filename docs include
+  the new sequence component; one ADR collocation fix. CodeRabbit withdrew the
+  round-1 "an rstest-bdd" finding after the pronunciation-rule reply.
 - [ ] Post-delivery: remaining manual verification (zoom bounds).
 
 ## Surprises & discoveries
@@ -388,10 +400,10 @@ escalation, not workarounds.
   `cross build -p thysalion` graph and break six-target release builds. The
   per-demo feature convention costs nothing now (demo-empty needs only the
   harness) and prevents the demos crate becoming a union of every spike's
-  dependencies (dbsp, oxigraph, bevy_voxel_world) that every
-  `cargo run --bin demo-empty` must compile. If the union still hurts by phase
-  6, the recorded migration path is crate-per-demo. Date/Author: 2026-07-24,
-  per design review (alternatives and scaling lenses).
+  dependencies (dbsp, oxigraph, bevy_voxel_world) that every `make demo` must
+  compile. If the union still hurts by phase 6, the recorded migration path is
+  crate-per-demo. Date/Author: 2026-07-24, per design review (alternatives and
+  scaling lenses).
 - Decision: plane crates ship as documented, dependency-free stubs with a
   `//!` header only — no placeholder public API, no stub doctests. Rationale:
   `missing_docs` fires on public items only, so an empty `lib.rs` with the
@@ -476,10 +488,10 @@ What cost time:
   validation; the plan's file-by-file progress notes made resumption cheap,
   which vindicates the "update the living sections frequently" discipline.
 
-Left open (tracked in Progress): human verification of the windowed demo's feel
-and the F12 screenshot artefact, and the first CI run's warm-cache duration.
-Neither blocks roadmap 1.2, which builds on the scene contract rather than the
-harness chrome.
+Left open (tracked in Progress): the manual zoom-bounds check in the windowed
+demo. Rotation, the overlay, the F12 screenshot, and the warm-cache CI duration
+are all verified and recorded above. The open check does not block roadmap 1.2,
+which builds on the scene contract rather than the harness chrome.
 
 ## Context and orientation
 
@@ -858,7 +870,7 @@ Sequential execution only — no parallel gate runs.
    cargo test -p thysalion-harness -p thysalion-presentation
    # red (assertion failures) before implementation, green after
    make all
-   cargo run --bin demo-empty        # manual check, developer machine
+   make demo                         # manual check, developer machine
    ```
 
 4. Commit 3 — documentation and ADR:
@@ -891,7 +903,7 @@ gate run.
 
 Task 1.1.2 acceptance, manual (developer machine with a display):
 
-1. `cargo run --bin demo-empty` opens a window titled per
+1. `make demo` opens a window titled per
    `HarnessConfig`.
 2. A ground plane is visible from an isometric viewpoint.
 3. `Q`/`E` rotate the view through exactly four quadrants; the camera

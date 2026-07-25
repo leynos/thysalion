@@ -41,19 +41,22 @@ pub(crate) fn trigger_screenshots(
 ) {
     let requested = reader
         .read()
-        .any(|action| matches!(action, HarnessAction::Screenshot));
-    if !requested {
+        .filter(|action| matches!(action, HarnessAction::Screenshot))
+        .count();
+    if requested == 0 {
         return;
     }
     if let Err(error) = ensure_screenshot_dir() {
         error!(%error, "could not create the screenshots directory; capture skipped");
         return;
     }
-    let path = capture_path(&config.slug);
-    info!(path = %absolute_display(&path), "capturing screenshot");
-    commands
-        .spawn(Screenshot::primary_window())
-        .observe(save_to_disk(path.into_string()));
+    for _ in 0..requested {
+        let path = capture_path(&config.slug);
+        info!(path = %absolute_display(&path), "capturing screenshot");
+        commands
+            .spawn(Screenshot::primary_window())
+            .observe(save_to_disk(path.into_string()));
+    }
 }
 
 /// Creates the screenshots directory when missing.

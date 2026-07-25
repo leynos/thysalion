@@ -87,9 +87,9 @@ not count new windowed code against the coverage ratchet — keep logic testable
 headless and leave only thin windowed shims excluded.
 
 Screenshots (`F12`, on key release) save to
-`screenshots/<slug>-<timestamp>.png` (git-ignored). Bevy screenshots can lag
-the camera by one frame (bevyengine/bevy issue 18230); let the view settle
-before capturing.
+`screenshots/<slug>-<timestamp>-<sequence>.png` (git-ignored). Bevy screenshots
+can lag the camera by one frame (bevyengine/bevy issue 18230); let the view
+settle before capturing.
 
 ## Binary assets and Git LFS
 

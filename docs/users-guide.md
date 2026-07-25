@@ -62,10 +62,12 @@ Inside any demo:
   time, and simulation tick time once a simulation exists — until then it reads
   `tick: n/a`).
 - `F12` (on release) saves a screenshot to
-  `screenshots/<demo>-<timestamp>.png` and logs the absolute path. Screenshots
-  capture the settled view; immediately after a camera move the image can trail
-  the screen by one frame, so pause briefly before capturing.
+  `screenshots/<demo>-<timestamp>-<sequence>.png` and logs the absolute path.
+  Screenshots capture the settled view; immediately after a camera move the
+  image can trail the screen by one frame, so pause briefly before capturing.
 
 The binding table is defined once in the harness source
-(`thysalion_harness::input::KEY_BINDINGS`); if this list ever disagrees with
+(`thysalion_harness::input::KEY_BINDINGS`, plus
+`thysalion_harness::input::SCREENSHOT_KEY` for `F12`, which is kept separate
+because screenshots trigger on key release); if this list ever disagrees with
 the code, the code wins and this guide needs updating.

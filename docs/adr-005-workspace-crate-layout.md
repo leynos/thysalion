@@ -12,8 +12,8 @@ Accepted
 
 Thysalion's design ([thysalion-design.md](thysalion-design.md) §6.1) divides
 the game into four planes — state, logic, knowledge, and presentation — and its
-roadmap delivers capability spikes (phases 2–5) that radiate independently from
-a shared core, each shipping a runnable demonstration binary. The repository
+roadmap delivers capability spikes (phases 2–5) that radiate independently of a
+shared core, each shipping a runnable demonstration binary. The repository
 began as a single stub crate. Before any spike starts, the project must fix the
 crate layout, the layering mechanism that keeps the planes' cyclic *data* flow
 acyclic at the *crate* level, and the scaffolding contract every demonstration
@@ -110,8 +110,8 @@ The lint table lives in `[workspace.lints]` and every member inherits it
 (`[lints] workspace = true`). The graphics-crate allowance set, enumerated
 empirically against the full gate, is exactly:
 
-- `clippy::float_arithmetic` — module-level `#![expect]` in geometry and
-  overlay modules, and
+- `clippy::float_arithmetic` — function-scoped `#[expect]` on the geometry
+  functions that perform floating-point arithmetic, and
 - `clippy::needless_pass_by_value` — per-system `#[expect]`, because
   Bevy system parameters (`Res<T>`, `Query`) are taken by value.
 

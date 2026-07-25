@@ -3,10 +3,6 @@
 //! touch render-world types (`Camera3d`, `Projection`) and therefore live
 //! in `DemoHarnessPlugin`, never in the headless core (they are also
 //! excluded from the CI coverage boundary — see the developers' guide).
-#![expect(
-    clippy::float_arithmetic,
-    reason = "camera geometry is inherently floating point (design §8.2)"
-)]
 
 use bevy::{camera::ScalingMode, prelude::*};
 use thysalion_presentation::ZoomBounds;
@@ -55,6 +51,10 @@ pub(crate) fn spawn_camera(mut commands: Commands, config: Res<HarnessConfig>, r
     clippy::needless_pass_by_value,
     reason = "Bevy system parameters are taken by value"
 )]
+#[expect(
+    clippy::float_arithmetic,
+    reason = "camera geometry is inherently floating point (design §8.2)"
+)]
 pub(crate) fn sync_camera(
     time: Res<Time>,
     rig: Res<RigState>,
@@ -76,6 +76,10 @@ pub(crate) fn sync_camera(
 
 /// Builds the camera transform for a yaw angle at the fixed dimetric
 /// pitch, looking at the scene origin.
+#[expect(
+    clippy::float_arithmetic,
+    reason = "camera geometry is inherently floating point (design §8.2)"
+)]
 fn camera_transform(yaw: f32) -> Transform {
     let radius = CAMERA_DISTANCE * CAMERA_PITCH.cos();
     let height = CAMERA_DISTANCE * CAMERA_PITCH.sin();
@@ -84,6 +88,10 @@ fn camera_transform(yaw: f32) -> Transform {
 }
 
 /// Returns the signed shortest rotation from `from` to `to`, in radians.
+#[expect(
+    clippy::float_arithmetic,
+    reason = "angle wrapping is inherently floating point"
+)]
 fn shortest_angle_delta(from: f32, to: f32) -> f32 {
     use core::f32::consts::{PI, TAU};
     ((to - from + PI).rem_euclid(TAU)) - PI
