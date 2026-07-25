@@ -244,6 +244,13 @@ escalation, not workarounds.
   validation is intentionally delegated to Cargo: an unknown `DEMO` value fails
   with Cargo's own missing-feature/missing-binary error, which names the
   problem precisely.
+- [x] (2026-07-25) CodeRabbit PR review round 4 (1 comment) actioned: the
+  `make demo` target now validates `DEMO` before use — the value reaches the
+  shell via an exported environment variable (never via make interpolation, so
+  it cannot inject shell syntax) and a `case` guard whitelists `[a-z0-9-]+`
+  slugs with a clear error. Verified: an injection attempt and an empty value
+  fail with the guard's message; an unknown-but-well-formed slug still reaches
+  Cargo's precise missing-feature error.
 - [ ] Post-delivery: remaining manual verification (zoom bounds). This is
   the only open item; all review-bot findings raised on the pull request are
   actioned or explicitly declined with rationale.

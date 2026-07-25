@@ -66,8 +66,19 @@ lint: ## Run Clippy with warnings denied
 typecheck: ## Type-check without building
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
 
+# DEMO reaches the shell via the environment, never via make interpolation,
+# so its value cannot inject shell syntax; the case guard then whitelists
+# slug characters before Cargo sees it.
+demo: export DEMO_SLUG = $(DEMO)
 demo: ## Run a capability demonstration binary (DEMO=empty by default)
-	$(CARGO) run -p thysalion-demos --features demo-$(DEMO) --bin demo-$(DEMO)
+	@case "$$DEMO_SLUG" in \
+		''|*[!a-z0-9-]*) \
+			printf 'DEMO must be a lowercase slug ([a-z0-9-]+), got: %s\n' \
+				"$$DEMO_SLUG" >&2; \
+			exit 2 ;; \
+	esac
+	$(CARGO) run -p thysalion-demos --features "demo-$$DEMO_SLUG" \
+		--bin "demo-$$DEMO_SLUG"
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) +nightly fmt --all
