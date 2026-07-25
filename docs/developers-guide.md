@@ -63,8 +63,8 @@ Diagnostics flow through Bevy's `DiagnosticsStore` under the typed paths in
 `thysalion_harness::diagnostics`. The `TICK_TIME` path (`thysalion/tick_time`)
 is the seam the simulation plane writes from phase 4 (via the composition
 root); the overlay shows `tick: n/a` until a measurement exists. Later counters
-(for example design §10.6's per-operator trace sizes) register additional paths
-the same way.
+(for example, design §10.6's per-operator trace sizes) register additional
+paths the same way.
 
 To add a new demo: create `crates/demos/src/bin/demo-<name>.rs`, declare any
 heavy dependencies `optional = true` behind a `demo-<name>` feature with

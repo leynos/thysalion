@@ -2,10 +2,6 @@
 //! thysalion-design.md §8.2: exactly four yaw quadrants and a bounded zoom
 //! range. No Bevy types appear here; the demo harness (and, from phase 2,
 //! the octant-culling mesher) consume these values.
-#![expect(
-    clippy::float_arithmetic,
-    reason = "camera geometry is inherently floating point (design §8.2)"
-)]
 
 use core::{
     f32::consts::{FRAC_PI_2, FRAC_PI_4},
@@ -107,6 +103,10 @@ impl Quadrant {
     /// assert!((Quadrant::NorthEast.yaw_radians() - FRAC_PI_4).abs() < f32::EPSILON);
     /// ```
     #[must_use]
+    #[expect(
+        clippy::float_arithmetic,
+        reason = "camera geometry is inherently floating point (design §8.2)"
+    )]
     pub const fn yaw_radians(self) -> f32 {
         match self {
             Self::NorthEast => FRAC_PI_4,
@@ -250,6 +250,10 @@ impl ZoomBounds {
     /// assert!(bounds.viewport_height(2.0) < bounds.viewport_height(1.0));
     /// ```
     #[must_use]
+    #[expect(
+        clippy::float_arithmetic,
+        reason = "camera geometry is inherently floating point (design §8.2)"
+    )]
     pub fn viewport_height(&self, zoom: f32) -> f32 {
         Self::BASE_VIEWPORT_HEIGHT / self.clamp(zoom)
     }
@@ -271,9 +275,30 @@ mod tests {
     //! Unit tests for the camera contract: quadrant cycle laws, yaw
     //! placement, zoom validation, clamping, and viewport monotonicity.
 
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
+
+    /// Shared zoom range exercised by the clamping and viewport tests.
+    /// [`ZoomBounds::default`] is the 0.5–4.0 range of design §8.2.
+    #[fixture]
+    fn bounds() -> ZoomBounds {
+        // Kept multi-line: collapsing to one line trips `unused_braces`
+        // through the `#[fixture]` macro expansion.
+        ZoomBounds::default()
+    }
+
+    /// Asserts two floats are within [`f32::EPSILON`] of each other.
+    #[expect(
+        clippy::float_arithmetic,
+        reason = "epsilon comparison is inherently floating point"
+    )]
+    fn assert_close(actual: f32, expected: f32) {
+        assert!(
+            (actual - expected).abs() < f32::EPSILON,
+            "{actual} should equal {expected}"
+        );
+    }
 
     #[rstest]
     #[case(Quadrant::NorthEast, Quadrant::SouthEast)]
@@ -302,6 +327,10 @@ mod tests {
     }
 
     #[rstest]
+    #[expect(
+        clippy::float_arithmetic,
+        reason = "computing expected yaws and epsilon comparisons"
+    )]
     fn yaws_are_the_four_quarter_turn_diagonals() {
         for (index, quadrant) in Quadrant::ALL.iter().enumerate() {
             #[expect(
@@ -336,14 +365,16 @@ mod tests {
     #[case(1.0, 1.0)]
     #[case(9.0, 4.0)]
     #[case(f32::NAN, 0.5)]
-    fn zoom_requests_clamp_to_bounds(#[case] request: f32, #[case] expected: f32) {
-        let bounds = ZoomBounds::new(0.5, 4.0).expect("valid bounds");
-        assert!((bounds.clamp(request) - expected).abs() < f32::EPSILON);
+    fn zoom_requests_clamp_to_bounds(
+        bounds: ZoomBounds,
+        #[case] request: f32,
+        #[case] expected: f32,
+    ) {
+        assert_close(bounds.clamp(request), expected);
     }
 
     #[rstest]
-    fn viewport_height_is_strictly_decreasing_in_zoom() {
-        let bounds = ZoomBounds::new(0.5, 4.0).expect("valid bounds");
+    fn viewport_height_is_strictly_decreasing_in_zoom(bounds: ZoomBounds) {
         let zooms = [0.5_f32, 1.0, 2.0, 4.0];
         for (lower, higher) in zooms.iter().zip(zooms.iter().skip(1)) {
             assert!(

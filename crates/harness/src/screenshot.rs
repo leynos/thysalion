@@ -1,13 +1,16 @@
 //! Windowed screenshot capture: on [`HarnessAction::Screenshot`] (emitted
 //! on key *release* — see the input module), capture the primary window to
-//! `screenshots/<slug>-<timestamp>.png`.
+//! `screenshots/<slug>-<timestamp>-<sequence>.png`.
 //!
 //! Bevy screenshots can lag the camera by one frame
 //! (bevyengine/bevy issue 18230); triggering on key release and letting
 //! the app run leaves the captured frame settled in practice. The users'
 //! guide documents the behaviour.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use bevy::{
     ecs::message::MessageReader,
@@ -21,6 +24,10 @@ use crate::{config::HarnessConfig, input::HarnessAction};
 
 /// Directory (relative to the working directory) receiving captures.
 const SCREENSHOT_DIR: &str = "screenshots";
+
+/// Process-local capture counter, so two captures within the same second
+/// cannot collide on one path.
+static CAPTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// Spawns a screenshot capture for each requested action.
 #[expect(
@@ -55,12 +62,13 @@ fn ensure_screenshot_dir() -> std::io::Result<()> {
     cwd.create_dir_all(SCREENSHOT_DIR)
 }
 
-/// Builds the capture path `screenshots/<slug>-<unix-seconds>.png`.
+/// Builds the capture path `screenshots/<slug>-<unix-seconds>-<sequence>.png`.
 fn capture_path(slug: &str) -> Utf8PathBuf {
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_secs());
-    Utf8PathBuf::from(SCREENSHOT_DIR).join(format!("{slug}-{seconds}.png"))
+    let sequence = CAPTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    Utf8PathBuf::from(SCREENSHOT_DIR).join(format!("{slug}-{seconds}-{sequence}.png"))
 }
 
 /// Renders the path as absolute where the working directory is readable,

@@ -3,7 +3,7 @@
 //! Authority row (thysalion-design.md §6.1): authoritative for meshes,
 //! lighting textures, and UI; never mutates game state.
 //!
-//! This step the crate hosts only the pure camera contract of design §8.2
+//! At this step, the crate hosts only the pure camera contract of design §8.2
 //! (an orthographic-isometric camera with exactly four yaw quadrants and
 //! bounded zoom). Meshing, lighting, and atmosphere passes arrive in
 //! roadmap phases 2–3. Eventual heavy dependencies: `bevy`,

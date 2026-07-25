@@ -4,7 +4,8 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
 and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
-Status: COMPLETE
+Status: COMPLETE (implementation and gates; one post-delivery manual check —
+zoom bounds in the windowed demo — remains open in Progress)
 
 ## Purpose / big picture
 
@@ -210,6 +211,18 @@ escalation, not workarounds.
   ms/frame, tick: n/a" — 14 fps is the expected llvmpipe software-rendering
   rate, and "tick: n/a" is correct because `TICK_TIME` is registered but
   nothing measures into it until the simulation plane exists.
+- [x] (2026-07-25) CodeRabbit PR review round 1 (11 comments,
+  CHANGES_REQUESTED) actioned: initial zoom now clamps into the configured
+  bounds in `RigState::from_config`; screenshot filenames gained a
+  process-local sequence counter so same-second captures cannot collide; the
+  presentation crate's `float_arithmetic` expectation narrowed from module
+  level to the two arithmetic functions plus a shared `assert_close` test
+  helper; the zoom tests share an rstest `bounds` fixture; the workflow-shape
+  test now rejects `shared-actions` references lacking `@<sha>`; five prose and
+  grammar fixes across the docs; the plan status line now names the open
+  zoom-bounds check explicitly. One suggestion declined with a reply: "an
+  rstest-bdd" is correct because the letter r is pronounced with a leading
+  vowel sound.
 - [ ] Post-delivery: remaining manual verification (zoom bounds).
 
 ## Surprises & discoveries
@@ -644,8 +657,8 @@ dependency (staged, not yet added):
 - `crates/knowledge` — package `thysalion-knowledge`. Knowledge plane.
   Eventually: oxigraph.
 - `crates/presentation` — package `thysalion-presentation`. Presentation
-  plane. This step it gains the pure camera-contract module (Stage C2 types with
-  `todo!()` bodies land here in this stage so Stage B tests compile).
+  plane. At this step, it gains the pure camera-contract module (Stage C2 types
+  with `todo!()` bodies land here at this stage, so Stage B tests compile).
   Eventually: bevy, bevy_voxel_world.
 - `crates/harness` — package `thysalion-harness`. Demo scaffolding
   (Stage C2). Depends on bevy and thysalion-presentation.

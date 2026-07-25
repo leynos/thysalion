@@ -49,9 +49,9 @@ fn workflows_pin_shared_actions_to_full_length_shas() {
             let Some((_, reference)) = line.split_once("leynos/shared-actions/") else {
                 continue;
             };
-            let Some((_, sha)) = reference.split_once('@') else {
-                continue;
-            };
+            let (_, sha) = reference
+                .split_once('@')
+                .expect("shared-actions references must include @<commit-sha>");
             let trimmed = sha.trim();
             assert!(
                 trimmed.len() == 40 && trimmed.chars().all(|c| c.is_ascii_hexdigit()),

@@ -26,11 +26,14 @@ pub struct RigState {
 
 impl RigState {
     /// Creates the rig state a demo starts with.
+    ///
+    /// The baseline zoom of `1.0` is clamped into the configured bounds,
+    /// so a range that excludes `1.0` still starts inside its bounds.
     #[must_use]
     pub const fn from_config(config: &HarnessConfig) -> Self {
         Self {
             quadrant: config.initial_quadrant,
-            zoom: 1.0,
+            zoom: config.zoom_bounds.clamp(1.0),
         }
     }
 

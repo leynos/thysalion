@@ -358,9 +358,9 @@ Each plane has one authority relationship:
 
 The planes map onto Cargo workspace crates —
 [ADR 005](adr-005-workspace-crate-layout.md) records the crate-per-plane
-layout, the plane-to-crate name table, the layering rules that keep the cyclic
-data flow above acyclic at the crate level, and the demo harness contract
-shared by every capability demonstration.
+layout, the plane-to-crate name table, the layering rules that keep the crate
+dependency graph acyclic while allowing the cyclic data flow above, and the
+demo harness contract shared by every capability demonstration.
 
 ### 6.2. Frame anatomy
 
