@@ -235,7 +235,18 @@ escalation, not workarounds.
   `SCREENSHOT_KEY` alongside `KEY_BINDINGS`; screenshot filename docs include
   the new sequence component; one ADR collocation fix. CodeRabbit withdrew the
   round-1 "an rstest-bdd" finding after the pronunciation-rule reply.
-- [ ] Post-delivery: remaining manual verification (zoom bounds).
+- [x] (2026-07-25) CodeRabbit PR review round 3 (2 comments; all
+  round-1/2 threads confirmed resolved) actioned: screenshot capture-path
+  generation gained unit and behavioural tests (distinct same-second paths; a
+  mixed action batch spawns one capture per screenshot action), and slugs are
+  now sanitized to `[A-Za-z0-9-]` in capture paths so a slug containing path
+  separators cannot escape the screenshots directory. `make demo` input
+  validation is intentionally delegated to Cargo: an unknown `DEMO` value fails
+  with Cargo's own missing-feature/missing-binary error, which names the
+  problem precisely.
+- [ ] Post-delivery: remaining manual verification (zoom bounds). This is
+  the only open item; all review-bot findings raised on the pull request are
+  actioned or explicitly declined with rationale.
 
 ## Surprises & discoveries
 

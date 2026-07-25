@@ -71,7 +71,23 @@ fn capture_path(slug: &str) -> Utf8PathBuf {
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_secs());
     let sequence = CAPTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    Utf8PathBuf::from(SCREENSHOT_DIR).join(format!("{slug}-{seconds}-{sequence}.png"))
+    let safe_slug = sanitize_slug(slug);
+    Utf8PathBuf::from(SCREENSHOT_DIR).join(format!("{safe_slug}-{seconds}-{sequence}.png"))
+}
+
+/// Reduces a slug to filename-safe characters, replacing anything outside
+/// ASCII alphanumerics and `-` with `-`, so a slug containing path
+/// separators cannot escape the screenshots directory.
+fn sanitize_slug(slug: &str) -> String {
+    slug.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect()
 }
 
 /// Renders the path as absolute where the working directory is readable,
@@ -81,4 +97,53 @@ fn absolute_display(path: &Utf8PathBuf) -> Utf8PathBuf {
         .ok()
         .and_then(|cwd| Utf8PathBuf::from_path_buf(cwd).ok())
         .map_or_else(|| path.clone(), |cwd| cwd.join(path))
+}
+
+#[cfg(test)]
+mod tests {
+    //! Coverage for screenshot scheduling: every request maps to a
+    //! distinct, directory-confined destination, and mixed action batches
+    //! spawn one capture per screenshot action.
+
+    use bevy::ecs::message::Messages;
+
+    use super::*;
+
+    #[test]
+    fn consecutive_capture_paths_are_distinct() {
+        let first = capture_path("demo-test");
+        let second = capture_path("demo-test");
+        assert_ne!(first, second, "same-second captures must not collide");
+    }
+
+    #[test]
+    fn hostile_slugs_stay_inside_the_screenshots_directory() {
+        let path = capture_path("../escape/attempt");
+        assert!(
+            path.starts_with(SCREENSHOT_DIR) && !path.as_str().contains(".."),
+            "sanitized path escaped the screenshots directory: {path}"
+        );
+    }
+
+    #[test]
+    fn mixed_batches_spawn_one_capture_per_screenshot_action() {
+        let mut app = App::new();
+        app.add_message::<HarnessAction>()
+            .insert_resource(HarnessConfig::default())
+            .add_systems(Update, trigger_screenshots);
+        let mut messages = app.world_mut().resource_mut::<Messages<HarnessAction>>();
+        messages.write(HarnessAction::Screenshot);
+        messages.write(HarnessAction::RotateLeft);
+        messages.write(HarnessAction::Screenshot);
+        app.update();
+        let captures = app
+            .world_mut()
+            .query::<&Screenshot>()
+            .iter(app.world())
+            .count();
+        assert_eq!(
+            captures, 2,
+            "two screenshot actions must spawn two captures"
+        );
+    }
 }
