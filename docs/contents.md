@@ -18,6 +18,9 @@ documentation set.
   quests.
 - [ADR 004: tiered lighting with software-ray-marched DDGI](adr-004-tiered-lighting-software-ddgi.md)
   records the three-tier lighting architecture without hardware ray tracing.
+- [ADR 005: workspace crate layout](adr-005-workspace-crate-layout.md)
+  records the crate-per-plane workspace, the layering and release-scoping
+  rules, and the demo harness contract.
 - [Roadmap](roadmap.md) sequences delivery as independent capability-
   demonstration spikes off a shared core, with two integration milestones.
 

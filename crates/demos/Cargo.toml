@@ -1,0 +1,27 @@
+[package]
+name = "thysalion-demos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Thysalion capability demonstrations: one binary per spike"
+
+# Convention (ADR-005): each demo's heavy dependencies are declared
+# `optional = true` behind a per-demo feature, with `required-features` on
+# the corresponding [[bin]], so no demo pays for another demo's dependency
+# graph. demo-empty needs only the harness, so its feature is empty — but
+# it still exists, so `make demo DEMO=<name>` can pass `--features
+# demo-$(DEMO)` uniformly for every demo.
+[features]
+demo-empty = []
+
+[dependencies]
+bevy = { workspace = true }
+thysalion-harness = { workspace = true }
+
+[[bin]]
+name = "demo-empty"
+required-features = ["demo-empty"]
+
+[lints]
+workspace = true

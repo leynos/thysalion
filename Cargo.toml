@@ -1,16 +1,69 @@
-[package]
-name = "thysalion"
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-description = "Voxels. Everywhere."
 license = "ISC"
 repository = "https://github.com/leynos/thysalion"
+
+# Shared dependency pins. `[workspace.dependencies]` is the single source of
+# truth for version literals (see docs/adr-005-workspace-crate-layout.md).
+# The bevy feature list is curated: umbrella features (`2d`, `3d`, `ui`)
+# hard-include gamepad (libudev) and Wayland system dependencies, so the
+# fine-grained set below composes 3-D PBR rendering, UI text, PNG
+# screenshots, and X11 windowing without any system-dev-header requirement.
+[workspace.dependencies]
+thysalion-presentation = { path = "crates/presentation" }
+thysalion-harness = { path = "crates/harness" }
+bevy = { version = "0.19", default-features = false, features = [
+  "default_app",
+  "std",
+  "multi_threaded",
+  "bevy_winit",
+  "x11",
+  "default_font",
+  "keyboard",
+  "mouse",
+  "common_api",
+  "bevy_light",
+  "bevy_render",
+  "bevy_core_pipeline",
+  "bevy_pbr",
+  "tonemapping_luts",
+  "ktx2",
+  "zstd_rust",
+  "ui_api",
+  "ui_bevy_render",
+  "png",
+] }
+cap-std = { version = "3", features = ["fs_utf8"] }
+camino = "1"
+rstest = "0.26"
+proptest = "1"
+trybuild = "1"
+rstest-bdd = "0.6.0-beta3"
+rstest-bdd-macros = "0.6.0-beta3"
+rstest-bdd-harness = "0.6.0-beta3"
+
+[package]
+name = "thysalion"
+version.workspace = true
+edition.workspace = true
+description = "Voxels. Everywhere."
+license.workspace = true
+repository.workspace = true
 homepage = "https://github.com/leynos/thysalion"
 readme = "README.md"
 keywords = ["game"]
 categories = ["game"]
 
 [dependencies]
+
+[dev-dependencies]
+cap-std = { workspace = true }
+camino = { workspace = true }
 
 # The package.metadata.binstall pkg-url intentionally mixes Jinja2 values
 # rendered at project generation with single-brace cargo-binstall variables
@@ -20,7 +73,10 @@ pkg-url = "https://github.com/leynos/thysalion/releases/download/v{ version }/th
 pkg-fmt = "bin"
 disabled-strategies = ["quick-install", "compile"]
 
-[lints.clippy]
+[lints]
+workspace = true
+
+[workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 
 # 1. hygiene
@@ -82,8 +138,11 @@ missing_panics_doc                  = "deny"
 error_impl_error                    = "deny"
 result_large_err                    = "deny"
 
-[lints.rust]
+[workspace.lints.rust]
 missing_docs                        = "deny"
+# `coverage_nightly` is set by cargo-llvm-cov; it gates the `#[coverage(off)]`
+# boundary that keeps windowed-only code out of the coverage ratchet.
+unexpected_cfgs = { level = "deny", check-cfg = ["cfg(coverage_nightly)"] }
 
-[lints.rustdoc]
+[workspace.lints.rustdoc]
 missing_crate_level_docs            = "deny"

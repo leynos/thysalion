@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit
+.PHONY: help all clean test build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit demo
 
 SHELL := bash
 
@@ -13,7 +13,14 @@ RUST_FLAGS ?=
 RUST_FLAGS := -D warnings $(RUST_FLAGS)
 RUSTDOC_FLAGS ?=
 RUSTDOC_FLAGS := -D warnings $(RUSTDOC_FLAGS)
-CARGO_FLAGS ?= --all-targets --all-features
+# --workspace is load-bearing: with a root package present, Cargo would
+# otherwise default to the root package alone and silently skip members.
+CARGO_FLAGS ?= --workspace --all-targets --all-features
+DEMO ?= empty
+# Windowed harness modules and demo binaries cannot execute in CI, so they
+# are excluded from coverage measurement (see docs/adr-005 and the
+# developers' guide "Demo harness" section for the boundary).
+COVERAGE_IGNORE ?= --ignore-filename-regex 'crates/(demos|harness/src/(overlay|screenshot|camera))'
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
@@ -48,16 +55,38 @@ coverage: ## Generate lcov coverage with lld for llvm-tools compatibility
 		RUSTFLAGS="$(COVERAGE_RUST_FLAGS)" \
 		CFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
-		$(CARGO) llvm-cov --lcov --output-path lcov.info $(TEST_FLAGS)
+		$(CARGO) llvm-cov --lcov --output-path lcov.info $(COVERAGE_IGNORE) $(TEST_FLAGS)
 
 lint: ## Run Clippy with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
 	$(CARGO) clippy $(CLIPPY_FLAGS)
 	@echo "Whitaker binary: $(WHITAKER)"
 	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: ## Type-check without building
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
+
+# Supported demos are derived from the demo binaries on disk, so the guard
+# below cannot drift from reality. DEMO and the derived list reach the shell
+# via the environment, never via make interpolation, so neither can inject
+# shell syntax; the guard rejects anything not in the list before Cargo is
+# invoked. `$(value DEMO)` captures the caller's raw text without a second
+# expansion, so a value like `$$(shell ...)` is inert data rather than a
+# Make function call. tests/demo_guard.rs pins this behaviour.
+DEMOS := $(patsubst demo-%,%,$(basename $(notdir $(wildcard crates/demos/src/bin/demo-*.rs))))
+
+demo: export DEMO_SLUG = $(value DEMO)
+demo: export DEMO_ALLOWED = $(DEMOS)
+demo: ## Run a capability demonstration binary (DEMO=empty by default)
+	@case " $$DEMO_ALLOWED " in \
+		*" $$DEMO_SLUG "*) : ;; \
+		*) \
+			printf 'DEMO must be one of: %s (got: %s)\n' \
+				"$$DEMO_ALLOWED" "$$DEMO_SLUG" >&2; \
+			exit 2 ;; \
+	esac
+	$(CARGO) run -p thysalion-demos --features "demo-$$DEMO_SLUG" \
+		--bin "demo-$$DEMO_SLUG"
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) +nightly fmt --all
