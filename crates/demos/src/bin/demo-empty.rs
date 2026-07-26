@@ -67,11 +67,12 @@ fn spawn_ground(
 
 #[cfg(test)]
 mod tests {
-    //! Startup-scene smoke test for `demo-empty`.
+    //! Startup-scene smoke tests for `demo-empty`.
     //!
     //! `spawn_ground` is a plain startup system, so it runs in a bare app
     //! holding only the asset resources it writes to: no window, renderer,
-    //! or graphics device is involved, and `main` is untouched.
+    //! or graphics device is involved, and `main` is untouched. Each test
+    //! asserts one contract, so a failure names the property that broke.
 
     use bevy::{asset::AssetPlugin, camera::primitives::MeshAabb as _};
 
@@ -89,11 +90,10 @@ mod tests {
         app
     }
 
-    #[test]
-    fn startup_spawns_one_lit_ground_plane() {
-        let mut app = scene_app();
-
-        let grounds: Vec<(Mesh3d, MeshMaterial3d<StandardMaterial>)> = app
+    /// Returns the ground entity's mesh and material handles, asserting
+    /// exactly one ground entity exists.
+    fn ground_handles(app: &mut App) -> (Mesh3d, MeshMaterial3d<StandardMaterial>) {
+        let mut grounds: Vec<(Mesh3d, MeshMaterial3d<StandardMaterial>)> = app
             .world_mut()
             .query::<(&Mesh3d, &MeshMaterial3d<StandardMaterial>)>()
             .iter(app.world())
@@ -104,8 +104,12 @@ mod tests {
             1,
             "startup must spawn exactly one ground entity"
         );
+        grounds.remove(0)
+    }
 
-        let lights: Vec<DirectionalLight> = app
+    /// Returns the sole directional light, asserting exactly one exists.
+    fn key_light(app: &mut App) -> DirectionalLight {
+        let mut lights: Vec<DirectionalLight> = app
             .world_mut()
             .query::<&DirectionalLight>()
             .iter(app.world())
@@ -116,10 +120,20 @@ mod tests {
             1,
             "startup must spawn exactly one directional light"
         );
+        lights.remove(0)
+    }
 
-        let Some(light) = lights.first() else {
-            panic!("the directional light was asserted present above");
-        };
+    #[test]
+    fn startup_spawns_one_ground_entity_and_one_key_light() {
+        let mut app = scene_app();
+        let _ = ground_handles(&mut app);
+        let _ = key_light(&mut app);
+    }
+
+    #[test]
+    fn the_key_light_keeps_its_lighting_contract() {
+        let mut app = scene_app();
+        let light = key_light(&mut app);
         assert!(
             (light.illuminance - LIGHT_ILLUMINANCE).abs() < f32::EPSILON,
             "key-light illuminance must stay {LIGHT_ILLUMINANCE}, got {}",
@@ -129,10 +143,12 @@ mod tests {
             light.shadow_maps_enabled,
             "the key light must cast shadows, or the plane reads flat"
         );
+    }
 
-        let Some((mesh_handle, material_handle)) = grounds.first() else {
-            panic!("the ground entity was asserted present above");
-        };
+    #[test]
+    fn the_ground_mesh_spans_the_intended_extent() {
+        let mut app = scene_app();
+        let (mesh_handle, _) = ground_handles(&mut app);
         let meshes = app.world().resource::<Assets<Mesh>>();
         let mesh = meshes
             .get(&mesh_handle.0)
@@ -154,6 +170,12 @@ mod tests {
             "the ground must be a flat plane, got y half-extent {}",
             bounds.half_extents.y
         );
+    }
+
+    #[test]
+    fn the_ground_material_keeps_its_appearance() {
+        let mut app = scene_app();
+        let (_, material_handle) = ground_handles(&mut app);
         let materials = app.world().resource::<Assets<StandardMaterial>>();
         let material = materials
             .get(&material_handle.0)

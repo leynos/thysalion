@@ -355,6 +355,14 @@ escalation, not workarounds.
   world units in x and z, got half-extents Vec3A(6.0, 0.0, 12.0)"; the mutation
   was then reverted and the suite re-run green. Gates re-run after the change:
   `make all`, `make markdownlint`, `make nixie` (log `/tmp/v3.out`).
+- [x] (2026-07-26) CodeRabbit review round 9 returned **no findings**
+  ("Review finished", zero comments) against `a094a54`. CodeScene flagged one
+  new code-health issue introduced by the round-8 test — the monolithic
+  `startup_spawns_one_lit_ground_plane` had reached 72 lines against a 70-line
+  threshold — so it was split into four focused tests (entity counts, light
+  contract, mesh extent, material appearance) over shared `ground_handles`/
+  `key_light` helpers. Largest resulting test: 26 lines. Gates re-run green (log
+  `/tmp/v4.out`).
 - [ ] Post-delivery: remaining manual verification (zoom bounds). This is
   the only open item; all review-bot findings raised on the pull request are
   actioned or explicitly declined with rationale.
