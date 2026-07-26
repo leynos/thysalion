@@ -363,9 +363,50 @@ escalation, not workarounds.
   contract, mesh extent, material appearance) over shared `ground_handles`/
   `key_light` helpers. Largest resulting test: 26 lines. Gates re-run green (log
   `/tmp/v4.out`).
+- [x] (2026-07-26) Closed the follow-up "Testing (Overall)" finding on
+  configuration propagation and the supported launcher path:
+  - `crates/harness/src/core_plugin_tests.rs` drives a non-default
+    configuration (slug `demo-custom`, zoom range 2.0–3.0, initial
+    quadrant `SouthWest`) through `HarnessCorePlugin::new(...)` rather
+    than by inserting resources, asserting the installed config resource,
+    the starting quadrant, the initial zoom clamped up to the custom
+    minimum (the 1.0 baseline lies outside the range, so a default-bounds
+    fallback is visible), and clamping at both custom limits after a
+    bounded run of real `ZoomIn`/`ZoomOut` messages.
+  - `crates/harness/src/windowed_tests/custom_configuration.rs` does the
+    same through `DemoHarnessPlugin`: the camera spawns aimed at the
+    configured quadrant, and the orthographic fixed-vertical viewport
+    height derives from the configured bounds — asserted both at startup
+    and after saturating zoom, including an explicit check that the
+    expected height differs from the default-bounds height, so the test
+    can actually detect a fallback. Screenshot configuration is covered
+    through the installed slug rather than by capturing, keeping the
+    filesystem out of the test.
+  - `tests/demo_guard.rs` gained two positive launcher tests alongside the
+    existing negative one. Neither launches the windowed binary. They are
+    complementary because no single invocation shows everything:
+    `make --dry-run demo` prints the recipe before the shell runs it, so
+    it proves the `--features`/`--bin` arguments stay quoted but leaves
+    the slug as the shell variable `demo-$DEMO_SLUG`; running the recipe
+    with `CARGO` overridden to an echo stub lets the shell expand
+    everything, proving the default path resolves to `demo-empty` (and to
+    no other slug), by which point the quotes have been consumed.
+- [x] (2026-07-26) Validation evidence for that coverage, each command run
+  to completion: `cargo +nightly fmt --all -- --check` **pass**;
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+  **pass** (after replacing an `.expect()` in a test helper — which Clippy's
+  `expect_used` does not treat as test code — with match-and-panic);
+  `cargo test --workspace --all-targets --all-features` **pass**;
+  `cargo test --doc --workspace --all-features` **pass** (13 doctests);
+  `make all` **pass** with nextest **86/86**; `make markdownlint` and
+  `make nixie` **pass**. Logs `/tmp/v6.out`, `/tmp/v7.out`. The windowed_tests
+  module was split into `windowed_tests/mod.rs` plus
+  `windowed_tests/custom_configuration.rs` when the additions pushed it past
+  Whitaker's 400-line module limit.
 - [ ] Post-delivery: remaining manual verification (zoom bounds). This is
   the only open item; all review-bot findings raised on the pull request are
-  actioned or explicitly declined with rationale.
+  actioned or explicitly declined with rationale. This manual check is
+  GPU-dependent and has **not** been performed.
 
 ## Surprises & discoveries
 

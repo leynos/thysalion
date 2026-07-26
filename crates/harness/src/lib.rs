@@ -44,6 +44,8 @@ pub mod rig;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod camera;
+#[cfg(test)]
+mod core_plugin_tests;
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod overlay;
 #[cfg_attr(coverage_nightly, coverage(off))]

@@ -31,14 +31,24 @@ use crate::{
     rig::RigState,
 };
 
-/// Builds a headless app with the full windowed plugin and runs startup.
-fn windowed_app() -> App {
+mod custom_configuration;
+
+/// Builds a headless app running the full windowed plugin from the
+/// supplied configuration, and runs startup.
+///
+/// Taking the configuration as an argument (rather than hard-coding the
+/// default) lets the custom-configuration tests below exercise the same
+/// startup path a demo with non-default settings would get.
+fn windowed_app_with(config: HarnessConfig) -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins)
-        .add_plugins(DemoHarnessPlugin::new(HarnessConfig::default()));
+        .add_plugins(DemoHarnessPlugin::new(config));
     app.update();
     app
 }
+
+/// Builds a headless windowed app with the default configuration.
+fn windowed_app() -> App { windowed_app_with(HarnessConfig::default()) }
 
 fn send(app: &mut App, action: HarnessAction) {
     app.world_mut()
