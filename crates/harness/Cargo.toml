@@ -13,10 +13,12 @@ cap-std = { workspace = true }
 thysalion-presentation = { workspace = true }
 
 [dev-dependencies]
+proptest = { workspace = true }
 rstest = { workspace = true }
 rstest-bdd = { workspace = true }
 rstest-bdd-harness = { workspace = true }
 rstest-bdd-macros = { workspace = true }
+trybuild = { workspace = true }
 
 [lints]
 workspace = true

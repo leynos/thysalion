@@ -66,15 +66,21 @@ lint: ## Run Clippy with warnings denied
 typecheck: ## Type-check without building
 	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
 
-# DEMO reaches the shell via the environment, never via make interpolation,
-# so its value cannot inject shell syntax; the case guard then whitelists
-# slug characters before Cargo sees it.
+# Supported demos are derived from the demo binaries on disk, so the guard
+# below cannot drift from reality. DEMO and the derived list reach the shell
+# via the environment, never via make interpolation, so neither can inject
+# shell syntax; the guard rejects anything not in the list before Cargo is
+# invoked. tests/demo_guard.rs pins this behaviour.
+DEMOS := $(patsubst demo-%,%,$(basename $(notdir $(wildcard crates/demos/src/bin/demo-*.rs))))
+
 demo: export DEMO_SLUG = $(DEMO)
+demo: export DEMO_ALLOWED = $(DEMOS)
 demo: ## Run a capability demonstration binary (DEMO=empty by default)
-	@case "$$DEMO_SLUG" in \
-		''|*[!a-z0-9-]*) \
-			printf 'DEMO must be a lowercase slug ([a-z0-9-]+), got: %s\n' \
-				"$$DEMO_SLUG" >&2; \
+	@case " $$DEMO_ALLOWED " in \
+		*" $$DEMO_SLUG "*) : ;; \
+		*) \
+			printf 'DEMO must be one of: %s (got: %s)\n' \
+				"$$DEMO_ALLOWED" "$$DEMO_SLUG" >&2; \
 			exit 2 ;; \
 	esac
 	$(CARGO) run -p thysalion-demos --features "demo-$$DEMO_SLUG" \

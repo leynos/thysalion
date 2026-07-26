@@ -70,7 +70,9 @@ To add a new demo: create `crates/demos/src/bin/demo-<name>.rs`, declare any
 heavy dependencies `optional = true` behind a `demo-<name>` feature with
 `required-features` on the `[[bin]]`, build a `HarnessConfig`, add
 `DemoHarnessPlugin`, and spawn the demo's own content. Run it with
-`make demo DEMO=<name>`.
+`make demo DEMO=<name>`; the target whitelists demo names derived from the
+binaries on disk and rejects anything else before Cargo runs
+(`tests/demo_guard.rs` pins that guard).
 
 ### Headless testing and the coverage boundary
 
@@ -78,7 +80,17 @@ Behavioural tests use `rstest-bdd` (0.6.0-beta3) with a Bevy harness adapter
 (`crates/harness/tests/headless/support.rs`) that builds a `MinimalPlugins` app
 with `HarnessCorePlugin` and hands it to steps via the reserved
 `rstest_bdd_harness_context` fixture. Feature files live in
-`crates/harness/tests/features/`. Unit-level mathematics uses plain `rstest`.
+`crates/harness/tests/features/`. Unit-level mathematics uses plain `rstest`;
+generated-input properties (zoom clamping, the rig's action-sequence model) use
+`proptest`; and compile-time contracts (for example, struct-literal
+construction of `#[non_exhaustive]` harness types being rejected) are pinned
+with `trybuild` cases under `crates/harness/tests/ui/`.
+
+The windowed half is behaviourally tested too, without a window or graphics
+device: `crates/harness/src/windowed_tests.rs` runs `DemoHarnessPlugin` under
+`MinimalPlugins`, where camera and UI text components are plain entity data.
+The module documents its isolation seams (the `OverlayTimer` brink seam and the
+plugin-owned screenshot `CaptureSequence` resource).
 
 The windowed modules (camera, overlay, screenshot) and demo binaries cannot
 execute in continuous integration; they carry `#[coverage(off)]` and the

@@ -10,9 +10,12 @@ use thysalion_presentation::{Quadrant, ZoomBounds};
 /// plugins. Inserted as a Bevy [`Resource`] by `HarnessCorePlugin`.
 ///
 /// The `slug` is the demo's stable machine name: it names screenshot
-/// files (`screenshots/<slug>-<timestamp>.png`) and must stay filesystem
-/// safe. The window title is presentation-only and defaults to a value
-/// derived from the slug.
+/// files (`screenshots/<slug>-<timestamp>-<sequence>.png`). The screenshot
+/// module sanitizes the slug at the filesystem boundary (ASCII
+/// alphanumerics, `-`, and `_` are kept; anything else becomes `-`), so a
+/// hostile value cannot escape the screenshots directory — but keeping the
+/// slug filename-safe at source is still the convention. The window title
+/// is presentation-only and defaults to a value derived from the slug.
 ///
 /// # Examples
 ///

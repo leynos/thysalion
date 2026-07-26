@@ -16,7 +16,7 @@ pub struct HarnessCamera;
 /// The camera's smoothed yaw, in radians (settles toward the rig's
 /// quadrant yaw rather than snapping).
 #[derive(Component, Debug)]
-pub(crate) struct CameraYaw(f32);
+pub(crate) struct CameraYaw(pub(crate) f32);
 
 /// Distance from the scene origin to the camera along its view ray.
 const CAMERA_DISTANCE: f32 = 40.0;
@@ -92,7 +92,7 @@ fn camera_transform(yaw: f32) -> Transform {
     clippy::float_arithmetic,
     reason = "angle wrapping is inherently floating point"
 )]
-fn shortest_angle_delta(from: f32, to: f32) -> f32 {
+pub(crate) fn shortest_angle_delta(from: f32, to: f32) -> f32 {
     use core::f32::consts::{PI, TAU};
     ((to - from + PI).rem_euclid(TAU)) - PI
 }

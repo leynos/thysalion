@@ -41,6 +41,8 @@ bevy = { version = "0.19", default-features = false, features = [
 cap-std = { version = "3", features = ["fs_utf8"] }
 camino = "1"
 rstest = "0.26"
+proptest = "1"
+trybuild = "1"
 rstest-bdd = "0.6.0-beta3"
 rstest-bdd-macros = "0.6.0-beta3"
 rstest-bdd-harness = "0.6.0-beta3"

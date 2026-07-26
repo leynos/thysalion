@@ -1,0 +1,11 @@
+error[E0639]: cannot create non-exhaustive struct using struct expression
+  --> tests/ui/non_exhaustive_config_literal.rs:8:19
+   |
+ 8 |       let _config = HarnessConfig {
+   |  ___________________^
+ 9 | |         slug: String::from("demo-empty"),
+10 | |         window_title: String::from("Thysalion"),
+11 | |         zoom_bounds: Default::default(),
+12 | |         initial_quadrant: Default::default(),
+13 | |     };
+   | |_____^

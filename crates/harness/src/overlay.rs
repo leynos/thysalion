@@ -32,6 +32,17 @@ impl Default for OverlayTimer {
     }
 }
 
+impl OverlayTimer {
+    /// Test seam: advances the timer to just before expiry, so the next
+    /// system tick (any positive delta) triggers a refresh without the
+    /// test having to wait out the real throttle interval.
+    #[cfg(test)]
+    pub(crate) fn advance_to_brink(&mut self) {
+        let brink = self.0.duration().saturating_sub(Duration::from_nanos(1));
+        self.0.tick(brink);
+    }
+}
+
 /// Spawns the overlay text node, initially visible.
 pub(crate) fn setup_overlay(mut commands: Commands) {
     commands.spawn((
@@ -106,5 +117,41 @@ pub(crate) fn refresh_overlay(
     let readout = format_readout(smoothed(&FPS), smoothed(&FRAME_TIME), smoothed(&TICK_TIME));
     for mut text in &mut overlays {
         text.0.clone_from(&readout);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Semantic assertions for the overlay readout formatter: exact
+    //! strings for populated, partially populated, and missing
+    //! diagnostics.
+
+    use rstest::rstest;
+
+    use super::*;
+
+    #[rstest]
+    fn populated_diagnostics_render_all_three_values() {
+        let readout = format_readout(Some(60.0), Some(16.6666), Some(2.5));
+        assert_eq!(readout, "60 fps  16.67 ms/frame  2.50 ms/tick");
+    }
+
+    #[rstest]
+    fn missing_tick_measurement_renders_not_available() {
+        let readout = format_readout(Some(14.0), Some(70.9111), None);
+        assert_eq!(readout, "14 fps  70.91 ms/frame  tick: n/a");
+    }
+
+    #[rstest]
+    fn missing_frame_diagnostics_render_the_collecting_placeholder() {
+        assert_eq!(format_readout(None, None, None), "collecting…  tick: n/a");
+    }
+
+    #[rstest]
+    fn partial_frame_diagnostics_still_render_collecting() {
+        assert_eq!(
+            format_readout(Some(60.0), None, Some(1.0)),
+            "collecting…  1.00 ms/tick"
+        );
     }
 }

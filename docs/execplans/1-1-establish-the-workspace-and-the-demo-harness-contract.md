@@ -251,6 +251,47 @@ escalation, not workarounds.
   slugs with a clear error. Verified: an injection attempt and an empty value
   fail with the guard's message; an unknown-but-well-formed slug still reaches
   Cargo's precise missing-feature error.
+- [x] (2026-07-26) CodeRabbit PR review round 5 (consolidated work order)
+  actioned in full:
+  - Screenshot slugs are sanitized at the filesystem boundary under a
+    documented policy (retain ASCII alphanumerics, `-`, `_`; replace
+    everything else; non-empty `capture` fallback), with rstest cases for
+    traversal, separators, absolute prefixes, control characters, Unicode
+    separators, and degenerate slugs.
+  - `make demo` now whitelists demo names derived from
+    `crates/demos/src/bin/demo-*.rs` and rejects unsupported names before
+    Cargo runs; `tests/demo_guard.rs` pins both the derivation shape and
+    the runtime rejection.
+  - The process-global capture counter became the plugin-owned
+    `CaptureSequence` resource (deterministic per test app); behavioural
+    tests cover multi-screenshot batches (one capture per action, distinct
+    paths) and mixed streams (no captures), without writing image files.
+  - New windowed behavioural suite (`crates/harness/src/windowed_tests.rs`)
+    runs `DemoHarnessPlugin` under `MinimalPlugins`: startup entity counts,
+    projection-tracks-zoom, monotone smoothing settle, odd/even overlay
+    toggles, refresh throttling, and readout text for missing and populated
+    tick diagnostics. Isolation seams documented in the module.
+  - Property coverage via `proptest` (workspace-pinned): zoom clamping is
+    always finite and in-bounds for arbitrary `f32` (including NaN and
+    infinities); viewport height strictly decreases for generated ordered
+    zooms; `RigState` matches a reference model over generated action
+    sequences and stays bounded after every action. The `Quadrant` cycle
+    laws are proved by exhaustive enumeration over `Quadrant::ALL`
+    (documented as the proof for the closed four-value enum).
+  - Compile-time contract pinned with `trybuild`: external struct-literal
+    construction of the `#[non_exhaustive]` `HarnessConfig` fails with
+    E0639 (expected diagnostic checked in under
+    `crates/harness/tests/ui/`). `overlay::format_readout` gained exact
+    string assertions for populated, partial, and missing diagnostics.
+  - Consistency sweep: item-scoped `float_arithmetic` wording, sequence
+    component in every screenshot pattern, workspace-qualified demo
+    commands throughout, and the camera module split (`camera/mod.rs` +
+    `camera/tests.rs`) to stay inside the 400-line module limit.
+- [x] (2026-07-26) Validation evidence for the round-5 work: `make fmt`,
+  `make all` (check-fmt; rustdoc, Clippy, and Whitaker with warnings denied;
+  nextest 63/63 including the property, demo-guard, and trybuild suites;
+  doctests 13/13; spelling), `make markdownlint`, and `make nixie` all pass
+  sequentially (log `/tmp/gates-cr13.out`).
 - [ ] Post-delivery: remaining manual verification (zoom bounds). This is
   the only open item; all review-bot findings raised on the pull request are
   actioned or explicitly declined with rationale.
@@ -308,7 +349,8 @@ escalation, not workarounds.
   giving synthetic input one-shot semantics; roadmap 1.3's CI scaffolding
   inherits this behaviour.
 - Observation: the empirical lint-allowance set is smaller than feared:
-  `float_arithmetic` (crate-level `#![expect]` in graphics crates) and
+  `float_arithmetic` (item-scoped `#[expect]` on the functions that perform
+  floating-point geometry — narrowed from the module level during review) and
   `needless_pass_by_value` (per-system `#[expect]`) suffice; the other feared
   lints are satisfiable directly (`#[must_use]`, `const fn`, documentation).
   Whitaker additionally requires `//!` docs on *every* module, including
@@ -707,8 +749,9 @@ Makefile:
   line, `typecheck`, and `coverage`, so the root package no longer masks
   members.
 - Keep `TARGET ?= thysalion` for `build`/`release`; add a `demo` target
-  (`cargo run --bin demo-$(DEMO)` with `DEMO ?= empty`) as the documented way
-  to launch demonstrations.
+  (`cargo run -p thysalion-demos --features demo-$(DEMO) --bin demo-$(DEMO)`
+  with `DEMO ?= empty`, guarded by a whitelist derived from the demo binaries
+  on disk) as the documented way to launch demonstrations.
 - Add the coverage exclusion for windowed harness modules and the demos
   crate (llvm-cov ignore patterns) to the `coverage` target.
 - Run `mbake validate Makefile` and `checkmake` after editing.
@@ -810,8 +853,9 @@ Internal structure (each module ≤ 400 lines, `//!` docs, rstest tests alongsid
 - `screenshot.rs` (windowed) — on `HarnessAction::Screenshot` (key
   release), ensure `screenshots/` exists (cap_std `create_dir_all`), spawn
   `Screenshot::primary_window()` with a `save_to_disk` observer writing
-  `screenshots/<slug>-<timestamp>.png`, and log the absolute path at info level
-  so a silent write failure is visible.
+  `screenshots/<slug>-<unix-seconds>-<sequence>.png` (the slug sanitized at the
+  filesystem boundary), and log the absolute path at info level so a silent
+  write failure is visible.
 - `lib.rs` — the two plugin assemblies; the headless module set imports no
   render types (the `MinimalPlugins` test is the enforcing guard).
 

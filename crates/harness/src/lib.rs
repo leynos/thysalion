@@ -48,6 +48,8 @@ mod camera;
 mod overlay;
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod screenshot;
+#[cfg(test)]
+mod windowed_tests;
 
 pub use camera::HarnessCamera;
 pub use config::HarnessConfig;
@@ -164,6 +166,7 @@ impl Plugin for DemoHarnessPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(HarnessCorePlugin::new(self.config.clone()))
             .init_resource::<overlay::OverlayTimer>()
+            .init_resource::<screenshot::CaptureSequence>()
             .add_systems(Startup, (camera::spawn_camera, overlay::setup_overlay))
             .add_systems(
                 Update,
