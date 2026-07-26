@@ -318,6 +318,34 @@ escalation, not workarounds.
   can prevent this, and no privilege boundary is crossed — a caller who can type
   `make DEMO=…` can already run arbitrary commands directly. Evidence:
   minimal-makefile reproductions run during the round-6 response.
+- [x] (2026-07-26) Closed the remaining "Testing (Overall)" review finding
+  with targeted behavioural coverage:
+  - `read_input` scroll mapping: a table-driven case set over positive,
+    negative, small-positive, zero, and horizontal-only deltas asserts
+    exactly one `ZoomIn`/`ZoomOut` or none, plus a diagonal-scroll case
+    proving the horizontal component neither adds nor suppresses an action.
+  - `read_input` screenshot edge: a press/update/release/update sequence
+    asserts F12 press emits nothing, release emits exactly one
+    `Screenshot`, and a further update does not repeat it. The bare test
+    app omits `clear_synthetic_input`, so the test also proves the
+    one-frame edge comes from `ButtonInput` itself.
+  - `demo-empty` startup scene: the setup system runs in a headless app
+    holding only `AssetPlugin` plus the two asset collections, asserting
+    exactly one ground entity (with `Mesh3d` and
+    `MeshMaterial3d<StandardMaterial>`) and one directional light, that
+    the light keeps 12 000 lux with shadow maps enabled, and that the mesh
+    and material assets exist with the intended albedo and 0.9 roughness.
+    The scene constants were named rather than inlined so the test asserts
+    the contract instead of restating magic numbers; `main` is unchanged.
+- [x] (2026-07-26) Validation evidence for that coverage, each command run
+  to completion: `cargo +nightly fmt --all -- --check` (pass);
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings` (pass,
+  after replacing two indexing expressions the `indexing_slicing` lint rejected
+  with `first()` and `let … else`);
+  `cargo test --workspace --all-targets --all-features` (pass); `make all` —
+  check-fmt, rustdoc, Clippy, Whitaker, nextest **72/72**, doctests **13/13**,
+  spelling (pass); `make markdownlint` and `make nixie` (pass). Log:
+  `/tmp/v-all.out`.
 - [ ] Post-delivery: remaining manual verification (zoom bounds). This is
   the only open item; all review-bot findings raised on the pull request are
   actioned or explicitly declined with rationale.
