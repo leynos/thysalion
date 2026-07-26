@@ -304,20 +304,20 @@ escalation, not workarounds.
     overlay tests failed under the act runner's timing). The seam now uses
     `set_elapsed`, so the system's own tick is always the finishing call.
 - [x] (2026-07-26) CodeRabbit PR review round 6 (2 new findings)
-  actioned: `sanitisation` corrected to the Oxford `-ization` spelling, and the
-  `make demo` export now captures `$(value DEMO)` so the caller's raw text is
-  never expanded a second time at the export site.
-- Observation (round 6): CodeRabbit's stated rationale for the `$(value)`
-  change — that it stops `DEMO='$(shell …)'` executing a Make function — does
-  not hold, and the change was made as defence-in-depth rather than as the
-  claimed fix. GNU Make expands *command-line* variable definitions at
-  definition time, before any makefile code runs: a makefile that never mentions
-  `DEMO` at all still triggers the shell function, as does an unrelated
-  variable name (`make -f trivial.mk target FOO='$(shell …)'`). No
-  makefile-side construct can prevent this, and no privilege boundary is
-  crossed — a caller who can type `make DEMO=…` can already run arbitrary
-  commands directly. Evidence: minimal-makefile reproductions run during the
-  round-6 response.
+  actioned: the `-isation` spelling corrected to the Oxford `-ization` form,
+  and the `make demo` export now captures `$(value DEMO)` so the caller's raw
+  text is never expanded a second time at the export site.
+- Observation (round 6, since acknowledged and withdrawn by CodeRabbit in
+  round 7): CodeRabbit's stated rationale for the `$(value)` change — that it
+  stops `DEMO='$(shell …)'` executing a Make function — does not hold, and the
+  change was made as defence-in-depth rather than as the claimed fix. GNU Make
+  expands *command-line* variable definitions at definition time, before any
+  makefile code runs: a makefile that never mentions `DEMO` at all still
+  triggers the shell function, as does an unrelated variable name
+  (`make -f trivial.mk target FOO='$(shell …)'`). No makefile-side construct
+  can prevent this, and no privilege boundary is crossed — a caller who can type
+  `make DEMO=…` can already run arbitrary commands directly. Evidence:
+  minimal-makefile reproductions run during the round-6 response.
 - [ ] Post-delivery: remaining manual verification (zoom bounds). This is
   the only open item; all review-bot findings raised on the pull request are
   actioned or explicitly declined with rationale.
