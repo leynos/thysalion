@@ -78,11 +78,11 @@ fn rig_zoom(app: &App) -> f32 { app.world().resource::<RigState>().zoom() }
     clippy::float_arithmetic,
     reason = "epsilon comparison of the clamped zoom level"
 )]
-fn assert_zoom_at(zoom: f32, expected: f32, bound: &str, default_bound: f32) {
+fn assert_zoom_at(zoom: f32, expected_bound: f32, bound_name: &str, default_bound: f32) {
     assert!(
-        (zoom - expected).abs() < f32::EPSILON,
-        "zoom must clamp at the configured {bound} {expected}, got {zoom} (the default {bound} is \
-         {default_bound})"
+        (zoom - expected_bound).abs() < f32::EPSILON,
+        "zoom must clamp at the configured {bound_name} {expected_bound}, got {zoom} (the default \
+         {bound_name} is {default_bound})"
     );
 }
 
@@ -146,8 +146,8 @@ fn the_initial_zoom_is_clamped_into_the_configured_range(custom_config: HarnessC
 #[case(HarnessAction::ZoomOut, CUSTOM_MIN_ZOOM, "minimum", 0.5)]
 fn zooming_clamps_at_the_configured_bound(
     #[case] action: HarnessAction,
-    #[case] expected: f32,
-    #[case] bound: &str,
+    #[case] expected_bound: f32,
+    #[case] bound_name: &str,
     #[case] default_bound: f32,
 ) {
     // The configuration is built directly rather than injected as a
@@ -157,7 +157,7 @@ fn zooming_clamps_at_the_configured_bound(
     for _ in 0..ZOOM_STEPS_TO_SATURATE {
         send_and_update(&mut app, action);
     }
-    assert_zoom_at(rig_zoom(&app), expected, bound, default_bound);
+    assert_zoom_at(rig_zoom(&app), expected_bound, bound_name, default_bound);
 }
 
 #[rstest]
