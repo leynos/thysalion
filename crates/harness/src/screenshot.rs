@@ -35,7 +35,7 @@ use crate::{config::HarnessConfig, input::HarnessAction};
 /// Directory (relative to the working directory) receiving captures.
 const SCREENSHOT_DIR: &str = "screenshots";
 
-/// Fallback filename stem when sanitisation leaves nothing of the slug.
+/// Fallback filename stem when sanitization leaves nothing of the slug.
 const FALLBACK_SLUG: &str = "capture";
 
 /// Monotonic capture counter, so two captures within the same second

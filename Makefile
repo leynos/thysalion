@@ -70,10 +70,12 @@ typecheck: ## Type-check without building
 # below cannot drift from reality. DEMO and the derived list reach the shell
 # via the environment, never via make interpolation, so neither can inject
 # shell syntax; the guard rejects anything not in the list before Cargo is
-# invoked. tests/demo_guard.rs pins this behaviour.
+# invoked. `$(value DEMO)` captures the caller's raw text without a second
+# expansion, so a value like `$$(shell ...)` is inert data rather than a
+# Make function call. tests/demo_guard.rs pins this behaviour.
 DEMOS := $(patsubst demo-%,%,$(basename $(notdir $(wildcard crates/demos/src/bin/demo-*.rs))))
 
-demo: export DEMO_SLUG = $(DEMO)
+demo: export DEMO_SLUG = $(value DEMO)
 demo: export DEMO_ALLOWED = $(DEMOS)
 demo: ## Run a capability demonstration binary (DEMO=empty by default)
 	@case " $$DEMO_ALLOWED " in \
