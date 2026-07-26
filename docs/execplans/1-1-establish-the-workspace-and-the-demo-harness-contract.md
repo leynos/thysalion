@@ -292,6 +292,17 @@ escalation, not workarounds.
   nextest 63/63 including the property, demo-guard, and trybuild suites;
   doctests 13/13; spelling), `make markdownlint`, and `make nixie` all pass
   sequentially (log `/tmp/gates-cr13.out`).
+- [x] (2026-07-26) First CI run on the round-5 commit failed two ways,
+  both fixed:
+  - The trybuild test was terminated at 180 seconds while its scratch
+    project cold-compiled the Bevy graph; `.config/nextest.toml` now gives
+    that one test a generous slow-timeout ceiling (subsequent runs take
+    seconds once the trybuild target directory is cached).
+  - The `OverlayTimer::advance_to_brink` seam originally *ticked* the
+    timer to the brink, which could cross the interval inside the seam and
+    consume the finish before the refresh system observed it (two windowed
+    overlay tests failed under the act runner's timing). The seam now uses
+    `set_elapsed`, so the system's own tick is always the finishing call.
 - [ ] Post-delivery: remaining manual verification (zoom bounds). This is
   the only open item; all review-bot findings raised on the pull request are
   actioned or explicitly declined with rationale.

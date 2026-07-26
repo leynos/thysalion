@@ -33,13 +33,15 @@ impl Default for OverlayTimer {
 }
 
 impl OverlayTimer {
-    /// Test seam: advances the timer to just before expiry, so the next
-    /// system tick (any positive delta) triggers a refresh without the
-    /// test having to wait out the real throttle interval.
+    /// Test seam: positions the timer just before expiry (via
+    /// `set_elapsed`, deliberately not `tick`), so the refresh system's
+    /// own tick — any positive delta — is the call that finishes the
+    /// timer. Ticking here instead could cross the interval inside the
+    /// seam and consume the finish before the system observes it.
     #[cfg(test)]
     pub(crate) fn advance_to_brink(&mut self) {
         let brink = self.0.duration().saturating_sub(Duration::from_nanos(1));
-        self.0.tick(brink);
+        self.0.set_elapsed(brink);
     }
 }
 

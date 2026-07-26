@@ -1,0 +1,11 @@
+# Nextest configuration.
+#
+# The trybuild compile-fail test drives a scratch Cargo project that
+# cold-compiles the full Bevy dependency graph on its first run (roughly
+# four minutes; seconds thereafter, once the trybuild target directory is
+# cached). Slow-test termination at the usual threshold would kill that
+# first run, so this override gives the test a generous ceiling while
+# still terminating a genuinely wedged run.
+[[profile.default.overrides]]
+filter = 'test(non_exhaustive_config_rejects_external_struct_literals)'
+slow-timeout = { period = "60s", terminate-after = 20 }
