@@ -69,6 +69,23 @@ fn send_and_update(app: &mut App, action: HarnessAction) {
 
 fn rig_zoom(app: &App) -> f32 { app.world().resource::<RigState>().zoom() }
 
+/// Asserts a zoom level equals its expected bound within one epsilon.
+///
+/// The comparison lives here rather than inline because `rstest` moves a
+/// `#[case]`-parameterized body into generated case functions, where a
+/// function-level `#[expect]` on the test no longer covers it.
+#[expect(
+    clippy::float_arithmetic,
+    reason = "epsilon comparison of the clamped zoom level"
+)]
+fn assert_zoom_at(zoom: f32, expected: f32, bound: &str, default_bound: f32) {
+    assert!(
+        (zoom - expected).abs() < f32::EPSILON,
+        "zoom must clamp at the configured {bound} {expected}, got {zoom} (the default {bound} is \
+         {default_bound})"
+    );
+}
+
 #[rstest]
 fn the_plugin_installs_the_supplied_configuration(custom_config: HarnessConfig) {
     let app = core_app(custom_config);
@@ -119,40 +136,28 @@ fn the_initial_zoom_is_clamped_into_the_configured_range(custom_config: HarnessC
     );
 }
 
+/// Saturating the zoom in either direction must settle on the
+/// *configured* limit. The default limit for the same direction is passed
+/// in only so the diagnostic can name it: this range shares neither limit
+/// with the default, so a fallback to `ZoomBounds::default()` shows up as
+/// the default value rather than as a near miss.
 #[rstest]
-#[expect(
-    clippy::float_arithmetic,
-    reason = "epsilon comparison of the clamped zoom level"
-)]
-fn zooming_in_clamps_at_the_configured_maximum(custom_config: HarnessConfig) {
-    let mut app = core_app(custom_config);
+#[case(HarnessAction::ZoomIn, CUSTOM_MAX_ZOOM, "maximum", 4.0)]
+#[case(HarnessAction::ZoomOut, CUSTOM_MIN_ZOOM, "minimum", 0.5)]
+fn zooming_clamps_at_the_configured_bound(
+    #[case] action: HarnessAction,
+    #[case] expected: f32,
+    #[case] bound: &str,
+    #[case] default_bound: f32,
+) {
+    // The configuration is built directly rather than injected as a
+    // fixture: with four `#[case]` parameters, a fifth argument would
+    // exceed the workspace's `too_many_arguments` limit.
+    let mut app = core_app(custom_config(custom_bounds()));
     for _ in 0..ZOOM_STEPS_TO_SATURATE {
-        send_and_update(&mut app, HarnessAction::ZoomIn);
+        send_and_update(&mut app, action);
     }
-    let zoom = rig_zoom(&app);
-    assert!(
-        (zoom - CUSTOM_MAX_ZOOM).abs() < f32::EPSILON,
-        "zoom must clamp at the configured maximum {CUSTOM_MAX_ZOOM}, got {zoom} (the default \
-         maximum is 4.0)"
-    );
-}
-
-#[rstest]
-#[expect(
-    clippy::float_arithmetic,
-    reason = "epsilon comparison of the clamped zoom level"
-)]
-fn zooming_out_clamps_at_the_configured_minimum(custom_config: HarnessConfig) {
-    let mut app = core_app(custom_config);
-    for _ in 0..ZOOM_STEPS_TO_SATURATE {
-        send_and_update(&mut app, HarnessAction::ZoomOut);
-    }
-    let zoom = rig_zoom(&app);
-    assert!(
-        (zoom - CUSTOM_MIN_ZOOM).abs() < f32::EPSILON,
-        "zoom must clamp at the configured minimum {CUSTOM_MIN_ZOOM}, got {zoom} (the default \
-         minimum is 0.5)"
-    );
+    assert_zoom_at(rig_zoom(&app), expected, bound, default_bound);
 }
 
 #[rstest]
