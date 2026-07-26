@@ -73,7 +73,7 @@ mod tests {
     //! holding only the asset resources it writes to: no window, renderer,
     //! or graphics device is involved, and `main` is untouched.
 
-    use bevy::asset::AssetPlugin;
+    use bevy::{asset::AssetPlugin, camera::primitives::MeshAabb as _};
 
     use super::*;
 
@@ -133,12 +133,26 @@ mod tests {
         let Some((mesh_handle, material_handle)) = grounds.first() else {
             panic!("the ground entity was asserted present above");
         };
+        let meshes = app.world().resource::<Assets<Mesh>>();
+        let mesh = meshes
+            .get(&mesh_handle.0)
+            .expect("the ground mesh asset must exist");
+        // Assert the geometry, not merely the handle: a handle check still
+        // passes if the plane is rebuilt at the wrong dimensions.
+        let bounds = mesh
+            .compute_aabb()
+            .expect("the ground mesh must have positions to bound");
+        let half = GROUND_SIZE / 2.0;
         assert!(
-            app.world()
-                .resource::<Assets<Mesh>>()
-                .get(&mesh_handle.0)
-                .is_some(),
-            "the ground mesh asset must exist"
+            (bounds.half_extents.x - half).abs() < f32::EPSILON
+                && (bounds.half_extents.z - half).abs() < f32::EPSILON,
+            "the ground must span {GROUND_SIZE} world units in x and z, got half-extents {:?}",
+            bounds.half_extents
+        );
+        assert!(
+            bounds.half_extents.y.abs() < f32::EPSILON,
+            "the ground must be a flat plane, got y half-extent {}",
+            bounds.half_extents.y
         );
         let materials = app.world().resource::<Assets<StandardMaterial>>();
         let material = materials

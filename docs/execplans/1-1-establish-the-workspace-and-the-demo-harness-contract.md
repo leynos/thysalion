@@ -346,6 +346,15 @@ escalation, not workarounds.
   check-fmt, rustdoc, Clippy, Whitaker, nextest **72/72**, doctests **13/13**,
   spelling (pass); `make markdownlint` and `make nixie` (pass). Log:
   `/tmp/v-all.out`.
+- [x] (2026-07-26) CodeRabbit review round 8 (1 finding) actioned: the
+  demo-empty scene test asserted only that the ground *mesh asset existed*,
+  which would still pass if the plane were rebuilt at the wrong dimensions. It
+  now computes the mesh bounding box and asserts the half-extents match
+  `GROUND_SIZE / 2` in x and z with a zero y extent. Verified by mutation:
+  halving the plane's x size makes the test fail with "the ground must span 24
+  world units in x and z, got half-extents Vec3A(6.0, 0.0, 12.0)"; the mutation
+  was then reverted and the suite re-run green. Gates re-run after the change:
+  `make all`, `make markdownlint`, `make nixie` (log `/tmp/v3.out`).
 - [ ] Post-delivery: remaining manual verification (zoom bounds). This is
   the only open item; all review-bot findings raised on the pull request are
   actioned or explicitly declined with rationale.
