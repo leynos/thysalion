@@ -30,10 +30,11 @@ Concretely, after this change:
 2. Loading a corrupt scene produces a distinct, named diagnostic for each
    corruption class, reports *every* problem found rather than the first, and
    never yields a partially constructed scene (task 1.2.2).
-3. Running `cargo run -p thysalion-world --bin scene-check --
-   assets/scenes/keep-interior.scene.json` prints `keep-interior: ok` and the
-   same command against `crates/world/tests/fixtures/corrupt/unknown-palette-index.scene.json`
-   prints a numbered diagnostic list and exits non-zero (task 1.2.2).
+3. Running `cargo run -p thysalion-world --example scene-check --
+   assets/scenes/keep-interior.scene.json` prints `keep-interior: ok` and exits
+   zero, and the same command against a corrupt fixture prints a located
+   diagnostic report and exits with a code that distinguishes an invalid scene
+   from a broken tool (task 1.2.2).
 4. All three fixture scenes under `assets/scenes/` load clean through the
    validator, exercised by a behavioural suite that runs headless in continuous
    integration (task 1.2.3).
@@ -130,6 +131,23 @@ escalation, not workarounds.
   introduces no `#[expect]` for `clippy::float_arithmetic` or the cast lints in
   `crates/world`. Voxel indexing therefore uses `slice::get`, and every
   narrowing conversion uses `TryFrom` with a named error.
+- The tracked `clippy.toml` tightens four thresholds far below Clippy's
+  defaults, to align with CodeScene's ceiling, and they shape this step's code
+  more than any individual lint: `cognitive-complexity-threshold = 9` (and
+  `cognitive_complexity` is *denied*), `too-many-lines-threshold = 70` per
+  function, `too-many-arguments-threshold = 4`, and
+  `excessive-nesting-threshold = 4`. A single function that walks a chunk's runs
+  while checking the volume sum, run canonicality, zero counts, and palette
+  bounds violates the complexity ceiling by construction. The traversal is
+  therefore *one pass with several collaborating checkers* — an iterator over
+  decoded runs feeding a small set of single-purpose accumulators — not one
+  function doing four jobs. Grouped parameters go into named structs rather
+  than long argument lists, per AGENTS.md.
+- No exported type in `thysalion-world` may be named exactly `Error`.
+  `clippy::error_impl_error`, which this workspace denies, fires only on an
+  exported type with that exact name; the naming convention here (`…Error`,
+  `…Diagnostic`) is already clear of it, and the rule keeps it that way without
+  a per-type check.
 - `make all` (check-fmt, lint, test, spelling) is the commit gate and must pass
   at every commit. Documentation changes must additionally pass
   `make markdownlint` and `make nixie`. Red test states live only in the working
@@ -157,9 +175,18 @@ escalation, not workarounds.
 Thresholds that trigger escalation. They bound autonomous action; they are not
 quality criteria.
 
-- Scope: if the change grows beyond roughly 40 files or 3,500 net lines
-  (excluding `Cargo.lock`, generated fixture JSON, and `insta` snapshots), stop
-  and escalate.
+- Scope: if the change grows beyond roughly 40 files or 3,500 net lines, stop
+  and escalate. Excluded from that count: `Cargo.lock`, generated fixture JSON
+  and provenance sidecars, `insta` snapshots, and the hand-authored fixture
+  sources under `assets/scenes/src/**`. The last exclusion is not a loophole
+  but a correction: a 128 x 128 interior at one raster per populated layer is
+  128 lines of 128 characters per layer across thirty to fifty layers, so a
+  single fixture is thousands of lines by design. Without the exclusion this
+  trigger fires on Stage C3 by construction, gets waved through, and thereafter
+  means nothing — which is worse than not having it. Instead, the budget on
+  fixture sources is stated where it can bite: at most 64 populated layers and
+  at most a 256-square authored footprint per fixture. Breaching *that* is a
+  real signal.
 - Dependencies: the approved new dependency set is exactly `serde` (with
   `derive`), `serde_json`, `rmp-serde`, `thiserror`, `smol_str` (with `serde`),
   `serde_path_to_error`, `schemars`, `tracing`, and `blake3` as normal
@@ -327,6 +354,22 @@ quality criteria.
   beneath it unless explicitly marked airborne. Reachability and structural
   soundness are deliberately out of scope; they need phase 4's pathfinding to
   define what reachable means.
+- Risk: a palette reorder silently reinterprets every voxel in every scene that
+  shares the palette. Indices are positional, `VoxelIndex` carries no palette
+  identity, and the grid stores indices rather than names — so inserting a voxel
+  type mid-palette to keep it grouped by material family, an entirely ordinary
+  editorial act, changes the meaning of every stored index above it. Every
+  fixture still loads clean, because validation checks that an index is *in
+  range* and never that it means what it meant yesterday.
+  Severity: high. Likelihood: medium, rising the moment a second scene shares a
+  legend or a phase-2 prefab hard-codes an index.
+  Mitigation: make the reorder visible rather than trusting it not to happen.
+  Each fixture's ordered palette — the `(name, material)` pairs in order — is
+  committed as a small manifest, and `make scenes-check` asserts against it, so
+  a reorder appears in review as a deliberate diff rather than as a silent
+  semantic change. Stage D's version-history table cites Minecraft's
+  1.15-to-1.16 index-packing break as a documentation lesson; the sharper
+  lesson is that index semantics need a mechanical invariant, not a note.
 - Risk: a diagnostic is technically correct and operationally useless. "Voxel
   run 3 references palette index 9" identifies a run *ordinal* in a JSON file no
   human wrote, and reaching the layer text that a person did write requires
@@ -605,11 +648,17 @@ travel with the C1 commit.
   Rationale: `rmp_serde`'s `serialize_tuple_struct` calls `write_array_len`
   unconditionally — it ignores the struct-map configuration — so the
   headline mitigation for positional encoding does not reach a tuple struct at
-  all. Worse than being unevolvable, its failure mode diverges across the two
-  encodings: were a third element ever added, an old JSON decoder errors
-  cleanly on the trailing element while an old MessagePack decoder reads two,
-  leaves the stream misaligned, and turns every subsequent run and section into
-  garbage or an unrelated error thousands of bytes downstream. Spike A2 must
+  all. To be precise about the severity, because an earlier revision of this
+  plan overstated it: a tuple struct is *not* a live defect. It encodes
+  identically under `to_vec` and `to_vec_named` and round-trips correctly in
+  both formats today, verified empirically. The objection is entirely about
+  evolution, and there it is sharp: were a third element ever added, an old JSON
+  decoder errors cleanly on the trailing element while an old MessagePack
+  decoder reads two, leaves the stream misaligned, and turns every subsequent
+  run and section into garbage or an unrelated error thousands of bytes
+  downstream. A wire type that can never gain a field, whose failure mode
+  differs between the two encodings, is not worth the bytes it saves in a
+  format that expects to evolve. Spike A2 must
   measure the named form, not the compact one this plan first drafted, because
   the tolerance is 1 MiB and the named form is roughly four times the JSON size
   per run.
@@ -743,6 +792,22 @@ travel with the C1 commit.
   not a format change. The schema is derived and never normative: it cannot
   express the semantic invariants phase two checks.
   Date/Author: 2026-07-28, plan author.
+- Decision: `SimProperties` uses an explicit Q8.8 fixed-point scale — the stored
+  `u16` divided by 256 — for `fuel` and `moisture_capacity`, and
+  `ignition_point` on the same scale with `u16::MAX` meaning "does not ignite".
+  Rationale: design §10.5 mandates 16-bit fixed point for the runtime material
+  fields but specifies no Q-format and no scale anywhere, so "the 16-bit
+  fixed-point representation §10.5 already mandates" — which an earlier draft
+  wrote — names a representation that does not exist yet. Without a scale the
+  values cannot be range-validated, cannot be authored meaningfully, and phase 4
+  will pick a scale that disagrees with whatever the fixtures assumed. Every
+  other unit in this document is pinned; this one was hand-waved. The fallback,
+  if Q8.8 proves wrong for phase 4's kernels, is to drop `SimProperties` from
+  version 1 entirely and let phase 4 add it — `#[serde(default)]` and a minor
+  version bump make that cheap, and it is the honest move if the scale cannot be
+  chosen confidently now. ADR 006 records whichever is taken, and design §10.5
+  is amended to carry the scale rather than only the width.
+  Date/Author: 2026-07-28, after the second design review.
 - Decision: `crates/world/src/grid/` is a **peer** of `scene/`, not a child of
   it. It owns `Extent`, `ChunkSize`, `VoxelPos`, `ChunkCoord`, `VoxelGrid`, and
   the index mapping. `scene/` depends on `grid/`; never the reverse.
@@ -805,14 +870,29 @@ travel with the C1 commit.
   registry becomes real in phase 2, in the Entity Component System layer.
   Date/Author: 2026-07-28, plan author.
 - Decision: the operator tool is `crates/world/examples/scene-check.rs`, a Cargo
-  example, not a `[[bin]]`.
+  example, not a `[[bin]]`. Its logic lives in `crates/world/src/check/`; the
+  example is a shim. It writes through `writeln!` on a locked `Stdout` handle,
+  never `println!`. And `crates/world/examples/` is added to the Makefile's
+  coverage-ignore pattern.
   Rationale: examples are built and linted by the workspace gate
   (`--all-targets`), never enter the release graph (which is scoped
   `-p thysalion`), and make no claim on ADR 005's rule that demo binaries live
   only in `thysalion-demos` or on the `make demo` allow-list derived from
-  `crates/demos/src/bin`. The alternative — a `[[bin]]` in `thysalion-world` —
-  is more discoverable but muddies both rules for no gain.
-  Date/Author: 2026-07-28, plan author.
+  `crates/demos/src/bin`. A `[[bin]]` in `thysalion-world` would be more
+  discoverable but muddies both rules for no gain.
+  The other two clauses resolve a genuine trilemma that an earlier draft left
+  standing: `make lint` lints examples, `clippy::print_stdout` is denied, an
+  operator tool must print, and this plan promised no new lint suppression in
+  `crates/world`. `writeln!` on a `Stdout` handle satisfies all four —
+  `print_stdout` fires on the `print!` family of macros, not on `Write`. The
+  coverage clause amends this plan's own earlier promise, and does so
+  deliberately rather than by omission: `cargo llvm-cov` runs `--all-targets`,
+  so an example is instrumented but never executed by a test, and its lines
+  would land uncovered against the patch target. Keeping the logic in
+  `check/` — where unit tests cover it — leaves only the argument-parsing shim
+  behind the ignore, which is the same boundary ADR 005 already draws for
+  windowed harness code.
+  Date/Author: 2026-07-28; extended after the second design review.
 - Decision: palette index `0` is reserved for air in every scene.
   Rationale: it gives run-length encoding and sparse chunk storage a shared
   meaning for "nothing here", so an absent chunk and a long air run agree
@@ -971,7 +1051,13 @@ the chunk-keyed payload for a 1024 x 1024 x 128 volume that is air except for a
 populated fragment of roughly sixty-four chunks, encodes it as JSON and as
 MessagePack, and reports both sizes, the decoded sparse memory footprint, and
 the wall-clock time to parse, decode, and traverse it in **both** release and
-debug builds. Measure with `hyperfine`.
+debug builds.
+
+Measure *in process*, and only cross-check with `hyperfine` against a
+pre-built binary. Timing `hyperfine 'cargo run --release …'` measures Cargo's
+freshness check and process startup — tens to hundreds of milliseconds — against
+a 250 ms tolerance, which is mostly noise. Design §6.3 will be measured
+in-process forever afterwards, so measure it that way from the start.
 
 Measure the **named** `VoxelRunDocument`, not a compact two-element array. The
 named form is roughly four times the JSON size per run, and the fixture
@@ -1005,6 +1091,13 @@ payload that `Error::path()` yields a usable structural path. If it does not,
 the MessagePack path degrades to an unlocated deserialization error, which is
 acceptable — MessagePack is the shipping encoding, not the authoring one — but
 the plan must say so rather than promise a path it cannot deliver.
+
+Reference data. Two constants that later stages *validate against* are written
+now, not in Stage D, because a check whose reference data arrives two stages
+later is a vacuous check and the fixtures are authored against it in between:
+the project IRI prefix table (`thy:` and the scene-graph prefix, with their full
+bases) and the prototype depth bound. Both land in `crates/world/src/` with the
+code that consumes them and are restated in ADR 006, rather than the reverse.
 
 Pinning. Add to `[workspace.dependencies]` in the root `Cargo.toml` exactly the
 approved set from `Tolerances`, at the versions verified during this stage, with
@@ -1076,17 +1169,26 @@ Feature: Scene loading and validation
     And the minimal hand-written scene document is loaded afterwards
     Then loading succeeds
 
-  Scenario: Every fixture scene loads clean
+  Scenario Outline: Every fixture scene loads clean
     Given the fixture scene "<name>"
     When the scene is loaded
     Then loading succeeds
+    And there are no warnings
 
     Examples:
       | name              |
       | keep-interior     |
       | market-town-block |
       | swamp-fragment    |
+      | bare-cell         |
 ```
+
+Note `Scenario Outline`, not `Scenario`: Gherkin binds `<name>` placeholders and
+an `Examples:` table only under an outline, and a plain `Scenario` carrying them
+is a parse error rather than a passing suite. This is the repository's first
+outline — `crates/harness/tests/features/harness.feature` has none — so confirm
+the `rstest-bdd` 0.6.0-beta3 `#[scenario]` macro's indexing treats each example
+row as its own scenario before writing the step functions.
 
 Create `crates/world/tests/loading/support.rs` holding the adapter, and
 `crates/world/tests/loading/main.rs` holding the step functions, mirroring the
@@ -1150,17 +1252,22 @@ Alongside the behavioural suite, add the task 1.2.1 unit and property tests:
   `Scene` cannot be constructed by struct literal, so validation cannot be
   bypassed.
 
-Here is the minimal hand-written scene the first scenario loads. It is the
-worked example a reader needs in order to understand every later section, and
-it is checked in at `crates/world/tests/fixtures/minimal.scene.json`. It
-declares one chunk of extent, a four-entry palette, a single populated chunk
-whose lower 4 x 4 x 4 corner is stone, one spawn, and one knowledge resource.
+Here is the minimal hand-written scene the first scenario loads, checked in at
+`crates/world/tests/fixtures/minimal.scene.json`. It is the worked example a
+reader needs in order to understand every later section, so it is shown in the
+**fully explicit** form the fixtures are committed in: every defaulted field is
+written out. That is not verbosity for its own sake — see the note on the two
+encoders below.
+
+It declares one chunk of extent, a three-entry palette, one populated chunk
+whose `z = 0` layer carries four rows of stone, one uniform chunk, one spawn,
+and one knowledge resource.
 
 ```json
 {
-  "version": 1,
+  "version": { "major": 1, "minor": 0 },
   "name": "minimal",
-  "dimensions": { "x": 32, "y": 32, "z": 32 },
+  "dimensions": { "x": 64, "y": 32, "z": 32 },
   "chunk_size": 32,
   "palette": [
     {
@@ -1169,29 +1276,66 @@ whose lower 4 x 4 x 4 corner is stone, one spawn, and one knowledge resource.
       "passable": {
         "pos_x": true, "neg_x": true, "pos_y": true,
         "neg_y": true, "pos_z": true, "neg_z": true
-      }
+      },
+      "slope": "flat",
+      "emission": { "intensity": 0, "colour": [0, 0, 0] },
+      "sim": { "fuel": 0, "ignition_point": 65535, "moisture_capacity": 0 },
+      "concept": null
     },
-    { "name": "stone-block", "material": "stone", "concept": "thy:StoneBlock" },
-    { "name": "oak-plank", "material": "timber", "concept": "thy:OakPlank" },
+    {
+      "name": "stone-block",
+      "material": "stone",
+      "passable": {
+        "pos_x": false, "neg_x": false, "pos_y": false,
+        "neg_y": false, "pos_z": false, "neg_z": false
+      },
+      "slope": "flat",
+      "emission": { "intensity": 0, "colour": [0, 0, 0] },
+      "sim": { "fuel": 0, "ignition_point": 65535, "moisture_capacity": 3277 },
+      "concept": "thy:StoneBlock"
+    },
     {
       "name": "wall-sconce",
       "material": "stone",
+      "passable": {
+        "pos_x": false, "neg_x": false, "pos_y": false,
+        "neg_y": false, "pos_z": false, "neg_z": false
+      },
+      "slope": "flat",
       "emission": { "intensity": 12, "colour": [255, 180, 90] },
+      "sim": { "fuel": 0, "ignition_point": 65535, "moisture_capacity": 0 },
       "concept": "thy:WallSconce"
     }
   ],
   "voxels": [
     {
       "at": { "x": 0, "y": 0, "z": 0 },
-      "runs": [
-        [4, 1], [28, 0], [4, 1], [28, 0],
-        [4, 1], [28, 0], [4, 1], [32668, 0]
-      ]
+      "payload": {
+        "runs": [
+          { "length": 4, "index": 1 }, { "length": 28, "index": 0 },
+          { "length": 4, "index": 1 }, { "length": 28, "index": 0 },
+          { "length": 4, "index": 1 }, { "length": 28, "index": 0 },
+          { "length": 4, "index": 1 }, { "length": 32668, "index": 0 }
+        ]
+      }
+    },
+    {
+      "at": { "x": 1, "y": 0, "z": 0 },
+      "payload": { "uniform": 1 }
     }
   ],
   "entities": {
     "prototypes": {},
-    "spawns": [ { "name": "party-start", "at": { "x": 2, "y": 2, "z": 4 } } ]
+    "spawns": [
+      {
+        "name": "party-start",
+        "prototype": null,
+        "at": { "x": 2, "y": 2, "z": 1 },
+        "facing": "pos_y",
+        "airborne": false,
+        "concept": null
+      }
+    ]
   },
   "lighting": {
     "sun_path": {
@@ -1201,22 +1345,50 @@ whose lower 4 x 4 x 4 corner is stone, one spawn, and one knowledge resource.
     "ambient_bands": [],
     "probe_spacing_mm": 2000
   },
-  "knowledge": { "graph": "thy:scene/minimal", "sources": ["minimal.trig"] }
+  "knowledge": {
+    "graph": "thy:scene/minimal",
+    "sources": ["knowledge/minimal.trig"]
+  }
 }
 ```
 
-Every field absent from a palette entry takes its documented default: fully
-impassable, flat, inert, and with no concept. The `runs` array is chunk-local
-and Z-major: within a chunk of side `s`, the voxel at chunk-local `(x, y, z)`
-sits at index `z * s * s + y * s + x`, which for `s = 32` is
-`z * 1024 + y * 32 + x`. Read the eight runs as four rows of stone, each four
-voxels of stone followed by twenty-eight of air, at `y = 0`, `1`, `2`, `3` on
-the `z = 0` layer, and then air for the remaining 32,668 positions. The counts
-sum to 32,768, the chunk volume, and validation rejects any chunk whose runs do
-not. Runs are also canonical: two adjacent runs may not share a palette index,
-because a non-unique encoding would make the content hashes design §12.3
-depends on unstable. Validation rejects the non-canonical form rather than
-silently normalizing it, so a generator bug is visible rather than absorbed.
+Four things this example is carrying, each of which an earlier draft got wrong
+and which the implementer must not re-break.
+
+**The payload is a tagged enum behind an explicit field.** A chunk entry is
+`{ "at": …, "payload": … }`, and the payload is an externally-tagged enum with
+*newtype* variants, so it reads `{"runs": [ … ]}` or `{"uniform": 1}`. An
+earlier draft wrote the runs array directly beside `at` and never declared the
+entry type at all; that does not deserialize. Struct variants would have given
+the doubled `{"runs":{"runs":[…]}}`, and `#[serde(flatten)]` — which would have
+flattened the payload into the entry — is banned by `Constraints` because it
+buffers through serde's `Content`.
+
+**Runs are named-field structs, not two-element arrays.** `{"length": 4,
+"index": 1}`, never `[4, 1]`. The reason is in the decision log; the practical
+consequence is that JSON runs are roughly four times the size of the compact
+form, which is what Spike A2 must measure against the 1 MiB tolerance.
+
+**The index formula.** Runs are chunk-local and Z-major: within a chunk of side
+`s`, chunk-local `(x, y, z)` sits at `z * s * s + y * s + x`, which for `s = 32`
+is `z * 1024 + y * 32 + x`. Read the eight runs as four rows of stone — four
+voxels of stone then twenty-eight of air — at `y = 0, 1, 2, 3` on the `z = 0`
+layer, then air for the remaining 32,668 positions. The counts sum to 32,768,
+the chunk volume, and validation rejects any chunk whose runs do not. Runs are
+canonical: no zero-length run, and no two adjacent runs sharing an index.
+Validation rejects the non-canonical form rather than silently normalizing it,
+so a generator bug is visible rather than absorbed.
+
+**Nothing is elided.** Every defaulted field appears. Committed fixtures are
+byte-identical to what `serde_json::to_string_pretty` produces for the same
+document, which is what `make scenes-check` asserts. Two writers exist for this
+format — the Python generator and Rust's serializer — and if the generator
+omits defaults that Rust re-emits, the two produce different bytes for the same
+scene from the first commit. That divergence is invisible to a canonical-bytes
+test, which only proves `document -> bytes` is stable, and it surfaces later as
+an unreviewable whole-file diff the first time anything re-emits a fixture.
+`#[serde(skip_serializing_if)]` is *not* the escape, being banned by
+`Constraints` for the content-hash reason; emitting the explicit form is.
 
 Validation for this stage: `cargo test -p thysalion-world` fails, and every
 failure names a missing item or an unmet assertion in the new code, not a
@@ -1237,7 +1409,11 @@ path announcing itself as a file format.
 ```plaintext
 crates/world/src/
 ├── grid/
-│   ├── mod.rs           ~120  VoxelGrid: BTreeMap<ChunkCoord, Box<[VoxelIndex]>>
+│   ├── mod.rs           ~150  VoxelGrid: BTreeMap<ChunkCoord, ChunkStore>,
+│   │                          where ChunkStore is Uniform(VoxelIndex) or a
+│   │                          boxed dense array — a uniform chunk must not
+│   │                          materialize 64 KiB, which would undo the very
+│   │                          elision the wire format performs
 │   ├── extent.rs        ~180  Extent, ChunkSize, checked volume arithmetic
 │   └── coords.rs        ~160  VoxelPos, ChunkCoord, chunk-local index mapping
 ├── scene/
@@ -1295,9 +1471,24 @@ The codec modules:
   works, and plainly otherwise; MessagePack carries no line or column in any
   case.
 
+The source module carries the path rules, which are the port's contract and not
+an adapter's business. A resource path is relative to the scene document's own
+directory, and an absolute path or one containing `..` is rejected by the port
+rather than by an adapter — `cap_std` already stops `DirSceneSource` escaping
+its root, but `MemorySceneSource` has no such protection, and the trust boundary
+in `Constraints` covers both. Concretely, `DirSceneSource` loading
+`assets/scenes/keep-interior.scene.json` is rooted at `assets/scenes/`, so the
+fixtures name their knowledge resources `knowledge/<file>.trig`. Note that this
+root also exposes `assets/scenes/src/` — the authoring sources — as readable
+resources; that is harmless but should be stated rather than discovered.
+
 Every *document* type carries `#[serde(deny_unknown_fields)]` and
 `#[derive(schemars::JsonSchema)]`, and does **not** carry `#[non_exhaustive]`.
 Every *domain* type carries `#[non_exhaustive]` and no `serde` derive at all.
+The generated JSON Schema documents the **JSON authoring form only**: it mirrors
+`deny_unknown_fields` as `additionalProperties: false`, and it cannot describe
+the MessagePack encoding at all. Say so where it is committed, or it will be
+read as the format specification and drift from the shipping encoding.
 
 Validation for this stage: the round-trip property, the wire-shape assertion,
 the canonical-bytes assertion, the content-hash equality across encodings, and
@@ -1322,8 +1513,10 @@ failing, then implement:
   text for humans and as JSON for machines, and it is *this crate's* renderer
   rather than a library's, so an upstream release cannot churn the snapshots.
 - `scene/validation/rules/` — the checks, one file per document subject. Rules
-  that must walk the voxel payload are fused into a single traversal per chunk
-  rather than one traversal per rule. Every rule is a pure function of the
+  that must walk the voxel payload share a single traversal per chunk rather
+  than taking one traversal each — but as an iterator feeding several
+  single-purpose accumulators, never as one function doing four jobs, which the
+  `clippy.toml` complexity ceiling forbids. Every rule is a pure function of the
   document; the one rule set that needs the source port lives in
   `rules/resources.rs` and is the only place infrastructure is reachable.
 - `scene/validation/mod.rs` — the phase orchestration described below, and the
@@ -1456,6 +1649,63 @@ nothing for empty chunks, so it needs no equivalent field.
 `scene.toml` accepts human units where the document stores integers — `azimuth =
 "17.45deg"` compiles to `1745` — which is the promised mitigation for the
 all-integer document's authoring cost.
+
+The layer format is specified here rather than left to the implementer, because
+it is the largest artefact in the step and an earlier draft named only the file
+names. A worked example, for a fixture whose `content_origin` is `[8, 8, 0]` and
+whose `content_extent` is `[6, 4, 2]`:
+
+`legend.toml`:
+
+```toml
+"." = "air"
+"#" = "stone-block"
+"=" = "oak-plank"
+"*" = "wall-sconce"
+```
+
+`layers/z000.txt`:
+
+```plaintext
+######
+#....#
+#....#
+######
+```
+
+`layers/z001.txt`:
+
+```plaintext
+#*..*#
+#....#
+#....#
+##==##
+```
+
+The rules, each of which an implementer would otherwise have to guess:
+
+- A raster covers the **content sub-box only**, not the declared extent. Its
+  width is `content_extent.x` and its height is `content_extent.y`; a
+  full-extent raster for the wilderness class would be a megabyte of text per
+  layer.
+- Row 0 is `y = content_origin.y`, and column 0 is `x = content_origin.x`. `y`
+  increases downward as the file reads, which matches how a layer looks when
+  viewed from above.
+- A file named `z<nnn>.txt` supplies the layer at `z = content_origin.z + nnn`.
+  An absent file is a layer of air. Files need not be contiguous.
+- Every character must appear in `legend.toml`; an unlisted character is an
+  error, never a silent air. A short row is an error too, rather than being
+  padded, because padding hides a truncated edit. Trailing whitespace is
+  stripped before the row is measured.
+- Voxels outwith the content sub-box are air. The generator computes chunk
+  entries from the resulting grid, elides all-air chunks entirely, and emits a
+  `uniform` payload for any chunk of a single type — the author never expresses
+  chunking at all.
+- `content_origin` and `content_extent` need not align to the chunk grid; the
+  generator handles a content box that straddles chunk boundaries. The scene's
+  *declared* dimensions must still be chunk-aligned, which validation enforces.
+- Spawns, prototypes, lighting, and the knowledge section live in `scene.toml`,
+  in scene coordinates, not in the rasters.
 
 `scripts/build_fixture_scenes.py` compiles those sources to
 `assets/scenes/<name>.scene.json`, emitting chunk-keyed payloads with uniform
@@ -1601,14 +1851,17 @@ here, with `make all` passing.
   run-length encoded"; a `version` field is added to the section list; and the
   appeal to lille's "proven format" is corrected to name it as a specification
   and to say which parts were taken and which were improved on (see
-  `Surprises & discoveries`).
+  `Surprises & discoveries`). Two amendments are easy to forget and are called
+  out for that reason: §7.2 still specifies `passable: [bool; 6]` and must be
+  changed to the six-field struct this plan substitutes, and §10.5 must gain the
+  fixed-point *scale* it currently omits, not merely the width.
 - Add `docs/world-plane-architecture.md` documenting the internally facing
   interfaces of `thysalion-world`: the scene module tree, the `SceneSource`
   port and its adapters, the loader and library, and the diagnostic
   vocabulary — with the field-by-field scene format reference and a worked
   minimal example. Index it in `docs/contents.md`.
-- Update `docs/repository-layout.md` for `assets/`, `crates/world/src/bin/`, and
-  the fixture generator script.
+- Update `docs/repository-layout.md` for `assets/`, `crates/world/examples/`,
+  the fixture generator script, and the amended coverage-ignore boundary.
 - Update `docs/developers-guide.md` with a "Scene fixtures" section: where
   fixtures live, how to author a layer, how to regenerate, and how to read a
   diagnostic report.
@@ -1637,7 +1890,8 @@ cargo test -p thysalion-world --test loading        # the behavioural suite
 cargo insta review                                  # accept diagnostic snapshots
 make scenes                                         # regenerate fixture JSON and the schema
 cargo run --release -p thysalion-world --example scene-check -- assets/scenes/keep-interior.scene.json
-hyperfine 'cargo run --release -p thysalion-world --example scene-check -- assets/scenes/swamp-fragment.scene.json'
+cargo build --release -p thysalion-world --examples
+hyperfine './target/release/examples/scene-check assets/scenes/swamp-fragment.scene.json'
 ```
 
 Expected transcript for the `scene-check` run:
@@ -1741,8 +1995,16 @@ Quality criteria for "done":
   item carries Rustdoc; ADR 006 and the world-plane architecture document exist
   and are indexed in `docs/contents.md`.
 - Spelling: `make spelling` green.
-- Coverage: no new entry in the Makefile's coverage-ignore pattern. Everything
-  this step adds is headless and must be measured.
+- Coverage: exactly one new entry in the Makefile's coverage-ignore pattern,
+  `crates/world/examples`, for the reason in the decision log. Everything else
+  this step adds is headless and must be measured; in particular
+  `crates/world/src/check/` is library code and is covered by unit tests, so
+  only the argument-parsing shim sits behind the ignore.
+- Lint: `make lint` also runs `cargo doc --no-deps --workspace` under
+  `RUSTDOCFLAGS="-D warnings"` and the `whitaker` lint set. A broken intra-doc
+  link in any of the two dozen diagnostic variants fails the commit gate, so
+  write those links carefully the first time rather than discovering them in
+  Stage D.
 
 ## Idempotence and recovery
 
@@ -1857,14 +2119,29 @@ pub struct VoxelRunDocument {
     pub index: u16,
 }
 
+/// One populated chunk: where it is, and what is in it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ChunkEntryDocument {
+    /// Chunk coordinate, counted in chunks rather than in voxels.
+    pub at: ChunkCoordDocument,
+    /// The chunk's contents.
+    pub payload: ChunkPayloadDocument,
+}
+
 /// A chunk's voxels: either one repeated type, or an explicit run stream.
+///
+/// Externally tagged with *newtype* variants, so it reads `{"uniform": 1}` or
+/// `{"runs": [...]}`. Struct variants would double the key —
+/// `{"runs":{"runs":[...]}}` — and `#[serde(flatten)]` on the payload is banned
+/// by this plan's `Constraints`, because it buffers through serde's `Content`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ChunkPayloadDocument {
-    /// Every voxel in the chunk is this type; no run stream is stored.
-    Uniform { voxel: u16 },
+    /// Every voxel in the chunk is this palette index; no run stream stored.
+    Uniform(u16),
     /// Chunk-local Z-major runs, summing to the chunk volume, canonical.
-    Runs { runs: Vec<VoxelRunDocument> },
+    Runs(Vec<VoxelRunDocument>),
 }
 ```
 
@@ -2157,3 +2434,66 @@ then documentation. Stage A now carries a third spike and a four-criterion
 go/no-go, and the reviewers' shared advice is that the interface shape must be
 settled before Stage B writes tests against it, since this plan's own interface
 tolerance makes a post-fixture API change an escalation.
+
+## Revision note (2026-07-28, second)
+
+A second adversarial review verified the plan's serde, Clippy, `schemars`, and
+`miette` claims empirically against the pinned toolchain rather than from
+memory. Most of the first review's findings were confirmed. Four things it found
+that the first pass had not, and that had survived into the revised plan:
+
+- **The worked minimal JSON did not deserialize.** `ChunkPayload` is an
+  externally-tagged enum, and the example wrote a run array directly beside
+  `at` while never declaring the entry type that joins them. The single most
+  load-bearing example in the document was wrong. The payload is now a newtype-
+  variant enum behind an explicit `payload` field, `ChunkEntryDocument` is
+  declared, and the uniform case is shown.
+- **`clippy.toml` had never been read.** It sets
+  `cognitive-complexity-threshold = 9` against a denied lint,
+  `too-many-lines-threshold = 70` per function, `too-many-arguments-threshold =
+  4`, and `excessive-nesting-threshold = 4` — and this plan *mandated* a fused
+  per-chunk traversal checking four properties, which violates the complexity
+  ceiling by construction. The traversal is now one pass feeding several
+  single-purpose accumulators, and the thresholds are in `Constraints`.
+- **The operator tool sat on an unresolvable trilemma.** `make lint` lints
+  examples, `clippy::print_stdout` is denied, and the plan forbade new
+  suppressions. `writeln!` on a `Stdout` handle resolves it without a
+  suppression. The coverage half is resolved by amending this plan's own
+  promise: one ignore entry for `crates/world/examples`, with the logic kept in
+  `check/` where tests reach it.
+- **Two writers, one format, one tested.** The staleness test compared Python
+  output against Python output. Rust's serializer re-emits defaults the
+  generator would omit, so the two produce different bytes for the same scene
+  from the first commit — invisible to a canonical-bytes test, which only proves
+  `document -> bytes` is stable. Fixtures are now committed in fully explicit
+  form, byte-identical to `serde_json::to_string_pretty`, and the worked example
+  shows that form.
+
+Also folded in: a palette-reorder hazard with a committed palette manifest as
+its guard; the layered-text authoring format specified to the same standard as
+the minimal JSON, with a worked example; the fixed-point scale for
+`SimProperties` pinned at Q8.8, since design §10.5 mandates a width and no
+scale; the scope tolerance corrected so it does not fire on Stage C3 by
+construction; the IRI prefix table and depth bound moved ahead of the rules that
+validate against them; `Scenario Outline` in place of a `Scenario` carrying an
+`Examples:` table, which would not parse; path-safety rules on the port; a
+uniform chunk no longer materializing a 64 KiB array and undoing the elision it
+exists for; and `hyperfine` pointed at a built binary rather than at
+`cargo run`, which was measuring Cargo's freshness check against a 250 ms
+tolerance.
+
+One severity claim is corrected rather than the decision it supported. The first
+revision note called the tuple-struct `VoxelRun` a defect. It is not: it encodes
+identically under both `to_vec` and `to_vec_named` and round-trips correctly in
+both formats today. The objection is purely about evolution, and the named
+struct stands on that ground alone.
+
+Two open questions are recorded for ADR 006 rather than resolved here.
+`chunk_size` is a document field with exactly one legal value, policed by its
+own diagnostic — either it is a real degree of freedom, in which case the design's
+32-cubed assumption needs auditing, or it should be a schema constant. And the
+`VoxelGrid` that this step decodes may be a transient buffer that phase 2 copies
+into `bevy_voxel_world`'s own storage and discards, which would make the dense
+materialization double work at exactly the moment design §6.3 turns
+Loading-to-Active into a performance contract. Step 2.1.1 owns that answer;
+`VoxelGrid`'s private fields keep it cheap to change.
