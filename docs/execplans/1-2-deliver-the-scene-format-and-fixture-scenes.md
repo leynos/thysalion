@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
 and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 ## Purpose / big picture
 
@@ -441,7 +441,11 @@ Four commits are expected, one per stage from C1 onwards, each passing
 `make all`. Stage A leaves no tracked changes beyond the dependency pins, which
 travel with the C1 commit.
 
-- [ ] Stage A: verification spikes A1–A3 and dependency pinning.
+- [x] (2026-07-30) Stage A: verification spikes A1–A3 and dependency pinning.
+  A1 and A3 passed outright and settled two questions the design review left
+  open; A2 failed its JSON-size criterion and the prescribed escape did not fix
+  it, resolved by encoding generated fixtures compactly (decision log).
+  Measurements in `Artefacts and notes`.
 - [ ] Stage B: the behavioural specification and the task 1.2.1 red tests.
 - [ ] Stage C1: the voxel type registry and scene document model (task 1.2.1) —
   first commit.
@@ -453,6 +457,61 @@ travel with the C1 commit.
   and cleanup — fourth commit.
 
 ## Surprises & discoveries
+
+- Observation: the behavioural specification asserted counts the worked example
+  cannot produce — "4 palette entries" against a three-entry palette, and a
+  non-air count left unstated.
+  Evidence: the minimal scene declares `air`, `stone-block`, and `wall-sconce`;
+  its two chunks hold 16 stone voxels in the run-encoded chunk and a uniform
+  chunk of 32,768, for 32,784 non-air.
+  Impact: corrected in place before any step function was written. Trivial in
+  itself, but it is the kind of defect a specification acquires when written
+  before the example it describes, and it would have surfaced as a confusing
+  red test rather than as an obvious typo.
+- Observation: pretty-printing, not field naming, is what drives the fixture
+  JSON over its size tolerance. Compact encoding costs 0.74 MiB where
+  `to_string_pretty` costs 2.33 MiB for the same document, a 3.1x multiplier;
+  short field renames — the escape this plan prescribed — move it only to
+  2.04 MiB and do not clear the 1 MiB bar on their own.
+  Evidence: Spike A2, `Artefacts and notes`.
+  Impact: Stage C1's instruction to encode with `serde_json::to_string_pretty`
+  is withdrawn for generated fixtures. `serde_json`'s pretty printer puts every
+  struct field on its own line, so an array of 33,000 two-field run objects
+  becomes well over 100,000 lines of mostly indentation. The resolution is in
+  the decision log; the short renames are *not* adopted, because compact
+  encoding clears the tolerance with headroom and unabbreviated field names are
+  worth more to a reader of the schema than 0.29 MiB is to the repository.
+- Observation: `rmpv::Value` does not implement `Deserialize` unless the crate
+  is taken with its `with-serde` feature, and the wire-shape assertion this
+  plan makes load-bearing decodes into exactly that type.
+  Evidence: Spike A1 failed to compile until the feature was added.
+  Impact: the pin is `rmpv = { version = "1.3", features = ["with-serde"] }`.
+- Observation: `serde_path_to_error` works under MessagePack, contradicting
+  this plan's expectation that it might not. A malformed payload yields the
+  path `payload.runs[0].length`, identical to the path the JSON decoder
+  produces for the same fault.
+  Evidence: Spike A3, `Artefacts and notes`.
+  Impact: better than planned. `codec/msgpack.rs` carries a structural path
+  after all, so both encodings locate a fault equally well and the plan's
+  contingency wording — "degrades to an unlocated deserialization error" — is
+  not needed. MessagePack still carries no line or column, which is inherent to
+  the format rather than a limitation of the crate.
+- Observation: the two claims the design review could not verify are both
+  confirmed, and both cut the way the reviewer feared. An array-encoded
+  MessagePack document decodes silently into an equal value, and
+  `deny_unknown_fields` is enforced under the *map* form but has nothing to act
+  on under the array form.
+  Evidence: Spike A1 items 4a and 3.
+  Impact: `to_vec_named` is load-bearing for correctness, not merely for
+  evolvability, and the wire-shape assertion is the only thing standing between
+  an accidental `to_vec` and a silently positional shipped scene. This belongs
+  in ADR 006's rationale, as the plan anticipated.
+- Observation: a `BTreeMap` with a struct key serializes under MessagePack and
+  fails under JSON with `key must be a string`, exactly as the `Constraints`
+  rule assumed.
+  Evidence: Spike A1 item 5.
+  Impact: the rule banning non-string map keys is confirmed rather than
+  theoretical, and ADR 006 can state it as a measured fact.
 
 - Observation: `rmp_serde`'s `serialize_tuple_struct` writes a positional array
   unconditionally, ignoring the struct-map configuration entirely, and its
@@ -542,6 +601,48 @@ travel with the C1 commit.
   one-shot-versus-restream decision.
 
 ## Decision log
+
+- Decision: generated fixture documents are encoded as **compact** JSON — one
+  line, `serde_json::to_string` — not pretty-printed. Hand-written test
+  fixtures under `crates/world/tests/fixtures/` stay pretty, because no
+  generator writes them. Short `serde` renames are **not** adopted.
+  Rationale: Spike A2 measured the busiest plausible wilderness fixture at
+  2.33 MiB pretty against a 1 MiB tolerance, and at 0.74 MiB compact. The
+  escape this plan prescribed — renaming `length` and `index` to `n` and `i` —
+  reaches only 2.04 MiB and does not clear the bar, because the cost is
+  `serde_json`'s pretty printer putting every field of every one of 33,000 run
+  objects on its own line, not the length of the field names.
+  The instruction being withdrawn was justified as keeping "authored documents
+  diffable", and that justification does not survive contact with Stage C3:
+  generated fixtures are *not* the authoring surface. The layer rasters are,
+  `make scenes-check` proves the JSON matches them, and the provenance sidecar
+  maps a diagnostic back to the raster. A reviewer has no reason to read the
+  generated JSON, and pretty-printing it buys a diff nobody reads at 3.1 times
+  the size, forever, in every clone.
+  A middle path was considered and rejected: pretty down to the chunk-entry
+  level with each payload compact on one line. It gives genuinely better diffs,
+  but it requires a custom `serde_json::ser::Formatter` *and* a byte-identical
+  reimplementation of it in the Python generator — two hand-written formatters
+  that must agree exactly, which is precisely the two-writer drift hazard this
+  plan already guards against elsewhere. Compact output is one line of
+  `json.dumps(..., separators=(",", ":"))` on the Python side and one call on
+  the Rust side, and the two agree by construction.
+  Consequences: Stage C1's `codec/json.rs` encodes compactly; the "byte
+  identical to `serde_json::to_string_pretty`" clause in Stage B's worked
+  example applies to the hand-written fixtures only; the fixture-size tolerance
+  stands unchanged at 1 MiB, and the wilderness fixture now sits at roughly
+  three quarters of it.
+  Date/Author: 2026-07-30, after Spike A2.
+- Decision: `to_vec_named` is recorded in ADR 006 as a **correctness**
+  requirement rather than an evolvability preference.
+  Rationale: Spike A1 confirmed that `rmp_serde` decodes an array-encoded
+  document silently into an equal value, and that `deny_unknown_fields` has
+  nothing to act on in the array form. So an accidental `to_vec` produces a
+  shipped scene that is positional and unevolvable, rejects nothing, and looks
+  entirely healthy to a round-trip test. Only the wire-shape assertion catches
+  it. The design review suspected both of these and could not verify them;
+  they are now measured.
+  Date/Author: 2026-07-30, after Spike A1.
 
 - Decision: the scene format stays inside `thysalion-world`; no leaf
   `thysalion-scene` crate is created. `bevy` becomes an *optional feature* of
@@ -1129,8 +1230,8 @@ Feature: Scene loading and validation
     Given the minimal hand-written scene document
     When the scene is loaded
     Then loading succeeds
-    And the scene reports 4 palette entries
-    And the scene reports 64 non-air voxels
+    And the scene reports 3 palette entries
+    And the scene reports 32784 non-air voxels
 
   Scenario: The same scene survives a MessagePack round trip
     Given the minimal hand-written scene document
@@ -1380,8 +1481,11 @@ Validation rejects the non-canonical form rather than silently normalizing it,
 so a generator bug is visible rather than absorbed.
 
 **Nothing is elided.** Every defaulted field appears. Committed fixtures are
-byte-identical to what `serde_json::to_string_pretty` produces for the same
-document, which is what `make scenes-check` asserts. Two writers exist for this
+byte-identical to what this crate's own encoder produces for the same document,
+which is what `make scenes-check` asserts. This worked example is shown
+pretty-printed because it is a hand-written test fixture and a teaching aid;
+the *generated* fixtures under `assets/scenes/` are compact, for the reason in
+the decision log. Two writers exist for this
 format — the Python generator and Rust's serializer — and if the generator
 omits defaults that Rust re-emits, the two produce different bytes for the same
 scene from the first commit. That divergence is invisible to a canonical-bytes
@@ -1464,12 +1568,14 @@ The codec modules:
   'fog_volume'` instead of "unsupported version 1.1; this build supports 1.0".
 - `codec/json.rs` — decodes through `serde_path_to_error` over
   `serde_json::Deserializer`, carrying the structural path and, where
-  `serde_json` supplies them, the line and column. Encodes with
-  `serde_json::to_string_pretty` so authored documents stay diffable.
+  `serde_json` supplies them, the line and column. Encodes **compactly** with
+  `serde_json::to_string`: Spike A2 measured pretty-printing at 3.1 times the
+  size, over the fixture tolerance, for a diff nobody reads — see the decision
+  log.
 - `codec/msgpack.rs` — encodes with `rmp_serde::to_vec_named` and never with
-  `to_vec`. Decodes through `serde_path_to_error` if Spike A3 confirmed that
-  works, and plainly otherwise; MessagePack carries no line or column in any
-  case.
+  `to_vec`. Decodes through `serde_path_to_error`, which Spike A3 confirmed
+  yields the same structural path as the JSON decoder; MessagePack carries no
+  line or column in either case.
 
 The source module carries the path rules, which are the port's contract and not
 an adapter's business. A resource path is relative to the scene document's own
@@ -2020,8 +2126,76 @@ escalate per `Tolerances` rather than loosening a test or adding a suppression.
 
 ## Artefacts and notes
 
-To be filled during implementation with the resolved dependency versions from
-Stage A, the Spike A1 and A2 measurements, and the first passing transcripts.
+### Resolved dependency versions (Stage A)
+
+Pinned in `[workspace.dependencies]`. Caret requirements throughout except
+`schemars`, which is exact for the reason in the decision log.
+
+```toml
+serde = { version = "1", features = ["derive"] }   # resolved 1.0.229
+serde_json = "1"                                    # resolved 1.0.151
+rmp-serde = "1.3"                                   # resolved 1.3.1
+serde_path_to_error = "0.1"                         # resolved 0.1.20
+schemars = "=1.2.1"
+smol_str = { version = "0.3", features = ["serde"] } # resolved 0.3.6
+thiserror = "2"                                     # resolved 2.0.19
+tracing = "0.1"                                     # resolved 0.1.44
+blake3 = "1"                                        # resolved 1.8.5
+insta = "1"                                         # resolved 1.48.0
+rmpv = { version = "1.3", features = ["with-serde"] } # resolved 1.3.1
+```
+
+### Spike A1 and A3 transcript
+
+Run against serde 1.0.229, serde_json 1.0.151, rmp-serde 1.3.1, rmpv 1.3.1.
+
+```plaintext
+1. round-trip parity: OK (json 201 bytes, msgpack 136 bytes)
+2. to_vec_named is_map=true | to_vec is_array=true
+   payload uniform json: {"uniform":1}
+   payload runs    json: {"runs":[{"length":4,"index":1}]}
+3. json unknown field rejected: unknown field `bogus`, expected one of ...
+   msgpack unknown field rejected: unknown field `bogus`, expected one of ...
+   serde(default) accepted when absent: added_later=0
+4a. array-encoded payload DECODES SILENTLY (equal=true)
+5. json struct-key rejected: key must be a string
+   msgpack struct-key accepted (144 bytes)
+A3. msgpack path = "payload.runs[0].length" | inner = wrong msgpack marker FixStr(12)
+A3. json    path = "payload.runs[0].length" | inner = invalid type: string ...
+```
+
+Every A1 question is answered affirmatively, and two open questions from the
+design review are now settled rather than assumed. The externally-tagged
+newtype payload reads exactly as the worked example in Stage B specifies.
+
+### Spike A2 measurements
+
+A 1024 x 1024 x 128 declared extent with sixty-four populated chunks in an
+8 x 8 footprint, each carrying a three-layer ground slab plus 140 scattered
+vertical features — deliberately busy content, chosen so the measurement is
+pessimistic rather than flattering.
+
+```plaintext
+populated chunks : 64 (0 uniform)
+total runs       : 33162          (mean 518 per chunk)
+decoded sparse   : 4.00 MiB       (tolerance 16 MiB — pass)
+declared dense   : 256.00 MiB     (what chunk-keying avoids)
+load+decode+scan : 96.6 ms debug, 6.4 ms release
+                                  (tolerances 3 s and 250 ms — pass)
+
+variant                       JSON MiB
+  pretty, long names          2.33      tolerance 1 MiB — FAIL
+  pretty, short names         2.04      FAIL
+  compact, long names         0.74      pass
+  compact, short names        0.45      pass
+  msgpack, long names         0.51
+  msgpack, short names        0.22
+```
+
+Three of the four go/no-go criteria pass with room to spare. The fourth — JSON
+size — fails, and the escape this plan prescribed (short `serde` renames) does
+not fix it: at 2.04 MiB it is still twice the tolerance. See the decision log
+entry on JSON encoding style for the resolution and the reasoning.
 
 ## Interfaces and dependencies
 
