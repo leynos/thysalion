@@ -25,6 +25,7 @@
 
 pub mod bounds;
 pub mod diagnostics;
+pub mod report;
 pub mod rules;
 
 pub use bounds::Bounds;
@@ -35,6 +36,7 @@ pub use diagnostics::{
     SceneDiagnostic,
     VoxelSite,
 };
+pub use report::{Report, SceneStats, Strictness};
 
 use crate::{
     grid::VoxelGrid,

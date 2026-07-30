@@ -137,7 +137,11 @@ impl ChunkContext<'_> {
                 ),
             ));
         }
-        if previous.is_some_and(|last| last >= self.coord) {
+        // Strictly greater, not `>=`. Equality is precisely the duplicate case,
+        // already reported above, and saying "and also not in ascending order"
+        // about it adds a second diagnostic for one authoring mistake — which
+        // is how a report of forty consequences buries the four causes.
+        if previous.is_some_and(|last| last > self.coord) {
             problems.push(self.structural(
                 DiagnosticCode::ChunksOutOfOrder,
                 "chunk entries must be sorted by coordinate, or the encoding is not canonical and \

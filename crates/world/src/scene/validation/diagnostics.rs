@@ -355,6 +355,15 @@ impl SceneDiagnostic {
         }
     }
 
+    /// The resource this diagnostic names, when it names one.
+    #[must_use]
+    pub fn resource_path(&self) -> Option<&camino::Utf8Path> {
+        match self {
+            Self::Resource { path, .. } => Some(path),
+            Self::Structural { .. } | Self::Positioned { .. } => None,
+        }
+    }
+
     /// Whether this diagnostic is advisory rather than fatal.
     #[must_use]
     pub const fn is_warning(&self) -> bool { self.code().is_warning() }

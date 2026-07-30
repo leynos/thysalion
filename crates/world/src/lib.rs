@@ -33,6 +33,7 @@
 //! absent chunk is entirely air. Palette index zero is always air. See
 //! [`scene::document`] for the wire types and design §7 for the specification.
 
+pub mod check;
 pub mod codec;
 pub mod grid;
 pub mod loader;

@@ -1,0 +1,278 @@
+{
+  "version": {
+    "major": 1,
+    "minor": 0
+  },
+  "name": "prototype-too-deep",
+  "dimensions": {
+    "x": 32,
+    "y": 32,
+    "z": 32
+  },
+  "chunk_size": 32,
+  "palette": [
+    {
+      "name": "air",
+      "material": "air",
+      "passable": {
+        "pos_x": true,
+        "neg_x": true,
+        "pos_y": true,
+        "neg_y": true,
+        "pos_z": true,
+        "neg_z": true
+      },
+      "slope": "flat",
+      "emission": {
+        "intensity": 0,
+        "colour": [
+          0,
+          0,
+          0
+        ]
+      },
+      "sim": {
+        "fuel": 0,
+        "ignition_point": 65535,
+        "moisture_capacity": 0
+      },
+      "concept": null
+    },
+    {
+      "name": "stone-block",
+      "material": "stone",
+      "passable": {
+        "pos_x": false,
+        "neg_x": false,
+        "pos_y": false,
+        "neg_y": false,
+        "pos_z": false,
+        "neg_z": false
+      },
+      "slope": "flat",
+      "emission": {
+        "intensity": 0,
+        "colour": [
+          0,
+          0,
+          0
+        ]
+      },
+      "sim": {
+        "fuel": 0,
+        "ignition_point": 65535,
+        "moisture_capacity": 0
+      },
+      "concept": "thy:StoneBlock"
+    }
+  ],
+  "voxels": [
+    {
+      "at": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "payload": {
+        "runs": [
+          {
+            "length": 32768,
+            "index": 1
+          }
+        ]
+      }
+    }
+  ],
+  "entities": {
+    "prototypes": {
+      "link-00": {
+        "extends": "link-01",
+        "concept": null
+      },
+      "link-01": {
+        "extends": "link-02",
+        "concept": null
+      },
+      "link-02": {
+        "extends": "link-03",
+        "concept": null
+      },
+      "link-03": {
+        "extends": "link-04",
+        "concept": null
+      },
+      "link-04": {
+        "extends": "link-05",
+        "concept": null
+      },
+      "link-05": {
+        "extends": "link-06",
+        "concept": null
+      },
+      "link-06": {
+        "extends": "link-07",
+        "concept": null
+      },
+      "link-07": {
+        "extends": "link-08",
+        "concept": null
+      },
+      "link-08": {
+        "extends": "link-09",
+        "concept": null
+      },
+      "link-09": {
+        "extends": "link-10",
+        "concept": null
+      },
+      "link-10": {
+        "extends": "link-11",
+        "concept": null
+      },
+      "link-11": {
+        "extends": "link-12",
+        "concept": null
+      },
+      "link-12": {
+        "extends": "link-13",
+        "concept": null
+      },
+      "link-13": {
+        "extends": "link-14",
+        "concept": null
+      },
+      "link-14": {
+        "extends": "link-15",
+        "concept": null
+      },
+      "link-15": {
+        "extends": "link-16",
+        "concept": null
+      },
+      "link-16": {
+        "extends": "link-17",
+        "concept": null
+      },
+      "link-17": {
+        "extends": "link-18",
+        "concept": null
+      },
+      "link-18": {
+        "extends": "link-19",
+        "concept": null
+      },
+      "link-19": {
+        "extends": "link-20",
+        "concept": null
+      },
+      "link-20": {
+        "extends": "link-21",
+        "concept": null
+      },
+      "link-21": {
+        "extends": "link-22",
+        "concept": null
+      },
+      "link-22": {
+        "extends": "link-23",
+        "concept": null
+      },
+      "link-23": {
+        "extends": "link-24",
+        "concept": null
+      },
+      "link-24": {
+        "extends": "link-25",
+        "concept": null
+      },
+      "link-25": {
+        "extends": "link-26",
+        "concept": null
+      },
+      "link-26": {
+        "extends": "link-27",
+        "concept": null
+      },
+      "link-27": {
+        "extends": "link-28",
+        "concept": null
+      },
+      "link-28": {
+        "extends": "link-29",
+        "concept": null
+      },
+      "link-29": {
+        "extends": "link-30",
+        "concept": null
+      },
+      "link-30": {
+        "extends": "link-31",
+        "concept": null
+      },
+      "link-31": {
+        "extends": "link-32",
+        "concept": null
+      },
+      "link-32": {
+        "extends": "link-33",
+        "concept": null
+      },
+      "link-33": {
+        "extends": "link-34",
+        "concept": null
+      },
+      "link-34": {
+        "extends": "link-35",
+        "concept": null
+      },
+      "link-35": {
+        "extends": "link-36",
+        "concept": null
+      },
+      "link-36": {
+        "extends": "link-37",
+        "concept": null
+      },
+      "link-37": {
+        "extends": "link-38",
+        "concept": null
+      },
+      "link-38": {
+        "extends": "link-39",
+        "concept": null
+      },
+      "link-39": {
+        "extends": null,
+        "concept": null
+      }
+    },
+    "spawns": [
+      {
+        "name": "party-start",
+        "prototype": "link-00",
+        "at": {
+          "x": 4,
+          "y": 4,
+          "z": 31
+        },
+        "facing": "pos_y",
+        "airborne": false,
+        "concept": null
+      }
+    ]
+  },
+  "lighting": {
+    "sun_path": {
+      "azimuth_centidegrees": 13500,
+      "elevation_centidegrees": 3000
+    },
+    "ambient_bands": [],
+    "probe_spacing_mm": 2000
+  },
+  "knowledge": {
+    "graph": "thy:scene/corrupt",
+    "sources": [
+      "knowledge/corrupt.trig"
+    ]
+  }
+}

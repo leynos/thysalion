@@ -1,0 +1,109 @@
+{
+  "version": {
+    "major": 1,
+    "minor": 0
+  },
+  "name": "duplicate-chunk",
+  "dimensions": {
+    "x": 32,
+    "y": 32,
+    "z": 32
+  },
+  "chunk_size": 32,
+  "palette": [
+    {
+      "name": "air",
+      "material": "air",
+      "passable": {
+        "pos_x": true,
+        "neg_x": true,
+        "pos_y": true,
+        "neg_y": true,
+        "pos_z": true,
+        "neg_z": true
+      },
+      "slope": "flat",
+      "emission": {
+        "intensity": 0,
+        "colour": [
+          0,
+          0,
+          0
+        ]
+      },
+      "sim": {
+        "fuel": 0,
+        "ignition_point": 65535,
+        "moisture_capacity": 0
+      },
+      "concept": null
+    },
+    {
+      "name": "stone-block",
+      "material": "stone",
+      "passable": {
+        "pos_x": false,
+        "neg_x": false,
+        "pos_y": false,
+        "neg_y": false,
+        "pos_z": false,
+        "neg_z": false
+      },
+      "slope": "flat",
+      "emission": {
+        "intensity": 0,
+        "colour": [
+          0,
+          0,
+          0
+        ]
+      },
+      "sim": {
+        "fuel": 0,
+        "ignition_point": 65535,
+        "moisture_capacity": 0
+      },
+      "concept": "thy:StoneBlock"
+    }
+  ],
+  "voxels": [
+    {
+      "at": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "payload": {
+        "uniform": 1
+      }
+    },
+    {
+      "at": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "payload": {
+        "uniform": 1
+      }
+    }
+  ],
+  "entities": {
+    "prototypes": {},
+    "spawns": []
+  },
+  "lighting": {
+    "sun_path": {
+      "azimuth_centidegrees": 13500,
+      "elevation_centidegrees": 3000
+    },
+    "ambient_bands": [],
+    "probe_spacing_mm": 2000
+  },
+  "knowledge": {
+    "graph": "thy:scene/corrupt",
+    "sources": [
+      "knowledge/corrupt.trig"
+    ]
+  }
+}

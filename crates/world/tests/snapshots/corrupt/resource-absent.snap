@@ -1,0 +1,11 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: resource-absent.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.knowledge.resource-absent at knowledge[0]
+  resource: knowledge/gone.trig
+  no resource at knowledge/gone.trig

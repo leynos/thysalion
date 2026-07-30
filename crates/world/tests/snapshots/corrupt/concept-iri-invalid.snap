@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: concept-iri-invalid.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.concept.invalid at palette[1]
+  concept "nope:StoneBlock" is invalid: prefix "nope" is not a project namespace

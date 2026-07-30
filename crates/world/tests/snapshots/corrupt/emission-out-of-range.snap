@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: emission-out-of-range.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.palette.emission-out-of-range at palette[1]
+  emission intensity 99 is above the 0-15 scale

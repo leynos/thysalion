@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: chunks-out-of-order.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.voxels.chunks-out-of-order at voxels[1]
+  chunk entries must be sorted by coordinate, or the encoding is not canonical and the content hash is unstable

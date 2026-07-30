@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: chunk-size-not-design.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.chunk-size.not-design at dimensions[0]
+  chunk size 16 is not the 32 design section 7.1 fixes
