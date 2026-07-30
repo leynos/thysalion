@@ -2022,9 +2022,35 @@ here, with `make all` passing.
   authoring encoding design §7.3 requires, and blockstate-string palette entries
   carrying none of passability, slope, emission, simulation coefficients, or
   concept IRI); MagicaVoxel `.vox` (geometry and colour only, 255 colours, a
-  256-per-axis model cap — an interchange for props, not a scene format); and
+  256-per-axis model cap — an interchange for props, not a scene format);
   OpenVDB (built for sparse *float* fields, with only a partial and dormant Rust
-  reader). Recording that survey is what stops it being redone at phase 8.
+  reader); and Apache Arrow or Parquet, for the reasons below. Recording that
+  survey is what stops it being redone at phase 8.
+
+  Arrow and Parquet deserve their own paragraph, because lille's own map-format
+  document proposed exactly this — §9 floats "an optional Apache Arrow encoding
+  (dictionary-encoded block IDs + sparse tensor)" — so the idea has provenance
+  in this project's lineage and will be raised again if it is not answered.
+  They are columnar analytics formats, and the mismatch is in four places.
+  A scene is one small, deeply nested, heterogeneous record plus one large
+  homogeneous array; Parquet is excellent at the second and clumsy at the
+  first, and a one-row table of nested structs is not what its tooling is for.
+  Parquet is binary only, so design §7.3's JSON authoring encoding would need a
+  second schema and a conversion between them — the two-writer drift hazard
+  this plan already guards against elsewhere. Parquet files embed writer
+  metadata, optional statistics, row-group layout, and codec choices, and
+  byte-determinism across writer versions is not a property the format
+  promises, which design §12.3's content hashes require. And the win Parquet
+  offers — predicate pushdown and column pruning over large datasets — is one
+  this project cannot spend: scenes load whole, and design §6.3 makes the
+  whole-scene load a performance contract rather than a query.
+  The narrower observation is that Arrow's dictionary encoding is what the
+  palette already is, and its run-end encoding is what the chunk payload
+  already is, so adopting the framework would buy two things this format has
+  in a few dozen lines. Where Arrow *would* fit is the replay corpus of
+  roadmap step 1.3.2 and invariant I1: many homogeneous rows, analytical
+  queries, no authoring surface. That is worth revisiting there, and is
+  recorded as such rather than dismissed.
   Minecraft Anvil's bit-packed palette indices are noted not as a rejected
   format but as a deferred optimization with a trigger, since design §7.2 fixes
   the index at 16 bits and narrowing it is a design amendment.
