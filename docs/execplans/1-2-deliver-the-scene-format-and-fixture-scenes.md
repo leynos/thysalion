@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
 and `Outcomes & retrospective` must be kept up to date as work proceeds.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -478,8 +478,14 @@ travel with the C1 commit.
   `make all`; the cross-language agreement test in
   `crates/world/tests/generated_fixtures.rs`; and two behavioural scenarios
   over the shipped artefacts. Measurements in `Artefacts and notes`.
-- [ ] Stage D: documentation, ADR 006, design-document amendments, refactor,
-  and cleanup — fourth commit.
+- [x] (2026-07-30) Stage D: documentation, ADR 006, design-document
+  amendments, refactor, and cleanup. Delivered:
+  `docs/adr-006-scene-document-model.md`, resolving ADR 005's forwarded open
+  question; `docs/world-plane-architecture.md` with the format reference, the
+  worked example, and the version-history table; amendments to design §7.2,
+  §7.3, §7.4, and §10.5; updates to `contents.md`, `repository-layout.md`,
+  `developers-guide.md`, and `users-guide.md`; and a refactor pass that
+  consolidated the duplicated fixture-locating test helpers.
 
 ## Surprises & discoveries
 
@@ -690,6 +696,38 @@ travel with the C1 commit.
   derives nothing from load order: palette indices, chunk coordinates, and
   spawn ordinals are all document-determined. Roadmap step 4.1.1 inherits the
   one-shot-versus-restream decision.
+
+- Observation: the format does **not** permit a scene extent that is not a
+  multiple of the chunk size, so `bare-cell` could not be given one as this
+  plan asked. Evidence: `Extent::new` refuses an unaligned axis, and the
+  chunk-keyed payload has no way to express a partial edge chunk — a chunk
+  entry is a whole 32-cube or it is absent. Impact: the plan anticipated this
+  ("if the format turns out *not* to permit a non-multiple extent, that is a
+  constraint worth learning now rather than at step 2.1.1"), and it is now
+  learned. `bare-cell` varies along every other axis instead: one chunk, two
+  palette entries, no entities, no ambient bands, no knowledge resources. A
+  scene whose content does not fill a whole chunk is expressed by a smaller
+  content box, not by a smaller extent.
+
+- Observation: writing the worked example into the world-plane architecture
+  document reproduced, exactly, the defect an empirical review caught in this
+  plan before implementation began — a hand-written scene document whose run
+  lengths did not sum to the chunk volume. Evidence: `scene-check` reported
+  `scene.voxels.run-length-mismatch`, 32 voxels short, on the first run against
+  the documented JSON. Impact: prose examples of a format with arithmetic
+  invariants must be *executed*, not proof-read; a reviewer will not add four
+  numbers and neither did the author. The example is now checked by running the
+  shipped tool against it.
+
+- Observation: the obstructed-spawn warning caught a real authoring mistake in
+  a fixture within minutes of the fixture existing. Evidence:
+  `market-town-block`'s `well-keeper` spawn stood inside the well's stone kerb,
+  reported as `scene.entities.spawn-obstructed` by the first strict check.
+  Impact: this is exactly the "loads clean, is nonsense" class the two warnings
+  were added to catch, and it validates spending two rules on it. It also
+  argues for the strict-clean assertion over the shipped fixtures, since the
+  same mistake in a fixture would otherwise have been inherited by every later
+  phase.
 
 ## Decision log
 
@@ -1263,8 +1301,67 @@ travel with the C1 commit.
 
 ## Outcomes & retrospective
 
-To be completed at the end of Stage D. One lesson is already worth recording,
-because it changed how the remaining stages are sized.
+Roadmap step 1.2 is delivered. A contributor can take a scene written as
+human-readable JSON, load it through one validating loader, and get back either
+a fully formed in-memory scene or a list of located diagnostics and nothing
+else. Four fixture scenes ship, authored as layered text and compiled, and they
+are the shared substrate every later phase renders, lights, simulates, and
+tests against.
+
+Measured against the four things `Purpose / big picture` promised:
+
+1. A JSON document round-trips losslessly through the Rust model and the
+   MessagePack encoding — proven by a property test over generated documents
+   and by checked-in golden bytes.
+2. Loading a corrupt scene produces a distinct named diagnostic per corruption
+   class, reports every distinct problem in the earliest failing phase, and
+   never yields a partially constructed scene. Twenty-nine corrupt fixtures,
+   one per class, each asserted to produce exactly one problem.
+3. `scene-check` reports `ok` and exits zero for a valid scene, and a located
+   diagnostic report with a code that distinguishes an invalid scene from a
+   broken tool otherwise.
+4. All four fixture scenes load clean — strict-clean — exercised by a
+   behavioural suite that runs headless.
+
+197 tests: 172 Rust and 25 pytest.
+
+### What would be done differently
+
+Stage C2 was planned as a single commit and is not one. The first attempt
+reached roughly sixty per cent — the port, the diagnostics, the palette, and
+two rule sets — before running out of room, and none of it compiled, because
+the behavioural suite it was written against referenced a `Scene`, a
+`validation` module, and a `loader` that did not exist yet. The work had to be
+stashed rather than committed, leaving no green checkpoint in the middle of the
+largest stage in the plan.
+
+The mistake was sizing the stage by *subject* (scene loading) rather than by
+*the smallest thing that compiles and passes*. Splitting it into C2a and C2b
+gave two commits that each stand alone. Stage C3 was split the same way from
+the outset and needed no rescue.
+
+### What worked
+
+Three controls earned their cost, and all three earned it by catching something
+real rather than by being reassuring.
+
+The exactly-one-problem assertion over the corrupt fixtures found a defect in
+the validator itself: chunk sort order was checked with `>=`, but equality is
+the duplicate case and already has its own rule, so a duplicated coordinate
+reported two faults for one authoring mistake.
+
+The strict-clean assertion over the shipped fixtures found a spawn standing
+inside a well's stone kerb, which is precisely the "loads clean, is nonsense"
+class the warnings exist for.
+
+The completeness test — every `DiagnosticCode` must have a fixture — found two
+codes with no coverage and forced an honest answer for each rather than a
+silent omission.
+
+The cheapest thing that paid off was reading the measurements. All four
+fixtures initially fell inside a single 32-cube, so nothing shipped exercised a
+content box straddling a chunk boundary; no test failed, and the table in
+`Artefacts and notes` made it obvious.
 
 Stage C2 was planned as a single commit and is not one. The first attempt
 reached roughly sixty per cent — the port, the diagnostics, the palette, and

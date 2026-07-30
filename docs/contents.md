@@ -21,6 +21,12 @@ documentation set.
 - [ADR 005: workspace crate layout](adr-005-workspace-crate-layout.md)
   records the crate-per-plane workspace, the layering and release-scoping
   rules, and the demo harness contract.
+- [ADR 006: the scene document model](adr-006-scene-document-model.md)
+  records the two-stage document/domain scene model, the canonical byte form,
+  and the compatibility policy for scene documents.
+- [World plane architecture](world-plane-architecture.md) documents the
+  `thysalion-world` crate's module tree, the `SceneSource` port, reading a
+  diagnostic report, the scene format reference, and the version-history table.
 - [Roadmap](roadmap.md) sequences delivery as independent capability-
   demonstration spikes off a shared core, with two integration milestones.
 

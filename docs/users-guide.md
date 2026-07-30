@@ -41,6 +41,9 @@ full generated workflow locally on Linux.
 
 - `make demo` runs a capability demonstration binary (`DEMO=empty` by
   default, so `make demo DEMO=empty` and `make demo` are equivalent).
+- `make scenes` compiles the fixture scenes under `assets/scenes/src/` into
+  the committed `assets/scenes/*.scene.json` documents; most contributors will
+  not need to run it directly.
 
 ## Running the demos
 
@@ -71,3 +74,19 @@ The binding table is defined once in the harness source
 `thysalion_harness::input::SCREENSHOT_KEY` for `F12`, which is kept separate
 because screenshots trigger on key release); if this list ever disagrees with
 the code, the code wins and this guide needs updating.
+
+## Checking a scene
+
+Thysalion ships four fixture scenes as committed JSON under `assets/scenes/`.
+To check one for validity, run:
+
+```sh
+cargo run -p thysalion-world --example scene-check -- \
+    assets/scenes/keep-interior.scene.json
+```
+
+Pass `--json` for structured output, `--strict` to treat warnings as failures,
+`--stats` to include voxel, run, and byte measurements, or `--help` for the
+full option list. The developer guide's "Scene fixtures" section and
+[World plane architecture](world-plane-architecture.md) cover the format itself
+and how to read a diagnostic report.
