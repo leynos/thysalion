@@ -11,8 +11,9 @@ Status: IN PROGRESS
 Thysalion is an isometric voxel role-playing game built on four architectural
 planes — state, logic, knowledge, and presentation — described in
 [thysalion-design.md](../thysalion-design.md) §6.1. Roadmap step 1.1 delivered
-the workspace and the demo harness; `crates/world` (the crate `thysalion-world`,
-the *state* plane) is still an empty skeleton whose module comment says so.
+the workspace and the demo harness; `crates/world` (the crate
+`thysalion-world`, the *state* plane) is still an empty skeleton whose module
+comment says so.
 
 Roadmap step 1.2 ([roadmap.md](../roadmap.md) §1.2) fills it. After this change
 a contributor can take a scene written as a human-readable JSON document, load
@@ -25,16 +26,17 @@ simulates, and tests against.
 Concretely, after this change:
 
 1. A JSON scene document round-trips losslessly through the Rust model and the
-   MessagePack encoding: `document -> JSON -> document -> MessagePack ->
-   document` yields a value equal to the original (task 1.2.1).
+   MessagePack encoding:
+   `document -> JSON -> document -> MessagePack -> document` yields a value
+   equal to the original (task 1.2.1).
 2. Loading a corrupt scene produces a distinct, named diagnostic for each
    corruption class, reports *every* problem found rather than the first, and
    never yields a partially constructed scene (task 1.2.2).
-3. Running `cargo run -p thysalion-world --example scene-check --
-   assets/scenes/keep-interior.scene.json` prints `keep-interior: ok` and exits
-   zero, and the same command against a corrupt fixture prints a located
-   diagnostic report and exits with a code that distinguishes an invalid scene
-   from a broken tool (task 1.2.2).
+3. Running
+   `cargo run -p thysalion-world --example scene-check -- assets/scenes/keep-interior.scene.json`
+   prints `keep-interior: ok` and exits zero, and the same command against a
+   corrupt fixture prints a located diagnostic report and exits with a code
+   that distinguishes an invalid scene from a broken tool (task 1.2.2).
 4. All three fixture scenes under `assets/scenes/` load clean through the
    validator, exercised by a behavioural suite that runs headless in continuous
    integration (task 1.2.3).
@@ -117,10 +119,10 @@ escalation, not workarounds.
   incompatible with it at runtime; `#[serde(untagged)]` is forbidden, because
   it buffers through serde's `Content`, collapses integer widths differently
   per format, and destroys error locality. No document type has a hand-written
-  `Serialize` or `Deserialize` implementation. No tuple struct reaches the
-  wire: `rmp_serde`'s `serialize_tuple_struct` writes a positional array
-  regardless of the struct-map configuration, so a tuple struct is permanently
-  unevolvable and its failure mode diverges between the two encodings.
+  `Serialize` or `Deserialize` implementation. No tuple struct reaches the wire:
+  `rmp_serde`'s `serialize_tuple_struct` writes a positional array regardless
+  of the struct-map configuration, so a tuple struct is permanently unevolvable
+  and its failure mode diverges between the two encodings.
 - The workspace lint table in the root `Cargo.toml` applies unchanged. The
   denials that bite hardest here are `clippy::indexing_slicing`,
   `clippy::cast_possible_truncation`, `clippy::cast_possible_wrap`,
@@ -136,12 +138,12 @@ escalation, not workarounds.
   more than any individual lint: `cognitive-complexity-threshold = 9` (and
   `cognitive_complexity` is *denied*), `too-many-lines-threshold = 70` per
   function, `too-many-arguments-threshold = 4`, and
-  `excessive-nesting-threshold = 4`. A single function that walks a chunk's runs
-  while checking the volume sum, run canonicality, zero counts, and palette
-  bounds violates the complexity ceiling by construction. The traversal is
-  therefore *one pass with several collaborating checkers* — an iterator over
-  decoded runs feeding a small set of single-purpose accumulators — not one
-  function doing four jobs. Grouped parameters go into named structs rather
+  `excessive-nesting-threshold = 4`. A single function that walks a chunk's
+  runs while checking the volume sum, run canonicality, zero counts, and
+  palette bounds violates the complexity ceiling by construction. The traversal
+  is therefore *one pass with several collaborating checkers* — an iterator
+  over decoded runs feeding a small set of single-purpose accumulators — not
+  one function doing four jobs. Grouped parameters go into named structs rather
   than long argument lists, per AGENTS.md.
 - No exported type in `thysalion-world` may be named exactly `Error`.
   `clippy::error_impl_error`, which this workspace denies, fires only on an
@@ -150,11 +152,11 @@ escalation, not workarounds.
   a per-type check.
 - `make all` (check-fmt, lint, test, spelling) is the commit gate and must pass
   at every commit. Documentation changes must additionally pass
-  `make markdownlint` and `make nixie`. Red test states live only in the working
-  tree, never in a commit (AGENTS.md quality gates).
+  `make markdownlint` and `make nixie`. Red test states live only in the
+  working tree, never in a commit (AGENTS.md quality gates).
 - Filesystem access uses `cap_std::fs_utf8` and `camino`, never `std::fs` or
-  `std::path` (AGENTS.md). The scene loader itself performs no ambient-authority
-  filesystem access: it reads through an injected port.
+  `std::path` (AGENTS.md). The scene loader itself performs no
+  ambient-authority filesystem access: it reads through an injected port.
 - Every module begins with a `//!` comment; every public item carries Rustdoc;
   no source file exceeds 400 lines (AGENTS.md).
 - Dependencies use caret requirements and are declared once in
@@ -162,8 +164,8 @@ escalation, not workarounds.
   `{ workspace = true }`.
 - All documentation follows the
   [documentation style guide](../documentation-style-guide.md): en-GB-oxendict
-  spelling, sentence-case headings, 80-column prose wrap, 120-column code, and a
-  language identifier on every fenced block. Python helper scripts follow
+  spelling, sentence-case headings, 80-column prose wrap, 120-column code, and
+  a language identifier on every fenced block. Python helper scripts follow
   [scripting standards](../scripting-standards.md): Python 3.13, an inline `uv`
   metadata block, Cyclopts for the command-line interface, and pytest coverage.
 - Binary assets are Git Large File Storage (LFS) attachments
@@ -199,8 +201,8 @@ quality criteria.
   fixture scenes are authored against it, stop and escalate rather than editing
   fixtures to match a churning API.
 - Fixture size: if any fixture scene's JSON document exceeds 1 MiB on disk, or
-  the decoded in-memory grid for any fixture exceeds 16 MiB, stop and escalate —
-  the storage strategy is wrong. The measured budgets these bound are in
+  the decoded in-memory grid for any fixture exceeds 16 MiB, stop and escalate
+  — the storage strategy is wrong. The measured budgets these bound are in
   `Risks`; the tripwires sit roughly two-and-a-half times above the expected
   values, so tripping one means a real regression, not tuning noise.
 - Load time: if any fixture takes more than 250 ms to load and validate in a
@@ -214,9 +216,9 @@ quality criteria.
 - Runtime resource bounds (these are enforced in code, not merely watched):
   a document may declare at most 65,536 palette entries — the 16-bit index
   space; at most 16,777,216 chunk entries; at most 65,536 runs per chunk; and a
-  prototype chain at most 32 deep. Decoded grid allocation is refused above
-  64 MiB. If any fixture approaches a bound, stop and escalate rather than
-  raising it.
+  prototype chain at most 32 deep. Decoded grid allocation is refused above 64
+  MiB. If any fixture approaches a bound, stop and escalate rather than raising
+  it.
 - Iterations: if the same test still fails after five attempts, stop and
   escalate with the failure output.
 - Ambiguity: if the design document and this plan disagree on the meaning of a
@@ -225,24 +227,24 @@ quality criteria.
 ## Risks
 
 - Risk: JSON and MessagePack diverge silently because a type's `serde`
-  implementation branches on `Serializer::is_human_readable`, and the failure is
-  invisible until a shipped scene decodes differently from the authored one.
-  Severity: high. Likelihood: low, given the mitigation.
-  Mitigation: type discipline, not configuration. The hazard list is narrower
-  than folklore suggests — in the standard library only the `std::net` address
-  types branch, plus `uuid::Uuid` and the `chrono` types outwith it; `glam`
-  vectors do not branch, and derived enums encode their variant name as a string
-  in both formats. ADR 006 therefore states a closed rule: a document type may
-  contain only integers, booleans, `String`, `SmolStr`, `Option`, `Vec`,
-  `BTreeMap`, plain derived enums, and other document types. No manual `serde`
+  implementation branches on `Serializer::is_human_readable`, and the failure
+  is invisible until a shipped scene decodes differently from the authored one.
+  Severity: high. Likelihood: low, given the mitigation. Mitigation: type
+  discipline, not configuration. The hazard list is narrower than folklore
+  suggests — in the standard library only the `std::net` address types branch,
+  plus `uuid::Uuid` and the `chrono` types outwith it; `glam` vectors do not
+  branch, and derived enums encode their variant name as a string in both
+  formats. ADR 006 therefore states a closed rule: a document type may contain
+  only integers, booleans, `String`, `SmolStr`, `Option`, `Vec`, `BTreeMap`,
+  plain derived enums, and other document types. No manual `serde`
   implementation, no `Uuid`, no `chrono`, no network types, no
   `serde_json::Value`. The enforcing guard is a `proptest` round-trip property
   over generated documents, because the failure is runtime and no lint or
   `trybuild` case can catch it.
 - Risk: `rmp-serde` serializes structs as positional arrays by default, so
   adding or reordering a field silently reinterprets previously encoded bytes.
-  Severity: high. Likelihood: high if unaddressed.
-  Mitigation: encode through `rmp_serde::to_vec_named` (equivalently
+  Severity: high. Likelihood: high if unaddressed. Mitigation: encode through
+  `rmp_serde::to_vec_named` (equivalently
   `Serializer::new(w).with_struct_map()`), never `to_vec` or a bare
   `Serializer::new`. This is writer-side only: `rmp-serde`'s deserializer
   forwards `deserialize_struct` to its any-value path and accepts either shape,
@@ -254,11 +256,11 @@ quality criteria.
 - Risk: the design's scene size classes (design §7.1, Table 1) reach
   1024 x 1024 x 128 voxels for the wilderness class. Decoded densely at two
   bytes per voxel that is 256 MiB, and a naive global run stream over it is
-  similarly unaffordable to encode, hash, or diff.
-  Severity: high. Likelihood: high if stored as one flat stream.
-  Mitigation: the document's voxel payload is keyed by chunk, and the decoded
-  grid is sparse by chunk, so both scale with populated volume rather than with
-  declared extent. The arithmetic, at the design's 32-cubed chunk size:
+  similarly unaffordable to encode, hash, or diff. Severity: high. Likelihood:
+  high if stored as one flat stream. Mitigation: the document's voxel payload
+  is keyed by chunk, and the decoded grid is sparse by chunk, so both scale
+  with populated volume rather than with declared extent. The arithmetic, at
+  the design's 32-cubed chunk size:
 
   | Class      | Extent            | Voxels  | Chunks | Dense   | Populated | Sparse |
   | ---------- | ----------------- | ------- | ------ | ------- | --------- | ------ |
@@ -275,165 +277,156 @@ quality criteria.
   fragment produces on the order of 8,000 interrupted rows and, at a plausible
   twenty runs per row, roughly 165,000 runs — about 2 MB of JSON, over the
   fixture tolerance, and a payload in which a one-building edit rewrites the
-  whole stream and defeats review.
-  Severity: high. Likelihood: high under the design's literal wording.
-  Mitigation: runs are chunk-local, and a chunk that is entirely one voxel type
-  is elided to a single uniform token (the trick Minecraft's Anvil format uses
-  for single-state sections). Locality collapses the run count by roughly an
-  order of magnitude, an edit touches one chunk's payload so the diff is
-  readable, and re-encoding costs time proportional to populated chunks rather
-  than to declared extent. This departs from design §7.3's literal "dense
-  Z-major layers, run-length encoded" and is written back into the design
-  document in Stage D.
+  whole stream and defeats review. Severity: high. Likelihood: high under the
+  design's literal wording. Mitigation: runs are chunk-local, and a chunk that
+  is entirely one voxel type is elided to a single uniform token (the trick
+  Minecraft's Anvil format uses for single-state sections). Locality collapses
+  the run count by roughly an order of magnitude, an edit touches one chunk's
+  payload so the diff is readable, and re-encoding costs time proportional to
+  populated chunks rather than to declared extent. This departs from design
+  §7.3's literal "dense Z-major layers, run-length encoded" and is written back
+  into the design document in Stage D.
 - Risk: design §12.3 requires save archives to carry content hashes over the
-  scene assets and to refuse a load on mismatch, and invariant I3 depends on it.
-  The naive implementation — hash the asset file's bytes — is broken by this
-  step's own premise of two encodings of one document: a scene's JSON form and
-  its shipped MessagePack form hash differently, so a save taken in a
+  scene assets and to refuse a load on mismatch, and invariant I3 depends on
+  it. The naive implementation — hash the asset file's bytes — is broken by
+  this step's own premise of two encodings of one document: a scene's JSON form
+  and its shipped MessagePack form hash differently, so a save taken in a
   development build would refuse to load in a shipped one. The failure surfaces
   in phase 8 as saves that refuse themselves, and by then it is unrepairable,
-  because every save in existence was written against the wrong hash.
-  Severity: high. Likelihood: high if unaddressed.
-  Mitigation: define the hash now, in this step, even though phase 8 consumes
-  it. The scene content hash is computed over the **canonical MessagePack
-  encoding of the validated document**, at load, independent of the encoding
-  actually read. That is well defined only because of the four canonicality
-  rules in `Constraints`, and it is why those rules cannot be relaxed later.
-  `Scene::content_hash` ships in this step; the tests assert that encoding the
-  same document twice yields identical bytes, that a document round-tripped
-  through JSON re-encodes to the same MessagePack bytes, and that the hash of a
-  scene loaded from JSON equals the hash of the same scene loaded from
-  MessagePack.
+  because every save in existence was written against the wrong hash. Severity:
+  high. Likelihood: high if unaddressed. Mitigation: define the hash now, in
+  this step, even though phase 8 consumes it. The scene content hash is
+  computed over the **canonical MessagePack encoding of the validated
+  document**, at load, independent of the encoding actually read. That is well
+  defined only because of the four canonicality rules in `Constraints`, and it
+  is why those rules cannot be relaxed later. `Scene::content_hash` ships in
+  this step; the tests assert that encoding the same document twice yields
+  identical bytes, that a document round-tripped through JSON re-encodes to the
+  same MessagePack bytes, and that the hash of a scene loaded from JSON equals
+  the hash of the same scene loaded from MessagePack.
 - Risk: the format acquires no evolution story, because a round-trip property
   proves symmetry *within one compilation* and nothing about durability across
   versions. A field is added for phase 3's fog volumes, every fixture is
   regenerated, every test passes — and every previously shipped document, and
-  every content hash taken over one, has silently moved.
-  Severity: high. Likelihood: medium.
-  Mitigation: three things, all cheap now. The version rule is stated in
-  `Constraints` and enforced by a probe that runs before full deserialization.
-  Additive fields carry `#[serde(default)]` and bump the minor version only, so
-  the checked-in fixtures do not fail the day a field arrives. And golden bytes
-  — `minimal.scene.json` and `minimal.scene.msgpack` under
+  every content hash taken over one, has silently moved. Severity: high.
+  Likelihood: medium. Mitigation: three things, all cheap now. The version rule
+  is stated in `Constraints` and enforced by a probe that runs before full
+  deserialization. Additive fields carry `#[serde(default)]` and bump the minor
+  version only, so the checked-in fixtures do not fail the day a field arrives.
+  And golden bytes — `minimal.scene.json` and `minimal.scene.msgpack` under
   `crates/world/tests/fixtures/golden/` — are checked in with a decode test,
   refreshed only deliberately. The golden test is the only thing in the suite
   capable of failing when the encoding drifts; regenerated fixtures never can,
   because they are current-version by construction.
 - Risk: `Scene` is built immutable, correctly for this step, and nobody records
-  what owns *mutable* voxel state. Roadmap step 2.1.3 then needs voxel edits for
-  incremental re-meshing, `bevy_voxel_world` supplies its own edit overlay
+  what owns *mutable* voxel state. Roadmap step 2.1.3 then needs voxel edits
+  for incremental re-meshing, `bevy_voxel_world` supplies its own edit overlay
   (design §7.1), and a second representation appears beside the first. By phase
   6 they disagree: an agent paths through a doorway that burned away at 4.2.3,
   and the cut-away clips the authored roof rather than the extant one.
   Severity: high. Likelihood: medium. This is not a bug but a missing decision
-  that six roadmap steps would each resolve differently.
-  Mitigation: record the answer now, in ADR 006, without building an edit
-  interface — that would be scope creep. The loaded `Scene` is the immutable
-  authored baseline, which is what gets content-hashed; runtime voxel state is
-  that baseline plus an edit overlay owned by the state plane, which is what
-  gets saved. `VoxelGrid` therefore ships read-only on purpose. Two follow-ups
-  are filed rather than solved: design §12.3's save-contents list does not
-  currently mention voxel edits, and roadmap step 2.1.1 owns the overlay's
-  relationship to `VoxelGrid`.
+  that six roadmap steps would each resolve differently. Mitigation: record the
+  answer now, in ADR 006, without building an edit interface — that would be
+  scope creep. The loaded `Scene` is the immutable authored baseline, which is
+  what gets content-hashed; runtime voxel state is that baseline plus an edit
+  overlay owned by the state plane, which is what gets saved. `VoxelGrid`
+  therefore ships read-only on purpose. Two follow-ups are filed rather than
+  solved: design §12.3's save-contents list does not currently mention voxel
+  edits, and roadmap step 2.1.1 owns the overlay's relationship to `VoxelGrid`.
 - Risk: a fixture loads clean and is nonsense — a market stall canopy resting on
   nothing, a guard spawned inside a wall, a step with no ramp. All fifteen
   corruption classes are structural, so validation cannot see it. Because the
-  fixture is the substrate for phases 2, 3, and 6, it will have been *looked at*
-  hundreds of times in screenshots, where a guard inside a wall is invisible,
-  and the failure surfaces at roadmap step 4.2.1 — whose success criterion is
-  literally "without clipping or floating" — as a suspected pathfinder bug.
-  Severity: medium. Likelihood: medium. The cost is in the fix, not the
-  discovery: changing a fixture perturbs every screenshot baseline from phases 2
-  and 3 and every probe-leak threshold tuned against the broken geometry.
-  Mitigation: reserve the warning tier before the API sets, which is the
-  expensive part to retrofit. `load` returns a `LoadedScene` carrying the scene
-  *and* a list of non-fatal findings, and `scene-check --strict` promotes them
-  to failure in continuous integration. Two semantic rules ship as warnings in
-  this step because they are nearly free and catch exactly this: a spawn must
-  not sit inside a non-passable voxel, and a spawn must have a supporting voxel
-  beneath it unless explicitly marked airborne. Reachability and structural
-  soundness are deliberately out of scope; they need phase 4's pathfinding to
-  define what reachable means.
+  fixture is the substrate for phases 2, 3, and 6, it will have been *looked
+  at* hundreds of times in screenshots, where a guard inside a wall is
+  invisible, and the failure surfaces at roadmap step 4.2.1 — whose success
+  criterion is literally "without clipping or floating" — as a suspected
+  pathfinder bug. Severity: medium. Likelihood: medium. The cost is in the fix,
+  not the discovery: changing a fixture perturbs every screenshot baseline from
+  phases 2 and 3 and every probe-leak threshold tuned against the broken
+  geometry. Mitigation: reserve the warning tier before the API sets, which is
+  the expensive part to retrofit. `load` returns a `LoadedScene` carrying the
+  scene *and* a list of non-fatal findings, and `scene-check --strict` promotes
+  them to failure in continuous integration. Two semantic rules ship as
+  warnings in this step because they are nearly free and catch exactly this: a
+  spawn must not sit inside a non-passable voxel, and a spawn must have a
+  supporting voxel beneath it unless explicitly marked airborne. Reachability
+  and structural soundness are deliberately out of scope; they need phase 4's
+  pathfinding to define what reachable means.
 - Risk: a palette reorder silently reinterprets every voxel in every scene that
   shares the palette. Indices are positional, `VoxelIndex` carries no palette
-  identity, and the grid stores indices rather than names — so inserting a voxel
-  type mid-palette to keep it grouped by material family, an entirely ordinary
-  editorial act, changes the meaning of every stored index above it. Every
-  fixture still loads clean, because validation checks that an index is *in
-  range* and never that it means what it meant yesterday.
-  Severity: high. Likelihood: medium, rising the moment a second scene shares a
-  legend or a phase-2 prefab hard-codes an index.
-  Mitigation: make the reorder visible rather than trusting it not to happen.
-  Each fixture's ordered palette — the `(name, material)` pairs in order — is
-  committed as a small manifest, and `make scenes-check` asserts against it, so
-  a reorder appears in review as a deliberate diff rather than as a silent
-  semantic change. Stage D's version-history table cites Minecraft's
-  1.15-to-1.16 index-packing break as a documentation lesson; the sharper
-  lesson is that index semantics need a mechanical invariant, not a note.
+  identity, and the grid stores indices rather than names — so inserting a
+  voxel type mid-palette to keep it grouped by material family, an entirely
+  ordinary editorial act, changes the meaning of every stored index above it.
+  Every fixture still loads clean, because validation checks that an index is
+  *in range* and never that it means what it meant yesterday. Severity: high.
+  Likelihood: medium, rising the moment a second scene shares a legend or a
+  phase-2 prefab hard-codes an index. Mitigation: make the reorder visible
+  rather than trusting it not to happen. Each fixture's ordered palette — the
+  `(name, material)` pairs in order — is committed as a small manifest, and
+  `make scenes-check` asserts against it, so a reorder appears in review as a
+  deliberate diff rather than as a silent semantic change. Stage D's
+  version-history table cites Minecraft's 1.15-to-1.16 index-packing break as a
+  documentation lesson; the sharper lesson is that index semantics need a
+  mechanical invariant, not a note.
 - Risk: a diagnostic is technically correct and operationally useless. "Voxel
-  run 3 references palette index 9" identifies a run *ordinal* in a JSON file no
-  human wrote, and reaching the layer text that a person did write requires
+  run 3 references palette index 9" identifies a run *ordinal* in a JSON file
+  no human wrote, and reaching the layer text that a person did write requires
   converting a cumulative run offset to a position, then a position to a file
-  and column — three steps no tool performs.
-  Severity: medium. Likelihood: high without the mitigation.
-  Mitigation: every positional diagnostic carries a `ChunkCoord` and a
-  chunk-local `VoxelPos`, which the decoder already computes. The generator
-  emits `assets/scenes/<name>.provenance.json` mapping chunk coordinates to the
-  authoring layer file and line, and `scene-check` appends that location to any
-  positional diagnostic. This is roughly forty lines of Python and is the
-  highest-leverage operational feature in the step; it is also why source spans
-  into the generated JSON were judged not worth a dependency (see the decision
-  log entry reversing the earlier `miette` choice).
+  and column — three steps no tool performs. Severity: medium. Likelihood: high
+  without the mitigation. Mitigation: every positional diagnostic carries a
+  `ChunkCoord` and a chunk-local `VoxelPos`, which the decoder already
+  computes. The generator emits `assets/scenes/<name>.provenance.json` mapping
+  chunk coordinates to the authoring layer file and line, and `scene-check`
+  appends that location to any positional diagnostic. This is roughly forty
+  lines of Python and is the highest-leverage operational feature in the step;
+  it is also why source spans into the generated JSON were judged not worth a
+  dependency (see the decision log entry reversing the earlier `miette` choice).
 - Risk: hand-authoring even a 128 x 128 x 64 interior as literal JSON is not
   humanly possible, so "author the three fixture scenes" degenerates into
-  checking in machine noise that no reviewer can diff.
-  Severity: medium. Likelihood: high.
-  Mitigation: fixtures are authored as layered text layouts with a character
-  legend — the text analogue of the Tiled layered-isometric workflow in design
-  §7.4 — and compiled to JSON by a checked-in, tested `uv` script. Both the
-  layouts and the generated JSON are tracked, so review reads the layouts and
-  continuous integration proves the JSON matches.
+  checking in machine noise that no reviewer can diff. Severity: medium.
+  Likelihood: high. Mitigation: fixtures are authored as layered text layouts
+  with a character legend — the text analogue of the Tiled layered-isometric
+  workflow in design §7.4 — and compiled to JSON by a checked-in, tested `uv`
+  script. Both the layouts and the generated JSON are tracked, so review reads
+  the layouts and continuous integration proves the JSON matches.
 - Risk: the concept IRI field (design §7.2) tempts a dependency on the
-  knowledge plane, inverting the layering rule.
-  Severity: medium. Likelihood: medium.
-  Mitigation: `ConceptIri` is a validated string newtype in `thysalion-world`
-  that checks syntax and project-namespace membership only. Resolution against
-  the ontology is the knowledge plane's job at roadmap step 5.1, and the
-  dependency edge runs `knowledge -> world`. The project namespaces are not yet
-  written down anywhere, so this step must define them — a prefix table mapping
-  `thy:` and the scene-graph prefix to their full IRI bases — in ADR 006 and the
-  world-plane architecture document. Without that table the namespace check has
-  nothing to check against and the "dangling knowledge IRI" diagnostic is
-  vacuous.
+  knowledge plane, inverting the layering rule. Severity: medium. Likelihood:
+  medium. Mitigation: `ConceptIri` is a validated string newtype in
+  `thysalion-world` that checks syntax and project-namespace membership only.
+  Resolution against the ontology is the knowledge plane's job at roadmap step
+  5.1, and the dependency edge runs `knowledge -> world`. The project
+  namespaces are not yet written down anywhere, so this step must define them —
+  a prefix table mapping `thy:` and the scene-graph prefix to their full IRI
+  bases — in ADR 006 and the world-plane architecture document. Without that
+  table the namespace check has nothing to check against and the "dangling
+  knowledge IRI" diagnostic is vacuous.
 - Risk: phase 2 needs to mutate voxels (roadmap step 2.1.3, incremental
   re-meshing on edit), but the `Scene` this step produces is an immutable
   load-time value with no edit interface. The likely accident is a second,
   mutable voxel representation appearing beside it, after which the two diverge
-  and nobody can say which is authoritative.
-  Severity: medium. Likelihood: medium.
-  Mitigation: state the answer now rather than discovering it in phase 2. Design
-  §7.1 already settles it — `bevy_voxel_world` supplies "the chunk map and edit
-  overlay", so the loaded `Scene` is the authored snapshot and runtime edits
-  live in the voxel world's overlay, with the ownership matrix in design §12.1
-  naming the Entity Component System as authoritative for the voxel grid.
-  `VoxelGrid` therefore ships read-only on purpose, and the world-plane
-  architecture document says so explicitly so that phase 2 wires the overlay
-  instead of inventing a parallel grid.
+  and nobody can say which is authoritative. Severity: medium. Likelihood:
+  medium. Mitigation: state the answer now rather than discovering it in phase
+  1. Design §7.1 already settles it — `bevy_voxel_world` supplies "the chunk
+  map and edit overlay", so the loaded `Scene` is the authored snapshot and
+  runtime edits live in the voxel world's overlay, with the ownership matrix in
+  design §12.1 naming the Entity Component System as authoritative for the
+  voxel grid. `VoxelGrid` therefore ships read-only on purpose, and the
+  world-plane architecture document says so explicitly so that phase 2 wires
+  the overlay instead of inventing a parallel grid.
 - Risk: the behavioural suite cannot reuse the existing Bevy `rstest-bdd`
   adapter, because `thysalion-world` has no Bevy dependency at this phase, and
   adding one to satisfy the harness would contradict ADR 005's staging.
-  Severity: low. Likelihood: high.
-  Mitigation: a second, structurally identical `HarnessAdapter` whose context is
-  a plain loader session. Both adapters are promoted into a shared test-support
-  crate at roadmap step 1.3.1, which the developers' guide already names as the
-  promotion point. See the decision log.
+  Severity: low. Likelihood: high. Mitigation: a second, structurally identical
+  `HarnessAdapter` whose context is a plain loader session. Both adapters are
+  promoted into a shared test-support crate at roadmap step 1.3.1, which the
+  developers' guide already names as the promotion point. See the decision log.
 - Risk: run-length decoding is the one hot loop in this step and sits under
   `clippy::indexing_slicing` and the cast denials, tempting a suppression.
-  Severity: low. Likelihood: medium.
-  Mitigation: the decoder is written against iterators and `slice::get_mut`,
-  with `TryFrom` at every narrowing boundary, and a `proptest` covering
-  encode/decode fixpoint over random grids. If a suppression looks unavoidable,
-  that is a tolerance breach, not a judgement call.
+  Severity: low. Likelihood: medium. Mitigation: the decoder is written against
+  iterators and `slice::get_mut`, with `TryFrom` at every narrowing boundary,
+  and a `proptest` covering encode/decode fixpoint over random grids. If a
+  suppression looks unavoidable, that is a tolerance breach, not a judgement
+  call.
 
 ## Progress
 
@@ -446,11 +439,34 @@ travel with the C1 commit.
   open; A2 failed its JSON-size criterion and the prescribed escape did not fix
   it, resolved by encoding generated fixtures compactly (decision log).
   Measurements in `Artefacts and notes`.
-- [ ] Stage B: the behavioural specification and the task 1.2.1 red tests.
-- [ ] Stage C1: the voxel type registry and scene document model (task 1.2.1) —
-  first commit.
-- [ ] Stage C2: scene loading with load-time validation (task 1.2.2) — opens
-  with its own red step; second commit.
+- [x] (2026-07-30) Stage B: the behavioural specification and the task 1.2.1
+  red tests. Observed red for the intended reason — the modules did not exist —
+  rather than for an unrelated compilation failure.
+- [x] (2026-07-30) Stage C1: the voxel type registry and scene document model
+  (task 1.2.1). Commit `900f754`. Delivered: the wire types under
+  `scene/document/`, the sparse chunk-keyed `VoxelGrid` and canonical run codec
+  under `grid/`, and the two-encoding `codec/` with its version probe. 33 tests
+  in the crate, 119 across the workspace, `make all` green with one scoped
+  `#[expect]` (the six-boolean passability struct) and no other suppression.
+  Deferred to C2 as planned, and sharpened during the stage: the domain types
+  (`Scene`, `Palette`, `VoxelType`), the diagnostics, and the loader, because
+  1.2.1's success criterion is a property of the document alone.
+- [ ] (2026-07-30) Stage C2: scene loading with load-time validation
+  (task 1.2.2) — split into two commits after the first attempt proved too
+  large to reach a green checkpoint (see `Outcomes & retrospective`).
+  - [x] (2026-07-30) C2a, the validating loader. Delivered: the `SceneSource`
+    port with its `cap_std` and in-memory adapters; `ConceptIri` and the
+    injected `NamespaceTable`; the 31-code diagnostic vocabulary with its
+    `DocumentLocation` ordering; runtime `Bounds`; the validated `Palette`,
+    `Entities`, and `SceneKnowledge`; five rule sets under
+    `scene/validation/rules/`; the three-phase orchestration in
+    `scene/validation/mod.rs`; the `Scene` aggregate with `content_hash`; and
+    `SceneLoader` with `LoadedScene` and `SceneLoadError`. All eight
+    behavioural scenarios green, `make all` passing.
+  - [ ] C2b, the reporter and the operator tool: `validation/report.rs`, the
+    `scene-check` example with its four exit codes, the hand-written corrupt
+    fixtures with their `insta` snapshots, and the hostile fixtures with their
+    termination assertions.
 - [ ] Stage C3: the three fixture scenes and their generator (task 1.2.3) —
   opens with its own red step; third commit.
 - [ ] Stage D: documentation, ADR 006, design-document amendments, refactor,
@@ -461,166 +477,156 @@ travel with the C1 commit.
 - Observation: the workspace denies `clippy::integer_division` *and*
   `clippy::integer_division_remainder_used`, so the `/` and `%` operators are
   unavailable on integers anywhere in this crate — including the chunk
-  coordinate arithmetic that is the whole point of the grid module.
-  Evidence: fourteen lint errors across `grid/coords.rs` and `grid/extent.rs`
-  on the first clippy run.
-  Impact: the sanctioned escape is the method form. `div_euclid`, `rem_euclid`,
-  and `is_multiple_of` are method calls rather than operators, so neither lint
-  fires, and they are arguably the better spelling anyway: Euclidean semantics
-  are explicit where `/` on a signed type quietly is not. No suppression was
-  needed. Worth stating in the developers' guide, because the next person to
-  write coordinate maths in a plane crate will hit it within minutes.
+  coordinate arithmetic that is the whole point of the grid module. Evidence:
+  fourteen lint errors across `grid/coords.rs` and `grid/extent.rs` on the
+  first clippy run. Impact: the sanctioned escape is the method form.
+  `div_euclid`, `rem_euclid`, and `is_multiple_of` are method calls rather than
+  operators, so neither lint fires, and they are arguably the better spelling
+  anyway: Euclidean semantics are explicit where `/` on a signed type quietly
+  is not. No suppression was needed. Worth stating in the developers' guide,
+  because the next person to write coordinate maths in a plane crate will hit
+  it within minutes.
 - Observation: `allow-expect-in-tests = true` does not cover helper functions,
   exactly as AGENTS.md warns — but the obvious remedy collides with another
   denied lint. Making a fixture fallible forces its callers to return `Result`,
   and `clippy::panic_in_result_fn` then forbids those callers from using
-  `assert!` or `assert_eq!`, which is most of what a test does.
-  Evidence: converting `small_chunk()` to return `Result` turned one lint error
-  into seven.
-  Impact: the resolution is a `const` fixture validated at compile time —
+  `assert!` or `assert_eq!`, which is most of what a test does. Evidence:
+  converting `small_chunk()` to return `Result` turned one lint error into
+  seven. Impact: the resolution is a `const` fixture validated at compile time —
   `const SMALL_CHUNK: ChunkSize = match ChunkSize::new(4) { Ok(s) => s, Err(_)
-  => panic!(...) }` — which fails the build rather than the run and leaves the
-  tests free to assert. Where a fixture genuinely cannot be `const`, the helper
-  returns `Result` and the *test body* unwraps it, keeping the `expect` where
-  the allowance applies. Both patterns belong in the developers' guide.
+  => panic!(…) }` —
+  which fails the build rather than the run and leaves the tests free to
+  assert. Where a fixture genuinely cannot be `const`, the helper returns
+  `Result` and the *test body* unwraps it, keeping the `expect` where the
+  allowance applies. Both patterns belong in the developers' guide.
 - Observation: Whitaker enforces the `cap_std` rule from AGENTS.md in test code
-  too, not only in production code.
-  Evidence: `no_std_fs_operations` denied `std::fs::read` and
-  `std::fs::create_dir_all` in `tests/golden_bytes.rs`.
+  too, not only in production code. Evidence: `no_std_fs_operations` denied
+  `std::fs::read` and `std::fs::create_dir_all` in `tests/golden_bytes.rs`.
   Impact: correct, and worth knowing before writing a fixture reader. The
   golden test opens `CARGO_MANIFEST_DIR` once as a `cap_std::fs_utf8::Dir` and
   reads through it, which also makes the filesystem surface of the test visible
   in one place.
 - Observation: each `tests/*.rs` compiles as its own crate, so a shared
-  `mod support` that one test uses only partly is dead code in the others —
-  and `make test` runs with warnings denied.
-  Evidence: sixteen `dead_code` warnings in `golden_bytes` from the `proptest`
-  strategy module that only `document_round_trip` uses.
-  Impact: the generators live in `tests/support/strategy.rs` and are declared
-  with `#[path]` by the one test that needs them, rather than re-exported from
-  `support/mod.rs`. Suppressing the warning was the alternative and is worse:
-  `#[allow]` is denied outright, and `#[expect]` would itself go unfulfilled in
-  the crate that *does* use the module.
+  `mod support` that one test uses only partly is dead code in the others — and
+  `make test` runs with warnings denied. Evidence: sixteen `dead_code` warnings
+  in `golden_bytes` from the `proptest` strategy module that only
+  `document_round_trip` uses. Impact: the generators live in
+  `tests/support/strategy.rs` and are declared with `#[path]` by the one test
+  that needs them, rather than re-exported from `support/mod.rs`. Suppressing
+  the warning was the alternative and is worse: `#[allow]` is denied outright,
+  and `#[expect]` would itself go unfulfilled in the crate that *does* use the
+  module.
 - Observation: `schemars` does not implement `JsonSchema` for `SmolStr` unless
   its `smol_str03` feature is enabled, and the document tree uses `SmolStr`
-  throughout.
-  Evidence: eight trait-bound errors on the first build.
-  Impact: the pin gains the feature. The alternative — a
-  `#[schemars(with = "String")]` on every string field — would have been noise
-  on a dozen fields and a trap for the next one added.
+  throughout. Evidence: eight trait-bound errors on the first build. Impact:
+  the pin gains the feature. The alternative — a `#[schemars(with = "String")]`
+  on every string field — would have been noise on a dozen fields and a trap
+  for the next one added.
 - Observation: `clippy::doc_markdown` treats every camel-cased proper noun in
   prose as a missing code reference, including `MessagePack`, which this
-  crate's documentation necessarily says often.
-  Evidence: ten errors, all in module documentation.
-  Impact: `clippy.toml` gains a `doc-valid-idents` list extending Clippy's
-  default with the proper nouns this project uses. Backticking them would be
-  actively wrong — they name formats and projects, not identifiers — and the
-  configuration key exists for precisely this case.
+  crate's documentation necessarily says often. Evidence: ten errors, all in
+  module documentation. Impact: `clippy.toml` gains a `doc-valid-idents` list
+  extending Clippy's default with the proper nouns this project uses.
+  Backticking them would be actively wrong — they name formats and projects,
+  not identifiers — and the configuration key exists for precisely this case.
 - Observation: the module tree places `VoxelIndex` in `scene/palette.rs` while
   also requiring that `grid/` never depend on `scene/`. `VoxelGrid` stores
-  voxel indices, so the two rules cannot both hold.
-  Evidence: the Stage C1 tree, read against its own stated dependency
-  direction.
-  Impact: `VoxelIndex` moves to `grid/voxel_index.rs` and `scene/` re-exports
-  it. That is the right home on the merits and not merely a fix: the grid
-  *stores* an index, the palette *interprets* one, and an index is meaningless
-  without a palette to resolve it against — which is exactly why the type
-  carries no palette identity and `Palette::get` is fallible. The dependency
-  direction `scene -> grid` is unchanged.
+  voxel indices, so the two rules cannot both hold. Evidence: the Stage C1
+  tree, read against its own stated dependency direction. Impact: `VoxelIndex`
+  moves to `grid/voxel_index.rs` and `scene/` re-exports it. That is the right
+  home on the merits and not merely a fix: the grid *stores* an index, the
+  palette *interprets* one, and an index is meaningless without a palette to
+  resolve it against — which is exactly why the type carries no palette
+  identity and `Palette::get` is fallible. The dependency direction
+  `scene -> grid` is unchanged.
 - Observation: task 1.2.1's success criterion is a property of the *document*
   alone — "a hand-written JSON scene round-trips through the model and the
   MessagePack encoding without loss" — and needs no validated `Scene`.
-  Evidence: roadmap §1.2.1 against the Stage C1 and C2 split.
-  Impact: the stage boundary is sharper than the plan's module tree implies.
-  Stage C1 delivers the wire types, the grid, and the codec, and its tests are
-  round-trip, wire-shape, canonical-bytes, and golden-bytes. The domain types
-  (`Scene`, `Palette`, `VoxelType`), the diagnostics, and the loader belong to
-  Stage C2, where validation gives them a reason to exist. This keeps
+  Evidence: roadmap §1.2.1 against the Stage C1 and C2 split. Impact: the stage
+  boundary is sharper than the plan's module tree implies. Stage C1 delivers
+  the wire types, the grid, and the codec, and its tests are round-trip,
+  wire-shape, canonical-bytes, and golden-bytes. The domain types (`Scene`,
+  `Palette`, `VoxelType`), the diagnostics, and the loader belong to Stage C2,
+  where validation gives them a reason to exist. This keeps
   `Palette::from_document` — which returns diagnostics — out of a stage that
   has no diagnostics yet.
 - Observation: the behavioural specification asserted counts the worked example
   cannot produce — "4 palette entries" against a three-entry palette, and a
-  non-air count left unstated.
-  Evidence: the minimal scene declares `air`, `stone-block`, and `wall-sconce`;
-  its two chunks hold 16 stone voxels in the run-encoded chunk and a uniform
-  chunk of 32,768, for 32,784 non-air.
-  Impact: corrected in place before any step function was written. Trivial in
-  itself, but it is the kind of defect a specification acquires when written
-  before the example it describes, and it would have surfaced as a confusing
-  red test rather than as an obvious typo.
+  non-air count left unstated. Evidence: the minimal scene declares `air`,
+  `stone-block`, and `wall-sconce`; its two chunks hold 16 stone voxels in the
+  run-encoded chunk and a uniform chunk of 32,768, for 32,784 non-air. Impact:
+  corrected in place before any step function was written. Trivial in itself,
+  but it is the kind of defect a specification acquires when written before the
+  example it describes, and it would have surfaced as a confusing red test
+  rather than as an obvious typo.
 - Observation: pretty-printing, not field naming, is what drives the fixture
   JSON over its size tolerance. Compact encoding costs 0.74 MiB where
   `to_string_pretty` costs 2.33 MiB for the same document, a 3.1x multiplier;
-  short field renames — the escape this plan prescribed — move it only to
-  2.04 MiB and do not clear the 1 MiB bar on their own.
-  Evidence: Spike A2, `Artefacts and notes`.
-  Impact: Stage C1's instruction to encode with `serde_json::to_string_pretty`
-  is withdrawn for generated fixtures. `serde_json`'s pretty printer puts every
-  struct field on its own line, so an array of 33,000 two-field run objects
-  becomes well over 100,000 lines of mostly indentation. The resolution is in
-  the decision log; the short renames are *not* adopted, because compact
-  encoding clears the tolerance with headroom and unabbreviated field names are
-  worth more to a reader of the schema than 0.29 MiB is to the repository.
+  short field renames — the escape this plan prescribed — move it only to 2.04
+  MiB and do not clear the 1 MiB bar on their own. Evidence: Spike A2,
+  `Artefacts and notes`. Impact: Stage C1's instruction to encode with
+  `serde_json::to_string_pretty` is withdrawn for generated fixtures.
+  `serde_json`'s pretty printer puts every struct field on its own line, so an
+  array of 33,000 two-field run objects becomes well over 100,000 lines of
+  mostly indentation. The resolution is in the decision log; the short renames
+  are *not* adopted, because compact encoding clears the tolerance with
+  headroom and unabbreviated field names are worth more to a reader of the
+  schema than 0.29 MiB is to the repository.
 - Observation: `rmpv::Value` does not implement `Deserialize` unless the crate
   is taken with its `with-serde` feature, and the wire-shape assertion this
-  plan makes load-bearing decodes into exactly that type.
-  Evidence: Spike A1 failed to compile until the feature was added.
-  Impact: the pin is `rmpv = { version = "1.3", features = ["with-serde"] }`.
+  plan makes load-bearing decodes into exactly that type. Evidence: Spike A1
+  failed to compile until the feature was added. Impact: the pin is
+  `rmpv = { version = "1.3", features = ["with-serde"] }`.
 - Observation: `serde_path_to_error` works under MessagePack, contradicting
-  this plan's expectation that it might not. A malformed payload yields the
-  path `payload.runs[0].length`, identical to the path the JSON decoder
-  produces for the same fault.
-  Evidence: Spike A3, `Artefacts and notes`.
-  Impact: better than planned. `codec/msgpack.rs` carries a structural path
-  after all, so both encodings locate a fault equally well and the plan's
-  contingency wording — "degrades to an unlocated deserialization error" — is
-  not needed. MessagePack still carries no line or column, which is inherent to
-  the format rather than a limitation of the crate.
+  this plan's expectation that it might not. A malformed payload yields the path
+  `payload.runs[0].length`, identical to the path the JSON decoder produces
+  for the same fault. Evidence: Spike A3, `Artefacts and notes`. Impact: better
+  than planned. `codec/msgpack.rs` carries a structural path after all, so both
+  encodings locate a fault equally well and the plan's contingency wording —
+  "degrades to an unlocated deserialization error" — is not needed. MessagePack
+  still carries no line or column, which is inherent to the format rather than
+  a limitation of the crate.
 - Observation: the two claims the design review could not verify are both
   confirmed, and both cut the way the reviewer feared. An array-encoded
   MessagePack document decodes silently into an equal value, and
   `deny_unknown_fields` is enforced under the *map* form but has nothing to act
-  on under the array form.
-  Evidence: Spike A1 items 4a and 3.
-  Impact: `to_vec_named` is load-bearing for correctness, not merely for
-  evolvability, and the wire-shape assertion is the only thing standing between
-  an accidental `to_vec` and a silently positional shipped scene. This belongs
-  in ADR 006's rationale, as the plan anticipated.
+  on under the array form. Evidence: Spike A1 items 4a and 3. Impact:
+  `to_vec_named` is load-bearing for correctness, not merely for evolvability,
+  and the wire-shape assertion is the only thing standing between an accidental
+  `to_vec` and a silently positional shipped scene. This belongs in ADR 006's
+  rationale, as the plan anticipated.
 - Observation: a `BTreeMap` with a struct key serializes under MessagePack and
   fails under JSON with `key must be a string`, exactly as the `Constraints`
-  rule assumed.
-  Evidence: Spike A1 item 5.
-  Impact: the rule banning non-string map keys is confirmed rather than
-  theoretical, and ADR 006 can state it as a measured fact.
+  rule assumed. Evidence: Spike A1 item 5. Impact: the rule banning non-string
+  map keys is confirmed rather than theoretical, and ADR 006 can state it as a
+  measured fact.
 
 - Observation: `rmp_serde`'s `serialize_tuple_struct` writes a positional array
   unconditionally, ignoring the struct-map configuration entirely, and its
-  `serialize_unit_variant` writes the variant *name* as a string rather than the
-  discriminant index.
-  Evidence: `rmp-serde` 1.3.1, `src/encode.rs`, read during design review.
-  Impact: two consequences, one bad and one good. The bad one is that
-  `to_vec_named` — this plan's headline mitigation for positional encoding —
-  does not reach a tuple struct at all, which is what forced `VoxelRun` to
-  become a named struct (see the decision log). The good one is that enum
-  representations are structurally identical across the two encodings, so
-  reordering variants is safe while renaming one is a wire break. Had variants
-  encoded by index, JSON and MessagePack would have disagreed silently and the
-  round-trip property would never have seen it.
+  `serialize_unit_variant` writes the variant *name* as a string rather than
+  the discriminant index. Evidence: `rmp-serde` 1.3.1, `src/encode.rs`, read
+  during design review. Impact: two consequences, one bad and one good. The bad
+  one is that `to_vec_named` — this plan's headline mitigation for positional
+  encoding — does not reach a tuple struct at all, which is what forced
+  `VoxelRun` to become a named struct (see the decision log). The good one is
+  that enum representations are structurally identical across the two
+  encodings, so reordering variants is safe while renaming one is a wire break.
+  Had variants encoded by index, JSON and MessagePack would have disagreed
+  silently and the round-trip property would never have seen it.
 - Observation: `rmp-serde`'s deserializer forwards `deserialize_struct` to its
-  any-value path, so it accepts either an array or a map on the wire.
-  Evidence: `rmp-serde` 1.3.1, `src/decode.rs`.
-  Impact: the struct-map choice is writer-side only, which makes migration
-  painless but also means an accidentally array-encoded payload will *not*
-  surface as a decode error. The map guarantee therefore rests on the
-  wire-shape assertion rather than on the decoder, which is why that assertion
-  exists as its own test rather than being folded into the round trip.
+  any-value path, so it accepts either an array or a map on the wire. Evidence:
+  `rmp-serde` 1.3.1, `src/decode.rs`. Impact: the struct-map choice is
+  writer-side only, which makes migration painless but also means an
+  accidentally array-encoded payload will *not* surface as a decode error. The
+  map guarantee therefore rests on the wire-shape assertion rather than on the
+  decoder, which is why that assertion exists as its own test rather than being
+  folded into the round trip.
 - Observation: `insta` is not yet a workspace dependency, despite AGENTS.md
-  requiring snapshot tests where multivariant output format consistency matters.
-  Evidence: no `insta::` reference anywhere in the workspace; absent from
-  `[workspace.dependencies]`.
-  Impact: this step introduces it, and the diagnostic report is its first
-  subject. The pin belongs in `[workspace.dependencies]` alongside the other
-  test tooling.
+  requiring snapshot tests where multivariant output format consistency
+  matters. Evidence: no `insta::` reference anywhere in the workspace; absent
+  from `[workspace.dependencies]`. Impact: this step introduces it, and the
+  diagnostic report is its first subject. The pin belongs in
+  `[workspace.dependencies]` alongside the other test tooling.
 - Observation: design §7.3 says the scene format follows "lille's proven
   format", but lille's JSON/MessagePack map format is an unimplemented
   specification. Lille ships a Tiled `.tmx` pipeline through `bevy_ecs_tiled`
@@ -629,48 +635,44 @@ travel with the C1 commit.
   Evidence: `docs/map-data-format.md` in `leynos/lille` describes the JSON
   document, but no corresponding module exists in `src/` and `Cargo.toml`
   carries no MessagePack dependency; `src/map/translate.rs` builds `Block`
-  records from Tiled tile positions with `z` hardcoded to zero.
-  Impact: material. The design document's appeal to prior art is weaker than it
-  reads, so this step must justify its format choices on their own merits
-  rather than by inheritance. Design §7.3 is corrected in Stage D to say the
-  format follows lille's *specification*, and the specific inheritances are
-  named. Three concrete lessons are taken from lille's document and are
-  improved upon here rather than copied: its per-face passability is a
-  stringly-keyed dictionary of unit-normal strings with no completeness
-  guarantee (this plan uses a six-field struct); its `extends` mechanism
-  specifies no cycle detection, depth limit, or resolution order (this plan
-  specifies all three); and it carries no schema version field at all (this
-  plan has `DocumentVersion` from the first commit). Its palettization is also
-  signalled by the mere presence of a palette array, which this plan avoids by
-  always palettizing.
+  records from Tiled tile positions with `z` hardcoded to zero. Impact:
+  material. The design document's appeal to prior art is weaker than it reads,
+  so this step must justify its format choices on their own merits rather than
+  by inheritance. Design §7.3 is corrected in Stage D to say the format follows
+  lille's *specification*, and the specific inheritances are named. Three
+  concrete lessons are taken from lille's document and are improved upon here
+  rather than copied: its per-face passability is a stringly-keyed dictionary
+  of unit-normal strings with no completeness guarantee (this plan uses a
+  six-field struct); its `extends` mechanism specifies no cycle detection,
+  depth limit, or resolution order (this plan specifies all three); and it
+  carries no schema version field at all (this plan has `DocumentVersion` from
+  the first commit). Its palettization is also signalled by the mere presence
+  of a palette array, which this plan avoids by always palettizing.
 - Observation: lille's slope story diverged between format and implementation —
   the documented format carries a horizontal direction of rise only
   (`slope_dir: [sx, sy]`), while the shipping `BlockSlope` component carries
   continuous `grad_x`/`grad_y` gradients, and the format never caught up.
   Evidence: `docs/map-data-format.md` versus `src/components.rs` in
-  `leynos/lille`.
-  Impact: a direction-only slope encoding is likely to prove insufficient once
-  roadmap step 4.2.1 resolves motion over ramps. This plan keeps design §7.2's
-  direction-only semantics (as `SlopeDirection`) but records the pressure, and
-  the `#[non_exhaustive]` `VoxelType` leaves room for a rise magnitude to
-  arrive without breaking authored scenes.
+  `leynos/lille`. Impact: a direction-only slope encoding is likely to prove
+  insufficient once roadmap step 4.2.1 resolves motion over ramps. This plan
+  keeps design §7.2's direction-only semantics (as `SlopeDirection`) but
+  records the pressure, and the `#[non_exhaustive]` `VoxelType` leaves room for
+  a rise magnitude to arrive without breaking authored scenes.
 - Observation: `bevy_voxel_world` 0.17.0 (released 2026-07-05) declares
-  `bevy ^0.19` and integrates authored content through a `voxel_lookup_delegate`
-  closure on its `VoxelWorldConfig` trait, so the crate that *constructs* the
-  configuration needs the scene, but the scene format needs nothing from
-  `bevy_voxel_world`.
-  Evidence: the crate's published dependency set and the `VoxelWorldConfig`
-  documentation.
-  Impact: confirms the layering this plan assumes. `thysalion-world` stays free
-  of both `bevy` and `bevy_voxel_world`; roadmap step 2.1.1 wires the delegate
-  in `thysalion-presentation`. It also warns against a direct dependency on
+  `bevy ^0.19` and integrates authored content through a
+  `voxel_lookup_delegate` closure on its `VoxelWorldConfig` trait, so the crate
+  that *constructs* the configuration needs the scene, but the scene format
+  needs nothing from `bevy_voxel_world`. Evidence: the crate's published
+  dependency set and the `VoxelWorldConfig` documentation. Impact: confirms the
+  layering this plan assumes. `thysalion-world` stays free of both `bevy` and
+  `bevy_voxel_world`; roadmap step 2.1.1 wires the delegate in
+  `thysalion-presentation`. It also warns against a direct dependency on
   `block-mesh` or `ndshape`, which `bevy_voxel_world` pulls in transitively and
   which have been dormant since 2024 and 2022 respectively.
 - Observation: lille re-pushes every static `Block` record into its DBSP
   circuit on every tick, and records this as a known, unfixed cost; its block
   identifiers are also session-scoped and explicitly not stable across saves or
-  reloads.
-  Evidence: `docs/lille-isometric-tiled-maps-design.md` §5.3 and §7;
+  reloads. Evidence: `docs/lille-isometric-tiled-maps-design.md` §5.3 and §7;
   `src/map/translate.rs` allocates identifiers from a `Local<i64>` counter.
   Impact: forward-facing, not blocking. Thysalion's design §12.2 requires a
   stable 64-bit `SimId` shared across all three stores, and §10.6 bounds trace
@@ -682,70 +684,86 @@ travel with the C1 commit.
 
 ## Decision log
 
+- Decision: the plain, invariant-free parts of the format's vocabulary —
+  `MaterialClass`, `SlopeDirection`, `Face`, `Passability`, `SimProperties` —
+  live in one `scene/vocabulary.rs` and are shared by the wire and domain
+  layers. Only invariant-*bearing* types get a distinct domain form:
+  `LightEmission` (0–15), `ConceptIri` (parsed and namespaced), `Palette`
+  (entry zero is air, names unique), `VoxelType`, and `Scene`. Rationale: the
+  constraint that domain types derive no `serde` traits exists to close one
+  hole — a derived `Deserialize` is a public constructor that reaches every
+  private field and skips validation. A plain enum has no private field and no
+  invariant, so duplicating it into a domain twin closes nothing and costs five
+  identical definitions that must be kept in step. Applying the rule where it
+  bites and not where it does not is the honest reading. It also fixes a naming
+  problem the literal reading would have created: a domain `VoxelType` whose
+  `material` field is typed `MaterialClassDocument` announces the wrong layer.
+  Timing: this reshapes public items added in Stage C1, which this plan's
+  interface tolerance says to escalate on *after the fixture scenes are
+  authored against them*. They are not yet — Stage C3 has not run — so now is
+  the cheapest moment, and the golden bytes are unaffected because the `serde`
+  names do not change. Date/Author: 2026-07-30, during Stage C2.
+
 - Decision: generated fixture documents are encoded as **compact** JSON — one
   line, `serde_json::to_string` — not pretty-printed. Hand-written test
   fixtures under `crates/world/tests/fixtures/` stay pretty, because no
-  generator writes them. Short `serde` renames are **not** adopted.
-  Rationale: Spike A2 measured the busiest plausible wilderness fixture at
-  2.33 MiB pretty against a 1 MiB tolerance, and at 0.74 MiB compact. The
-  escape this plan prescribed — renaming `length` and `index` to `n` and `i` —
-  reaches only 2.04 MiB and does not clear the bar, because the cost is
-  `serde_json`'s pretty printer putting every field of every one of 33,000 run
-  objects on its own line, not the length of the field names.
-  The instruction being withdrawn was justified as keeping "authored documents
-  diffable", and that justification does not survive contact with Stage C3:
-  generated fixtures are *not* the authoring surface. The layer rasters are,
-  `make scenes-check` proves the JSON matches them, and the provenance sidecar
-  maps a diagnostic back to the raster. A reviewer has no reason to read the
-  generated JSON, and pretty-printing it buys a diff nobody reads at 3.1 times
-  the size, forever, in every clone.
-  A middle path was considered and rejected: pretty down to the chunk-entry
-  level with each payload compact on one line. It gives genuinely better diffs,
-  but it requires a custom `serde_json::ser::Formatter` *and* a byte-identical
-  reimplementation of it in the Python generator — two hand-written formatters
-  that must agree exactly, which is precisely the two-writer drift hazard this
-  plan already guards against elsewhere. Compact output is one line of
-  `json.dumps(..., separators=(",", ":"))` on the Python side and one call on
-  the Rust side, and the two agree by construction.
+  generator writes them. Short `serde` renames are **not** adopted. Rationale:
+  Spike A2 measured the busiest plausible wilderness fixture at 2.33 MiB pretty
+  against a 1 MiB tolerance, and at 0.74 MiB compact. The escape this plan
+  prescribed — renaming `length` and `index` to `n` and `i` — reaches only 2.04
+  MiB and does not clear the bar, because the cost is `serde_json`'s pretty
+  printer putting every field of every one of 33,000 run objects on its own
+  line, not the length of the field names. The instruction being withdrawn was
+  justified as keeping "authored documents diffable", and that justification
+  does not survive contact with Stage C3: generated fixtures are *not* the
+  authoring surface. The layer rasters are, `make scenes-check` proves the JSON
+  matches them, and the provenance sidecar maps a diagnostic back to the
+  raster. A reviewer has no reason to read the generated JSON, and
+  pretty-printing it buys a diff nobody reads at 3.1 times the size, forever,
+  in every clone. A middle path was considered and rejected: pretty down to the
+  chunk-entry level with each payload compact on one line. It gives genuinely
+  better diffs, but it requires a custom `serde_json::ser::Formatter` *and* a
+  byte-identical reimplementation of it in the Python generator — two
+  hand-written formatters that must agree exactly, which is precisely the
+  two-writer drift hazard this plan already guards against elsewhere. Compact
+  output is one line of `json.dumps(..., separators=(",", ":"))` on the Python
+  side and one call on the Rust side, and the two agree by construction.
   Consequences: Stage C1's `codec/json.rs` encodes compactly; the "byte
   identical to `serde_json::to_string_pretty`" clause in Stage B's worked
   example applies to the hand-written fixtures only; the fixture-size tolerance
   stands unchanged at 1 MiB, and the wilderness fixture now sits at roughly
-  three quarters of it.
-  Date/Author: 2026-07-30, after Spike A2.
+  three quarters of it. Date/Author: 2026-07-30, after Spike A2.
 - Decision: `to_vec_named` is recorded in ADR 006 as a **correctness**
-  requirement rather than an evolvability preference.
-  Rationale: Spike A1 confirmed that `rmp_serde` decodes an array-encoded
-  document silently into an equal value, and that `deny_unknown_fields` has
-  nothing to act on in the array form. So an accidental `to_vec` produces a
-  shipped scene that is positional and unevolvable, rejects nothing, and looks
-  entirely healthy to a round-trip test. Only the wire-shape assertion catches
-  it. The design review suspected both of these and could not verify them;
-  they are now measured.
+  requirement rather than an evolvability preference. Rationale: Spike A1
+  confirmed that `rmp_serde` decodes an array-encoded document silently into an
+  equal value, and that `deny_unknown_fields` has nothing to act on in the
+  array form. So an accidental `to_vec` produces a shipped scene that is
+  positional and unevolvable, rejects nothing, and looks entirely healthy to a
+  round-trip test. Only the wire-shape assertion catches it. The design review
+  suspected both of these and could not verify them; they are now measured.
   Date/Author: 2026-07-30, after Spike A1.
 
 - Decision: the scene format stays inside `thysalion-world`; no leaf
   `thysalion-scene` crate is created. `bevy` becomes an *optional feature* of
   `thysalion-world` from the outset, and that feature — not a crate boundary —
-  is the mechanism that keeps the format engine-free.
-  Rationale: this resolves the open question ADR 005 forwarded to step 1.2. The
-  concept IRI is a syntactic string newtype, so it creates no knowledge-plane
-  edge and therefore no cycle to break, and `thysalion-world` is already the
-  designated dependency sink; a separate crate would add a boundary without
-  removing one. The feature gate matters because an earlier draft recorded the
-  reversal trigger as "`thysalion-world` acquires `bevy`" — which is not a
-  trigger at all, since ADR 005's own table already names `bevy` as this
-  crate's eventual heavy dependency and roadmap step 2.1.1 is the phase that
-  adds it. That draft was scheduling a reversal, not guarding against one, and
-  the reversal would have dragged the generator, the operator tool, ADR 006, the
-  architecture document, and every import path in three crates with it. With the
-  feature gate the trigger becomes one that might genuinely never fire: a
-  content-tooling binary outwith this workspace needing the format. Because ADR
-  005 concedes that review-enforced layering is not enforcement, continuous
-  integration builds `thysalion-world` with `--no-default-features` to prove the
-  format still compiles engine-free.
-  Date/Author: 2026-07-26; reversal trigger and feature gate revised 2026-07-28
-  after design review.
+  is the mechanism that keeps the format engine-free. Rationale: this resolves
+  the open question ADR 005 forwarded to step 1.2. The concept IRI is a
+  syntactic string newtype, so it creates no knowledge-plane edge and therefore
+  no cycle to break, and `thysalion-world` is already the designated dependency
+  sink; a separate crate would add a boundary without removing one. The feature
+  gate matters because an earlier draft recorded the reversal trigger as
+  "`thysalion-world` acquires `bevy`" — which is not a trigger at all, since
+  ADR 005's own table already names `bevy` as this crate's eventual heavy
+  dependency and roadmap step 2.1.1 is the phase that adds it. That draft was
+  scheduling a reversal, not guarding against one, and the reversal would have
+  dragged the generator, the operator tool, ADR 006, the architecture document,
+  and every import path in three crates with it. With the feature gate the
+  trigger becomes one that might genuinely never fire: a content-tooling binary
+  outwith this workspace needing the format. Because ADR 005 concedes that
+  review-enforced layering is not enforcement, continuous integration builds
+  `thysalion-world` with `--no-default-features` to prove the format still
+  compiles engine-free. Date/Author: 2026-07-26; reversal trigger and feature
+  gate revised 2026-07-28 after design review.
 - Decision: the two-stage split is real, not nominal. Document types live under
   `scene/document/`, derive `Serialize`/`Deserialize`/`JsonSchema` and nothing
   else, and are the only types `serde` ever sees. Domain types — `Scene`,
@@ -759,195 +777,184 @@ travel with the C1 commit.
   load-time-enforced, and on which the "absent chunk equals air equals index
   zero" scheme depends. `#[non_exhaustive]` does not close it either; it is
   documented as not restricting deserialization. The `trybuild` case pins the
-  struct-literal route, so a companion runtime test must pin the deserialization
-  route for each gated type.
-  Cost: `VoxelType` and `Palette` shapes exist twice, once as wire and once as
-  domain. That is the price of the guarantee, and it is the same price the
-  hexagonal reading of this crate would charge anyway.
-  Date/Author: 2026-07-28, after design review.
+  struct-literal route, so a companion runtime test must pin the
+  deserialization route for each gated type. Cost: `VoxelType` and `Palette`
+  shapes exist twice, once as wire and once as domain. That is the price of the
+  guarantee, and it is the same price the hexagonal reading of this crate would
+  charge anyway. Date/Author: 2026-07-28, after design review.
 - Decision: validation splits into a total, pure function over the document and
   a separate, thin rule set that resolves external references through the
   source port. The port collapses to a single `read` method returning
-  `Result<Vec<u8>, SceneSourceError>`; there is no `has`.
-  Rationale: an earlier draft gave the port `fn has(&self, path) -> bool`, which
-  cannot distinguish an absent file from a permissions failure, an I/O error, or
-  a capability rejection — so a `cap_std`-backed adapter would be *obliged* to
-  discard that information, and the report the `insta` snapshots are about to
-  pin as a contract could say "knowledge resource missing" about a file sitting
-  right there. That is a lie baked into a port signature, and it would outlive
+  `Result<Vec<u8>, SceneSourceError>`; there is no `has`. Rationale: an earlier
+  draft gave the port `fn has(&self, path) -> bool`, which cannot distinguish
+  an absent file from a permissions failure, an I/O error, or a capability
+  rejection — so a `cap_std`-backed adapter would be *obliged* to discard that
+  information, and the report the `insta` snapshots are about to pin as a
+  contract could say "knowledge resource missing" about a file sitting right
+  there. That is a lie baked into a port signature, and it would outlive
   everyone who remembered why. `has` existed only because pure validation had
   been fused with resource resolution; unfusing them removes it, removes the
   check-then-read race, and gives `NotFound` and `Unreadable` two distinct
-  diagnostics for free. Phase 5 reads those TriG files anyway, and phase 8 needs
-  their bytes for the content hashes, so `read` is the operation that was always
-  required. The pure half is also the real domain core: it unit-tests with no
-  infrastructure at all.
-  Date/Author: 2026-07-28, after design review.
+  diagnostics for free. Phase 5 reads those TriG files anyway, and phase 8
+  needs their bytes for the content hashes, so `read` is the operation that was
+  always required. The pure half is also the real domain core: it unit-tests
+  with no infrastructure at all. Date/Author: 2026-07-28, after design review.
 - Decision: the loaded `Scene` is an immutable authored baseline. Runtime voxel
   state is that baseline plus an edit overlay owned by the state plane. The
   baseline is what gets content-hashed; the overlay is what gets saved.
-  `VoxelGrid` ships read-only.
-  Rationale: the question "is `Scene` mutable?" has opposite answers depending
-  on which later phase asks, and leaving it unanswered would let six roadmap
-  steps each resolve it locally. Design §7.1 already gives `bevy_voxel_world`
-  "the chunk map and edit overlay" while design §12.1 makes the Entity Component
-  System authoritative for the voxel grid, so the baseline-plus-overlay reading
-  is the one the design already implies. Recording it costs a sentence; not
-  recording it costs a phase-6 divergence in which an agent paths through a
-  doorway that burned away. No edit interface is built here — that is roadmap
-  step 2.1.3's work, and building it now would be scope creep.
-  Date/Author: 2026-07-28, after design review.
+  `VoxelGrid` ships read-only. Rationale: the question "is `Scene` mutable?"
+  has opposite answers depending on which later phase asks, and leaving it
+  unanswered would let six roadmap steps each resolve it locally. Design §7.1
+  already gives `bevy_voxel_world` "the chunk map and edit overlay" while
+  design §12.1 makes the Entity Component System authoritative for the voxel
+  grid, so the baseline-plus-overlay reading is the one the design already
+  implies. Recording it costs a sentence; not recording it costs a phase-6
+  divergence in which an agent paths through a doorway that burned away. No
+  edit interface is built here — that is roadmap step 2.1.3's work, and
+  building it now would be scope creep. Date/Author: 2026-07-28, after design
+  review.
 - Decision: the scene document is all-integer. Angles are centi-degrees
   (`i32`), lengths are millimetres (`u32`), colours are 8-bit channels, light
   emission is the design's 0–15 scale, and simulation coefficients use the
   16-bit fixed-point representation design §10.5 already mandates for the
-  material fields.
-  Rationale: three reasons, in order of weight. First, the whole document tree
-  keeps `Eq`, `Ord`, and `Hash`; with floats anywhere in it, `Palette`,
-  `VoxelGrid`, and `SceneDocument` all fall back to `PartialEq`, which weakens
-  both the behavioural assertion that a MessagePack-loaded scene equals a
-  JSON-loaded one and the content hash that phase 8 needs. Second, NaN and the
-  infinities have no JSON representation at all — `serde_json` writes them as
-  `null` and then fails to decode that back — which is a genuine one-way
-  asymmetry rather than a theoretical one. Third, design §10.5 already mandates
-  fixed point for the simulation coefficients, so a mixed document would be
-  half-converted anyway. It also keeps `crates/world` free of the
+  material fields. Rationale: three reasons, in order of weight. First, the
+  whole document tree keeps `Eq`, `Ord`, and `Hash`; with floats anywhere in it,
+  `Palette`, `VoxelGrid`, and `SceneDocument` all fall back to `PartialEq`,
+  which weakens both the behavioural assertion that a MessagePack-loaded scene
+  equals a JSON-loaded one and the content hash that phase 8 needs. Second, NaN
+  and the infinities have no JSON representation at all — `serde_json` writes
+  them as `null` and then fails to decode that back — which is a genuine
+  one-way asymmetry rather than a theoretical one. Third, design §10.5 already
+  mandates fixed point for the simulation coefficients, so a mixed document
+  would be half-converted anyway. It also keeps `crates/world` free of the
   `clippy::float_arithmetic` allowance ADR 005 withholds from the world crate.
   Note what is *not* a reason, because an earlier draft claimed it: finite
   `f32` round-trips exactly through both encodings. `serde_json` emits the
   shortest round-tripping representation and `rmp-serde` writes an IEEE
   float32, and bare `f32` does not branch on `is_human_readable`. The
-  JSON-versus-MessagePack float divergence does not exist.
-  Cost: authoring writes `1745` where it means 17.45 degrees. Mitigated twice
-  over: unit-suffixed field names, and the fixture generator accepting
-  `azimuth = "17.45deg"` in its authoring source and emitting the integer. Human
-  units at the authoring layer, integers on the wire.
-  Date/Author: 2026-07-26; rationale corrected 2026-07-28 after design review.
+  JSON-versus-MessagePack float divergence does not exist. Cost: authoring
+  writes `1745` where it means 17.45 degrees. Mitigated twice over:
+  unit-suffixed field names, and the fixture generator accepting
+  `azimuth = "17.45deg"` in its authoring source and emitting the integer.
+  Human units at the authoring layer, integers on the wire. Date/Author:
+  2026-07-26; rationale corrected 2026-07-28 after design review.
 - Decision: no type that reaches the wire is a tuple struct. `VoxelRun` is a
   named struct with `length` and `index` fields, carrying short `serde` renames
-  if Spike A2 shows the verbose form breaches the size tolerance.
-  Rationale: `rmp_serde`'s `serialize_tuple_struct` calls `write_array_len`
-  unconditionally — it ignores the struct-map configuration — so the
-  headline mitigation for positional encoding does not reach a tuple struct at
-  all. To be precise about the severity, because an earlier revision of this
-  plan overstated it: a tuple struct is *not* a live defect. It encodes
-  identically under `to_vec` and `to_vec_named` and round-trips correctly in
-  both formats today, verified empirically. The objection is entirely about
-  evolution, and there it is sharp: were a third element ever added, an old JSON
-  decoder errors cleanly on the trailing element while an old MessagePack
-  decoder reads two, leaves the stream misaligned, and turns every subsequent
-  run and section into garbage or an unrelated error thousands of bytes
-  downstream. A wire type that can never gain a field, whose failure mode
-  differs between the two encodings, is not worth the bytes it saves in a
-  format that expects to evolve. Spike A2 must
-  measure the named form, not the compact one this plan first drafted, because
-  the tolerance is 1 MiB and the named form is roughly four times the JSON size
-  per run.
-  Date/Author: 2026-07-28, after design review.
+  if Spike A2 shows the verbose form breaches the size tolerance. Rationale:
+  `rmp_serde`'s `serialize_tuple_struct` calls `write_array_len`
+  unconditionally — it ignores the struct-map configuration — so the headline
+  mitigation for positional encoding does not reach a tuple struct at all. To
+  be precise about the severity, because an earlier revision of this plan
+  overstated it: a tuple struct is *not* a live defect. It encodes identically
+  under `to_vec` and `to_vec_named` and round-trips correctly in both formats
+  today, verified empirically. The objection is entirely about evolution, and
+  there it is sharp: were a third element ever added, an old JSON decoder
+  errors cleanly on the trailing element while an old MessagePack decoder reads
+  two, leaves the stream misaligned, and turns every subsequent run and section
+  into garbage or an unrelated error thousands of bytes downstream. A wire type
+  that can never gain a field, whose failure mode differs between the two
+  encodings, is not worth the bytes it saves in a format that expects to
+  evolve. Spike A2 must measure the named form, not the compact one this plan
+  first drafted, because the tolerance is 1 MiB and the named form is roughly
+  four times the JSON size per run. Date/Author: 2026-07-28, after design
+  review.
 - Decision: `DocumentVersion` is `{ major: u16, minor: u16 }`. A loader accepts
   `major == SUPPORTED_MAJOR && minor <= SUPPORTED_MINOR`. Adding a field bumps
   the minor and the field carries `#[serde(default)]`; removing, retyping, or
-  re-meaning a field bumps the major.
-  Rationale: a single monotonic integer plus a whitelist — which an earlier
-  draft implied — makes *every* additive change breaking, and the collision is
-  immediate: phase 3 adds a fog volume to the lighting section, and the three
-  checked-in fixtures would fail to load until regenerated. A major/minor pair
-  with an accepted range says precisely what is compatible. Not a semantic
-  version, because a file format has one axis of change and semantic versioning
-  only invites arguments about which component to bump.
-  Date/Author: 2026-07-28, after design review.
+  re-meaning a field bumps the major. Rationale: a single monotonic integer
+  plus a whitelist — which an earlier draft implied — makes *every* additive
+  change breaking, and the collision is immediate: phase 3 adds a fog volume to
+  the lighting section, and the three checked-in fixtures would fail to load
+  until regenerated. A major/minor pair with an accepted range says precisely
+  what is compatible. Not a semantic version, because a file format has one
+  axis of change and semantic versioning only invites arguments about which
+  component to bump. Date/Author: 2026-07-28, after design review.
 - Decision: `#[non_exhaustive]` sits on the domain types and on the
-  `SceneDiagnostic` enum, and *not* on the document types.
-  Rationale: on a `deny_unknown_fields` document type the two attributes assert
-  opposite policies and the pair actively misleads the next reader. It also
-  makes the property tests impossible to write without opening a constructor
-  surface wide enough to bypass validation. On the diagnostic enum it must sit
-  on the enum and never on a variant: `crates/world/tests/` is a separate
-  crate, and a `#[non_exhaustive]` *variant* cannot be constructed from
-  outwith the defining crate, which the per-diagnostic unit tests need.
-  Date/Author: 2026-07-28, after design review.
+  `SceneDiagnostic` enum, and *not* on the document types. Rationale: on a
+  `deny_unknown_fields` document type the two attributes assert opposite
+  policies and the pair actively misleads the next reader. It also makes the
+  property tests impossible to write without opening a constructor surface wide
+  enough to bypass validation. On the diagnostic enum it must sit on the enum
+  and never on a variant: `crates/world/tests/` is a separate crate, and a
+  `#[non_exhaustive]` *variant* cannot be constructed from outwith the defining
+  crate, which the per-diagnostic unit tests need. Date/Author: 2026-07-28,
+  after design review.
 - Decision: `slope_dir` is a closed `SlopeDirection` enum (`Flat`, `PlusX`,
-  `MinusX`, `PlusY`, `MinusY`) rather than design §7.2's `IVec2`.
-  Rationale: ramps and stairs rise in one of four compass directions; an
-  `IVec2` admits meaningless values such as `(7, -3)` that validation would then
-  have to reject anyway. It also removes a `glam` dependency, which matters
-  because Bevy 0.19 pins `glam` 0.32.1 while the registry is at 0.33.2, so a
-  direct pin would risk two `glam` versions in the graph. Note that avoiding
-  `glam` is *not* about serialization: `glam`'s `serde` implementations do not
-  branch on `is_human_readable` and would have round-tripped correctly. The
-  design document is amended in Stage D to match.
-  Date/Author: 2026-07-26, plan author.
+  `MinusX`, `PlusY`, `MinusY`) rather than design §7.2's `IVec2`. Rationale:
+  ramps and stairs rise in one of four compass directions; an `IVec2` admits
+  meaningless values such as `(7, -3)` that validation would then have to
+  reject anyway. It also removes a `glam` dependency, which matters because
+  Bevy 0.19 pins `glam` 0.32.1 while the registry is at 0.33.2, so a direct pin
+  would risk two `glam` versions in the graph. Note that avoiding `glam` is
+  *not* about serialization: `glam`'s `serde` implementations do not branch on
+  `is_human_readable` and would have round-tripped correctly. The design
+  document is amended in Stage D to match. Date/Author: 2026-07-26, plan author.
 - Decision: the voxel payload is keyed by chunk, and a chunk that is entirely
   one voxel type is elided to a uniform token. Runs are chunk-local, in
-  chunk-local Z-major order.
-  Rationale: it makes encoding, decoding, hashing, and diffing all scale with
-  populated volume instead of declared extent, it aligns the wire format with
-  the sparse in-memory grid so decoding is a direct transcription, and it keeps
-  an edit's diff confined to the chunk it touched. A global Z-major run stream
-  fragments on every raster row of a localized fixture — see `Risks` for the
-  arithmetic. The uniform-chunk elision is Minecraft Anvil's single-block-state
-  optimization; the ordered-palette-plus-explicit-index-formula shape is
-  Sponge Schematic v3's. Departs from design §7.3's literal wording, which
-  Stage D corrects.
+  chunk-local Z-major order. Rationale: it makes encoding, decoding, hashing,
+  and diffing all scale with populated volume instead of declared extent, it
+  aligns the wire format with the sparse in-memory grid so decoding is a direct
+  transcription, and it keeps an edit's diff confined to the chunk it touched.
+  A global Z-major run stream fragments on every raster row of a localized
+  fixture — see `Risks` for the arithmetic. The uniform-chunk elision is
+  Minecraft Anvil's single-block-state optimization; the
+  ordered-palette-plus-explicit-index-formula shape is Sponge Schematic v3's.
+  Departs from design §7.3's literal wording, which Stage D corrects.
   Date/Author: 2026-07-28, plan author, after the scaling analysis.
 - Decision: runs are explicit `(count, index)` structure. There are no in-band
   escape values, and no palette index carries a reserved meaning beyond index
-  zero being air.
-  Rationale: Qubicle Binary encodes runs with escape sequences built from
-  reserved colour values, which collide with real data and produce exactly the
-  corruption class that cannot be diagnosed after the fact. Explicitness costs
-  bytes and buys diagnosability.
-  Date/Author: 2026-07-28, plan author.
+  zero being air. Rationale: Qubicle Binary encodes runs with escape sequences
+  built from reserved colour values, which collide with real data and produce
+  exactly the corruption class that cannot be diagnosed after the fact.
+  Explicitness costs bytes and buys diagnosability. Date/Author: 2026-07-28,
+  plan author.
 - Decision: loading is two-phase. Phase one deserializes and fails fast on the
   first structural error, located by `serde_path_to_error`. Phase two validates
   the deserialized structure and accumulates *every* semantic violation before
-  failing.
-  Rationale: `serde` cannot continue past a type mismatch, so "report every
-  problem at once" is only achievable after deserialization succeeds. Splitting
-  the phases makes that honest rather than aspirational, and phase two is
-  encoding-agnostic — the same validator serves JSON and MessagePack, degrading
-  from source spans to structural paths for the binary encoding, which carries
-  no line or column information.
-  Date/Author: 2026-07-28, plan author.
+  failing. Rationale: `serde` cannot continue past a type mismatch, so "report
+  every problem at once" is only achievable after deserialization succeeds.
+  Splitting the phases makes that honest rather than aspirational, and phase
+  two is encoding-agnostic — the same validator serves JSON and MessagePack,
+  degrading from source spans to structural paths for the binary encoding,
+  which carries no line or column information. Date/Author: 2026-07-28, plan
+  author.
 - Decision (reversing an earlier one in this plan): diagnostics are plain
   `thiserror` variants with a stable machine-readable code apiece, rendered by
-  this crate's own reporter. `miette` is **not** adopted.
-  Rationale: an earlier draft took `miette` for its source spans and
-  `#[related]` accumulation. Three arguments overturned that. Spans need byte
-  offsets, but this step's corruption classes are overwhelmingly semantic —
-  discovered after deserialization, when offsets are gone — and
-  `serde_path_to_error` yields a structural path rather than a span. Worse, the
-  fixtures are *generated*, so a span into `keep-interior.scene.json` points at
-  machine output rather than at the author's mistake; the location an author
-  needs is in `assets/scenes/src/<name>/layers/z012.txt`, which no diagnostic
-  library can produce without a source map. The provenance sidecar delivers
-  that instead, and more cheaply. Finally, adopting `miette` would couple every
-  `insta` snapshot to `miette`'s renderer version, so a patch bump would churn
-  the entire diagnostic contract, and its `fancy` feature would pull terminal
-  styling crates into a state-plane crate's graph.
-  What survives from `miette` is the one good idea: each variant carries a
-  stable code, and the tests assert the *code* rather than the prose, so
-  rewording a message does not break a contract. `miette` can be layered at the
-  `scene-check` boundary later without touching the enum.
-  Date/Author: 2026-07-28, after design review.
+  this crate's own reporter. `miette` is **not** adopted. Rationale: an earlier
+  draft took `miette` for its source spans and `#[related]` accumulation. Three
+  arguments overturned that. Spans need byte offsets, but this step's
+  corruption classes are overwhelmingly semantic — discovered after
+  deserialization, when offsets are gone — and `serde_path_to_error` yields a
+  structural path rather than a span. Worse, the fixtures are *generated*, so a
+  span into `keep-interior.scene.json` points at machine output rather than at
+  the author's mistake; the location an author needs is in
+  `assets/scenes/src/<name>/layers/z012.txt`, which no diagnostic library can
+  produce without a source map. The provenance sidecar delivers that instead,
+  and more cheaply. Finally, adopting `miette` would couple every `insta`
+  snapshot to `miette`'s renderer version, so a patch bump would churn the
+  entire diagnostic contract, and its `fancy` feature would pull terminal
+  styling crates into a state-plane crate's graph. What survives from `miette`
+  is the one good idea: each variant carries a stable code, and the tests
+  assert the *code* rather than the prose, so rewording a message does not
+  break a contract. `miette` can be layered at the `scene-check` boundary later
+  without touching the enum. Date/Author: 2026-07-28, after design review.
 - Decision: `SceneLoadError` is an enum separating a malformed document from an
   invalid one from a source failure, and only the invalid case carries
-  accumulated diagnostics.
-  Rationale: "report every problem at once" is achievable only after
-  deserialization succeeds. A syntax error or an unknown field yields exactly
-  one problem and *no document*, so nothing can accumulate with it, and a single
-  error type carrying a diagnostics list would advertise an accumulation that
-  two of its three cases cannot deliver. The `insta` snapshots make this choice
-  load-bearing rather than cosmetic.
-  Date/Author: 2026-07-28, after design review.
+  accumulated diagnostics. Rationale: "report every problem at once" is
+  achievable only after deserialization succeeds. A syntax error or an unknown
+  field yields exactly one problem and *no document*, so nothing can accumulate
+  with it, and a single error type carrying a diagnostics list would advertise
+  an accumulation that two of its three cases cannot deliver. The `insta`
+  snapshots make this choice load-bearing rather than cosmetic. Date/Author:
+  2026-07-28, after design review.
 - Decision: diagnostics carry a `DocumentLocation { section, index }` with a
-  total order, and the reported list is sorted by it.
-  Rationale: the contract says "document order", but running one function per
-  check produces *rule registration* order, and the two differ precisely in the
-  multi-fault fixture whose snapshot is meant to pin the contract. Without an
-  explicit order, adding or reordering a rule churns unrelated snapshots for no
-  semantic reason, and the snapshots end up pinning an accident. An explicit
-  order also leaves the rules free to run in any sequence, or in parallel later.
+  total order, and the reported list is sorted by it. Rationale: the contract
+  says "document order", but running one function per check produces *rule
+  registration* order, and the two differ precisely in the multi-fault fixture
+  whose snapshot is meant to pin the contract. Without an explicit order,
+  adding or reordering a rule churns unrelated snapshots for no semantic
+  reason, and the snapshots end up pinning an accident. An explicit order also
+  leaves the rules free to run in any sequence, or in parallel later.
   Date/Author: 2026-07-28, after design review.
 - Decision: the document carries a monotonic integer `version` as its first
   field, read by a minimal probe structure before the full deserialization is
@@ -959,19 +966,17 @@ travel with the C1 commit.
   it works on both encodings precisely because MessagePack is written as maps.
   A plain integer rather than a semantic version, because a file format has one
   axis of change and semantic versioning only invites arguments about which
-  component to bump.
-  Date/Author: 2026-07-28, plan author.
+  component to bump. Date/Author: 2026-07-28, plan author.
 - Decision: `schemars` emits a JSON Schema for the document, committed to the
-  repository and regenerated by the same target that builds the fixtures; a test
-  fails if the committed schema is stale. `schemars` is pinned to an exact
-  version.
-  Rationale: it gives editors autocompletion and validation over hand-authored
-  scenes, and — more valuably — it turns any accidental change to the wire
-  format into a visible diff in review. `schemars` documents that its emitted
-  structure may change between versions without that being a breaking change,
-  hence the exact pin; a schema diff after a dependency bump is expected noise,
-  not a format change. The schema is derived and never normative: it cannot
-  express the semantic invariants phase two checks.
+  repository and regenerated by the same target that builds the fixtures; a
+  test fails if the committed schema is stale. `schemars` is pinned to an exact
+  version. Rationale: it gives editors autocompletion and validation over
+  hand-authored scenes, and — more valuably — it turns any accidental change to
+  the wire format into a visible diff in review. `schemars` documents that its
+  emitted structure may change between versions without that being a breaking
+  change, hence the exact pin; a schema diff after a dependency bump is
+  expected noise, not a format change. The schema is derived and never
+  normative: it cannot express the semantic invariants phase two checks.
   Date/Author: 2026-07-28, plan author.
 - Decision: `SimProperties` uses an explicit Q8.8 fixed-point scale — the stored
   `u16` divided by 256 — for `fuel` and `moisture_capacity`, and
@@ -980,30 +985,30 @@ travel with the C1 commit.
   fields but specifies no Q-format and no scale anywhere, so "the 16-bit
   fixed-point representation §10.5 already mandates" — which an earlier draft
   wrote — names a representation that does not exist yet. Without a scale the
-  values cannot be range-validated, cannot be authored meaningfully, and phase 4
-  will pick a scale that disagrees with whatever the fixtures assumed. Every
+  values cannot be range-validated, cannot be authored meaningfully, and phase
+  4 will pick a scale that disagrees with whatever the fixtures assumed. Every
   other unit in this document is pinned; this one was hand-waved. The fallback,
   if Q8.8 proves wrong for phase 4's kernels, is to drop `SimProperties` from
   version 1 entirely and let phase 4 add it — `#[serde(default)]` and a minor
-  version bump make that cheap, and it is the honest move if the scale cannot be
-  chosen confidently now. ADR 006 records whichever is taken, and design §10.5
-  is amended to carry the scale rather than only the width.
-  Date/Author: 2026-07-28, after the second design review.
+  version bump make that cheap, and it is the honest move if the scale cannot
+  be chosen confidently now. ADR 006 records whichever is taken, and design
+  §10.5 is amended to carry the scale rather than only the width. Date/Author:
+  2026-07-28, after the second design review.
 - Decision: `crates/world/src/grid/` is a **peer** of `scene/`, not a child of
   it. It owns `Extent`, `ChunkSize`, `VoxelPos`, `ChunkCoord`, `VoxelGrid`, and
-  the index mapping. `scene/` depends on `grid/`; never the reverse.
-  Rationale: `VoxelRun` is a wire type, but `VoxelGrid` is the state plane's
-  primary runtime data structure — design §7.1 says "the voxel grid itself is
-  the state plane's data" and design §12.1 gives it its own authority row with
-  graphics textures and circuit passability as derived copies. It is the thing
-  that survives after the document is dropped. Filing it under `scene/voxels.rs`
+  the index mapping. `scene/` depends on `grid/`; never the reverse. Rationale:
+  `VoxelRun` is a wire type, but `VoxelGrid` is the state plane's primary
+  runtime data structure — design §7.1 says "the voxel grid itself is the state
+  plane's data" and design §12.1 gives it its own authority row with graphics
+  textures and circuit passability as derived copies. It is the thing that
+  survives after the document is dropped. Filing it under `scene/voxels.rs`
   would mean roadmap steps 2.1.1, 2.1.2, 2.1.3, 4.2.1, and 8.2.1 — four phases
-  across three crates — importing the runtime grid through a path that announces
-  itself as the file format, and step 2.1.3 making it mutable inside a module
-  tree named after an immutable authored document. Coordinates are likewise not
-  a document concept. An hour of module placement now against a cross-crate
-  import churn at 2.1.1.
-  Date/Author: 2026-07-28, after design review.
+  across three crates — importing the runtime grid through a path that
+  announces itself as the file format, and step 2.1.3 making it mutable inside
+  a module tree named after an immutable authored document. Coordinates are
+  likewise not a document concept. An hour of module placement now against a
+  cross-crate import churn at 2.1.1. Date/Author: 2026-07-28, after design
+  review.
 - Decision: validation runs in ordered phases with a bound between them: cheap
   header invariants, then a *bounded* decode, then the semantic rules.
   Diagnostics accumulate within a phase; a failing phase stops the next.
@@ -1016,37 +1021,36 @@ travel with the C1 commit.
   allocation is ever proportional to an unvalidated declared extent.
   Date/Author: 2026-07-28, after design review.
 - Decision: `ConceptIri` validates syntax only. Project-namespace membership is
-  checked against a prefix list supplied by the validator's caller.
-  Rationale: the namespace list is knowledge-plane policy — design §11.5 and
-  invariant I6 both speak of IRIs "within project namespaces" — and hard-coding
-  it in the state plane means phase 5 adding a namespace edits `crates/world`.
-  There would be no Cargo edge for review to catch, which is exactly the
-  coupling ADR 005's review-enforced layering misses. Injecting the list keeps
-  the syntactic newtype where it belongs while leaving the policy with its
-  owner; ADR 006 names that owner.
-  Date/Author: 2026-07-28, after design review.
+  checked against a prefix list supplied by the validator's caller. Rationale:
+  the namespace list is knowledge-plane policy — design §11.5 and invariant I6
+  both speak of IRIs "within project namespaces" — and hard-coding it in the
+  state plane means phase 5 adding a namespace edits `crates/world`. There
+  would be no Cargo edge for review to catch, which is exactly the coupling ADR
+  005's review-enforced layering misses. Injecting the list keeps the syntactic
+  newtype where it belongs while leaving the policy with its owner; ADR 006
+  names that owner. Date/Author: 2026-07-28, after design review.
 - Decision: the fixture generator stays a Python script rather than becoming a
-  Rust `xtask` or a test-time builder.
-  Rationale: this is the strongest alternative considered and it deserves an
-  explicit answer. A Rust builder would call the real document types, so a
-  fixture could not be structurally invalid — but that is precisely the problem:
-  if the fixtures are emitted by the same types that validate them, they stop
-  being an *independent* check, and a schema bug becomes invisible because
-  producer and consumer agree by construction. The cross-language generator is a
-  second, independent implementation of the schema. That independence is only
-  real if it is guarded, so the guard ships with it: `deny_unknown_fields` on
-  every document type, plus a test in which Rust decodes a Python-emitted golden
-  document and re-encodes it byte-identically. Without that guard the two
-  schemas drift silently and the independence is theatre.
-  Date/Author: 2026-07-28, after design review.
+  Rust `xtask` or a test-time builder. Rationale: this is the strongest
+  alternative considered and it deserves an explicit answer. A Rust builder
+  would call the real document types, so a fixture could not be structurally
+  invalid — but that is precisely the problem: if the fixtures are emitted by
+  the same types that validate them, they stop being an *independent* check,
+  and a schema bug becomes invisible because producer and consumer agree by
+  construction. The cross-language generator is a second, independent
+  implementation of the schema. That independence is only real if it is
+  guarded, so the guard ships with it: `deny_unknown_fields` on every document
+  type, plus a test in which Rust decodes a Python-emitted golden document and
+  re-encodes it byte-identically. Without that guard the two schemas drift
+  silently and the independence is theatre. Date/Author: 2026-07-28, after
+  design review.
 - Decision: no `SceneLibrary` registry type is introduced. The roadmap's "leave
-  no scene state behind" is satisfied structurally.
-  Rationale: an earlier draft invented a registry so that a behavioural step
-  could assert it was empty after a failed load. That is a type existing only to
-  make a sentence assertable. At this step the loader is a pure function of
-  bytes and a `SceneSource`, so no state exists to leave behind; the guarantee
-  is that `Scene` has no public constructor and validation is the only path to
-  one, pinned by a `trybuild` case. The behavioural scenario asserts the honest
+  no scene state behind" is satisfied structurally. Rationale: an earlier draft
+  invented a registry so that a behavioural step could assert it was empty
+  after a failed load. That is a type existing only to make a sentence
+  assertable. At this step the loader is a pure function of bytes and a
+  `SceneSource`, so no state exists to leave behind; the guarantee is that
+  `Scene` has no public constructor and validation is the only path to one,
+  pinned by a `trybuild` case. The behavioural scenario asserts the honest
   observable instead: a failed load does not poison a subsequent good one. A
   registry becomes real in phase 2, in the Entity Component System layer.
   Date/Author: 2026-07-28, plan author.
@@ -1054,16 +1058,15 @@ travel with the C1 commit.
   example, not a `[[bin]]`. Its logic lives in `crates/world/src/check/`; the
   example is a shim. It writes through `writeln!` on a locked `Stdout` handle,
   never `println!`. And `crates/world/examples/` is added to the Makefile's
-  coverage-ignore pattern.
-  Rationale: examples are built and linted by the workspace gate
-  (`--all-targets`), never enter the release graph (which is scoped
-  `-p thysalion`), and make no claim on ADR 005's rule that demo binaries live
-  only in `thysalion-demos` or on the `make demo` allow-list derived from
-  `crates/demos/src/bin`. A `[[bin]]` in `thysalion-world` would be more
-  discoverable but muddies both rules for no gain.
-  The other two clauses resolve a genuine trilemma that an earlier draft left
-  standing: `make lint` lints examples, `clippy::print_stdout` is denied, an
-  operator tool must print, and this plan promised no new lint suppression in
+  coverage-ignore pattern. Rationale: examples are built and linted by the
+  workspace gate (`--all-targets`), never enter the release graph (which is
+  scoped `-p thysalion`), and make no claim on ADR 005's rule that demo
+  binaries live only in `thysalion-demos` or on the `make demo` allow-list
+  derived from `crates/demos/src/bin`. A `[[bin]]` in `thysalion-world` would
+  be more discoverable but muddies both rules for no gain. The other two
+  clauses resolve a genuine trilemma that an earlier draft left standing:
+  `make lint` lints examples, `clippy::print_stdout` is denied, an operator
+  tool must print, and this plan promised no new lint suppression in
   `crates/world`. `writeln!` on a `Stdout` handle satisfies all four —
   `print_stdout` fires on the `print!` family of macros, not on `Write`. The
   coverage clause amends this plan's own earlier promise, and does so
@@ -1072,39 +1075,121 @@ travel with the C1 commit.
   would land uncovered against the patch target. Keeping the logic in
   `check/` — where unit tests cover it — leaves only the argument-parsing shim
   behind the ignore, which is the same boundary ADR 005 already draws for
-  windowed harness code.
-  Date/Author: 2026-07-28; extended after the second design review.
+  windowed harness code. Date/Author: 2026-07-28; extended after the second
+  design review.
 - Decision: palette index `0` is reserved for air in every scene.
   Rationale: it gives run-length encoding and sparse chunk storage a shared
   meaning for "nothing here", so an absent chunk and a long air run agree
   without a lookup. Validation rejects a palette whose entry 0 is not the air
-  material class.
-  Date/Author: 2026-07-26, plan author.
+  material class. Date/Author: 2026-07-26, plan author.
 - Decision: entity spawns carry a closed, typed field set rather than an
-  untyped component bag.
-  Rationale: `serde_json::Value` is precisely the type whose behaviour differs
-  between the two encodings, and there is no Entity Component System component
-  vocabulary to author against until phase 4. A `#[non_exhaustive]` typed
-  struct defers the vocabulary to the phase that owns it without weakening the
-  round-trip guarantee.
-  Date/Author: 2026-07-26, plan author.
+  untyped component bag. Rationale: `serde_json::Value` is precisely the type
+  whose behaviour differs between the two encodings, and there is no Entity
+  Component System component vocabulary to author against until phase 4. A
+  `#[non_exhaustive]` typed struct defers the vocabulary to the phase that owns
+  it without weakening the round-trip guarantee. Date/Author: 2026-07-26, plan
+  author.
 - Decision: the behavioural suite for scene loading uses a new
-  `rstest-bdd` `HarnessAdapter` whose context is a plain loader session, not the
-  existing `BevyHarness` in `crates/harness/tests/headless/support.rs`.
+  `rstest-bdd` `HarnessAdapter` whose context is a plain loader session, not
+  the existing `BevyHarness` in `crates/harness/tests/headless/support.rs`.
   Rationale: `thysalion-world` has no Bevy dependency and ADR 005 stages Bevy
   into it later; adding `bevy` now purely to host a test harness would invert
   the staging and put the render feature set into the world crate's graph. The
   new adapter is deliberately structurally identical to `BevyHarness` so that
   roadmap step 1.3.1 can promote both into one shared test-support crate, which
   the developers' guide already names as the promotion point. The alternative —
-  hosting scene-loading scenarios in `crates/harness` against a `MinimalPlugins`
-  app — is available and is the right move once step 2.1.1 gives the scene an
-  Entity Component System representation to assert against.
+  hosting scene-loading scenarios in `crates/harness` against a
+  `MinimalPlugins` app — is available and is the right move once step 2.1.1
+  gives the scene an Entity Component System representation to assert against.
   Date/Author: 2026-07-26, plan author.
+
+- Decision: `Scene::content_hash` returns
+  `Result<SceneContentHash, CodecError>` rather than the infallible
+  `SceneContentHash` this plan's `Interfaces and dependencies` specified.
+  Rationale: the hash is taken over `encode_document(.., MessagePack)`, whose
+  signature is fallible. In practice it cannot fail — the writer is a `Vec` and
+  the document tree holds no type that can refuse to serialize — but the only
+  ways to present an infallible face over it are `expect`, which this workspace
+  denies outwith `#[test]` functions, or a silent fallback that would hash the
+  wrong bytes. Surfacing the `Result` costs a caller one `?` and tells the
+  truth. Phase 8 wants the encoded bytes anyway, so the natural call site
+  already has a `Result` in hand. Date/Author: 2026-07-30, during Stage C2.
+
+- Decision: `PrototypeDocument` drops its `facing` and `airborne` fields,
+  keeping only `extends` and `concept`. Rationale: a prototype can only
+  usefully default a field a spawn may omit, and `SpawnDocument` makes both
+  mandatory, so neither default could ever take effect. Shipping an inheritance
+  mechanism two thirds of which is inert is worse than a narrower one. The
+  alternative considered and rejected was making the spawn fields `Option`,
+  which is byte-compatible for the existing fixture but requires inventing a
+  scene-wide default facing that design §7.3 does not specify. Phase 4's
+  component vocabulary is what will give prototypes weight. The golden bytes
+  are unaffected: the minimal fixture's prototype map is empty. Date/Author:
+  2026-07-30, during Stage C2.
+
+- Decision: `SunPathDocument`, `AmbientBandDocument`, and `LightingDocument`
+  are renamed `SunPath`, `AmbientBand`, and `Lighting`, and are shared between
+  the wire and the domain. Rationale: the same rule already recorded for
+  `MaterialClass` and its peers. This step enforces no invariant over the
+  lighting section — it is absent from this plan's corruption-class list
+  entirely, because phase 3 owns the lighting semantics and is the phase with a
+  use for the values — so there is no second form for a domain type to be. A
+  `Scene` holding a field typed `LightingDocument` would announce the wrong
+  layer. When phase 3 adds a rule, the domain form arrives with it.
+  Date/Author: 2026-07-30, during Stage C2.
+
+- Decision: `SceneLoadError` is defined in `crates/world/src/loader.rs` rather
+  than in `scene/validation/diagnostics.rs` as this plan's
+  `Interfaces and dependencies` placed it. Rationale: it names
+  `codec::Encoding` and `source::SceneSourceError`, so siting it inside
+  `scene::validation` would give the pure rule modules a path to both the codec
+  and the port — the exact coupling the impure-rule-set-in-one-named-file
+  discipline exists to prevent. The loader is where the codec, the port, and
+  validation already meet, so it is where their common failure type belongs.
+  `SceneDiagnostic` stays in `diagnostics.rs`, and it is what the rules
+  produce. Date/Author: 2026-07-30, during Stage C2.
+
+- Decision: an unresolvable palette index reports **one** diagnostic per
+  chunk, not one per voxel. Rationale: a single bad run expands to as many
+  identical faults as it is long — up to 32,768 — and a report listing every
+  one buries every other diagnostic in the document. The one reported carries
+  its exact chunk and chunk-local position, which is what an author needs to
+  find the offending run. This narrows "every problem in the earliest failing
+  phase" to "every distinct problem", and the distinction is worth stating
+  because it is the one place the promise is deliberately not literal.
+  Date/Author: 2026-07-30, during Stage C2.
+
+- Decision: a new corruption class, `scene.knowledge.resource-unsafe-path`,
+  covers an absolute knowledge-source path or one with a parent-directory
+  component. Rationale: the plan's class list has no entry for it, and both
+  existing knowledge codes would misdescribe it — reporting `../../etc/passwd`
+  as "absent" sends the reader looking for a missing file, and as "unreadable"
+  suggests a permissions problem. The path is refused before any adapter sees
+  it, by `source::check_resource_path`, so it is a document fault and deserves
+  its own name. Adding a code is not a contract change; renaming one would be.
+  Date/Author: 2026-07-30, during Stage C2.
 
 ## Outcomes & retrospective
 
-To be completed at the end of Stage D.
+To be completed at the end of Stage D. One lesson is already worth recording,
+because it changed how the remaining stages are sized.
+
+Stage C2 was planned as a single commit and is not one. The first attempt
+reached roughly sixty per cent — the port, the diagnostics, the palette, and
+two rule sets — before running out of room, and none of it compiled, because
+the behavioural suite it was written against referenced a `Scene`, a
+`validation` module, and a `loader` that did not exist yet. The work had to be
+stashed rather than committed, leaving no green checkpoint in the middle of the
+largest stage in the plan.
+
+The mistake was sizing the stage by *subject* (scene loading) rather than by
+*the smallest thing that compiles and passes*. Splitting it into C2a (the
+validating loader, which the behavioural suite exercises end to end) and C2b
+(the reporter, the operator tool, and the fixture-driven snapshots) gives two
+commits that each stand alone, and C2a is the one the roadmap's acceptance
+criterion for task 1.2.2 actually rests on. Stage C3 carries the same risk —
+the generator and four fixtures are not one reviewable change — and is split
+the same way when it starts.
 
 ## Context and orientation
 
@@ -1164,8 +1249,8 @@ step's code are listed under `Constraints` above.
   Unicode. A voxel type may name the ontology concept it instantiates, for
   example `thy:OakDoor` (design §7.2).
 - **TriG** — a text serialization for Resource Description Framework datasets
-  with named graphs. Scenes reference TriG files for the knowledge plane to load
-  (design §7.3, §11.5).
+  with named graphs. Scenes reference TriG files for the knowledge plane to
+  load (design §7.3, §11.5).
 - **Behaviour-driven development (BDD)** — specifying behaviour as
   `Given`/`When`/`Then` scenarios in a `.feature` file, executed by step
   functions. This repository uses `rstest-bdd` 0.6.0-beta3.
@@ -1176,17 +1261,18 @@ Design §7.2 fixes what a voxel type carries: a name, a material class, per-face
 passability, a slope direction, light emission, simulation coefficients, and an
 optional concept IRI. Design §7.3 fixes the document's sections: `dimensions`,
 `chunk_size`, `palette`, `voxels` (palettized dense Z-major layers, run-length
-encoded), `entities` (a spawn list with prototype inheritance via `extends` plus
-overrides), `lighting` (sun path, ambient palette per time-of-day band, probe
-volume bounds and spacing overrides), and `knowledge` (TriG files plus the
-scene's own named-graph IRI). Design §7.1, Table 1 fixes the scene size classes.
+encoded), `entities` (a spawn list with prototype inheritance via `extends`
+plus overrides), `lighting` (sun path, ambient palette per time-of-day band,
+probe volume bounds and spacing overrides), and `knowledge` (TriG files plus
+the scene's own named-graph IRI). Design §7.1, Table 1 fixes the scene size
+classes.
 
-The concept art in `references/style-guide.png` fixes the vocabulary the fixture
-palettes must express: material families (stone, timber, roofing, cloth and
-banners, ground, natural), ground materials (cobblestone, wet cobblestone, wood
-planks, mud and dirt, grass and moss, forest path, swamp boardwalk, snow and
-ice), light sources (lantern, torch, fireplace, candle, magic, moonlight), and
-seven named colour palettes of which three are relevant here: Market Town,
+The concept art in `references/style-guide.png` fixes the vocabulary the
+fixture palettes must express: material families (stone, timber, roofing, cloth
+and banners, ground, natural), ground materials (cobblestone, wet cobblestone,
+wood planks, mud and dirt, grass and moss, forest path, swamp boardwalk, snow
+and ice), light sources (lantern, torch, fireplace, candle, magic, moonlight),
+and seven named colour palettes of which three are relevant here: Market Town,
 Keep Interior, and Haunted Swamp.
 
 ## Plan of work
@@ -1201,26 +1287,27 @@ repository, build a throwaway crate with `serde`, `serde_json`, `rmp-serde`, and
 `rmpv`, containing a struct that exercises every shape the scene document will
 use: nested structs, an enum with unit and struct variants, `Option`, `Vec`,
 `SmolStr`, both signed and unsigned integers of every width the format uses,
-and — this one specifically — a `BTreeMap` with a **struct** key. The map key is
-not incidental: `serde_json` stringifies integer keys but rejects struct, tuple,
-and sequence keys outright, while MessagePack accepts any key type. A spike that
-tests `BTreeMap<String, _>` proves nothing about the trap. Confirm four things:
+and — this one specifically — a `BTreeMap` with a **struct** key. The map key
+is not incidental: `serde_json` stringifies integer keys but rejects struct,
+tuple, and sequence keys outright, while MessagePack accepts any key type. A
+spike that tests `BTreeMap<String, _>` proves nothing about the trap. Confirm
+four things:
 
 1. Encoding to JSON and to MessagePack and decoding back yields an equal value
    in both directions.
 2. `rmp_serde::to_vec_named` produces maps and `rmp_serde::to_vec` produces
-   arrays, by decoding each into an `rmpv::Value` and inspecting it. This is the
-   assertion the production test will mirror.
+   arrays, by decoding each into an `rmpv::Value` and inspecting it. This is
+   the assertion the production test will mirror.
 3. `#[serde(deny_unknown_fields)]` rejects an extra field under both encodings,
    and a `#[serde(default)]` field is accepted when absent.
 4. Two claims the design review could not verify, both of which make
    `to_vec_named` load-bearing for *correctness* rather than merely for
    evolvability, and both of which belong in ADR 006's rationale: whether
-   `rmp_serde`'s `deserialize_struct` accepts both array and map markers — if it
-   does, an accidentally array-encoded scene decodes silently and the map
+   `rmp_serde`'s `deserialize_struct` accepts both array and map markers — if
+   it does, an accidentally array-encoded scene decodes silently and the map
    guarantee rests entirely on the wire-shape assertion — and whether
-   `deny_unknown_fields` is a no-op in the array form, which it almost certainly
-   is, a sequence carrying no field names to deny.
+   `deny_unknown_fields` is a no-op in the array form, which it almost
+   certainly is, a sequence carrying no field names to deny.
 
 Go/no-go: if any shape fails to round-trip, remove it from the format before
 Stage B rather than working around it later. If the struct-keyed map fails, the
@@ -1234,11 +1321,11 @@ MessagePack, and reports both sizes, the decoded sparse memory footprint, and
 the wall-clock time to parse, decode, and traverse it in **both** release and
 debug builds.
 
-Measure *in process*, and only cross-check with `hyperfine` against a
-pre-built binary. Timing `hyperfine 'cargo run --release …'` measures Cargo's
-freshness check and process startup — tens to hundreds of milliseconds — against
-a 250 ms tolerance, which is mostly noise. Design §6.3 will be measured
-in-process forever afterwards, so measure it that way from the start.
+Measure *in process*, and only cross-check with `hyperfine` against a pre-built
+binary. Timing `hyperfine 'cargo run --release …'` measures Cargo's freshness
+check and process startup — tens to hundreds of milliseconds — against a 250 ms
+tolerance, which is mostly noise. Design §6.3 will be measured in-process
+forever afterwards, so measure it that way from the start.
 
 Measure the **named** `VoxelRunDocument`, not a compact two-element array. The
 named form is roughly four times the JSON size per run, and the fixture
@@ -1266,25 +1353,26 @@ largest simplification available to this plan. Present them together if you
 present them at all.
 
 Spike A3 — `serde_path_to_error` under MessagePack. The crate documents that it
-wraps any `Deserializer`, but every published example is JSON and binary formats
-are not covered by its tests. Confirm on a deliberately malformed MessagePack
-payload that `Error::path()` yields a usable structural path. If it does not,
-the MessagePack path degrades to an unlocated deserialization error, which is
-acceptable — MessagePack is the shipping encoding, not the authoring one — but
-the plan must say so rather than promise a path it cannot deliver.
+wraps any `Deserializer`, but every published example is JSON and binary
+formats are not covered by its tests. Confirm on a deliberately malformed
+MessagePack payload that `Error::path()` yields a usable structural path. If it
+does not, the MessagePack path degrades to an unlocated deserialization error,
+which is acceptable — MessagePack is the shipping encoding, not the authoring
+one — but the plan must say so rather than promise a path it cannot deliver.
 
 Reference data. Two constants that later stages *validate against* are written
 now, not in Stage D, because a check whose reference data arrives two stages
 later is a vacuous check and the fixtures are authored against it in between:
-the project IRI prefix table (`thy:` and the scene-graph prefix, with their full
-bases) and the prototype depth bound. Both land in `crates/world/src/` with the
-code that consumes them and are restated in ADR 006, rather than the reverse.
+the project IRI prefix table (`thy:` and the scene-graph prefix, with their
+full bases) and the prototype depth bound. Both land in `crates/world/src/`
+with the code that consumes them and are restated in ADR 006, rather than the
+reverse.
 
 Pinning. Add to `[workspace.dependencies]` in the root `Cargo.toml` exactly the
-approved set from `Tolerances`, at the versions verified during this stage, with
-caret requirements — except `schemars`, which is pinned to an exact version for
-the reason in the decision log. Record each resolved version in `Artefacts and
-notes`.
+approved set from `Tolerances`, at the versions verified during this stage,
+with caret requirements — except `schemars`, which is pinned to an exact
+version for the reason in the decision log. Record each resolved version in
+`Artefacts and notes`.
 
 ### Stage B: the behavioural specification and the first red tests
 
@@ -1300,8 +1388,7 @@ impossible.
 The behavioural specification is written in full now, because it is the
 document a reviewer reads to understand the whole step, but only the scenarios
 belonging to task 1.2.1 are wired to `#[scenario]` functions at this stage.
-Create
-`crates/world/tests/features/scene_loading.feature`:
+Create `crates/world/tests/features/scene_loading.feature`:
 
 ```gherkin
 Feature: Scene loading and validation
@@ -1364,12 +1451,12 @@ Feature: Scene loading and validation
       | bare-cell         |
 ```
 
-Note `Scenario Outline`, not `Scenario`: Gherkin binds `<name>` placeholders and
-an `Examples:` table only under an outline, and a plain `Scenario` carrying them
-is a parse error rather than a passing suite. This is the repository's first
-outline — `crates/harness/tests/features/harness.feature` has none — so confirm
-the `rstest-bdd` 0.6.0-beta3 `#[scenario]` macro's indexing treats each example
-row as its own scenario before writing the step functions.
+Note `Scenario Outline`, not `Scenario`: Gherkin binds `<name>` placeholders
+and an `Examples:` table only under an outline, and a plain `Scenario` carrying
+them is a parse error rather than a passing suite. This is the repository's
+first outline — `crates/harness/tests/features/harness.feature` has none — so
+confirm the `rstest-bdd` 0.6.0-beta3 `#[scenario]` macro's indexing treats each
+example row as its own scenario before writing the step functions.
 
 Create `crates/world/tests/loading/support.rs` holding the adapter, and
 `crates/world/tests/loading/main.rs` holding the step functions, mirroring the
@@ -1410,9 +1497,10 @@ Alongside the behavioural suite, add the task 1.2.1 unit and property tests:
   The first two lines are not redundant with the third, and the fourth is not
   redundant with any of them. Every divergence class that matters here —
   struct-as-array versus struct-as-map, tuple-struct arity, variant index
-  versus variant name — round-trips *perfectly within* a single format while the
-  two formats disagree about the bytes. A chain that only ever crosses formats
-  once, which is all an earlier draft specified, cannot separate those cases.
+  versus variant name — round-trips *perfectly within* a single format while
+  the two formats disagree about the bytes. A chain that only ever crosses
+  formats once, which is all an earlier draft specified, cannot separate those
+  cases.
 
   Plus: chunk-local run encoding and decoding is a fixpoint over random chunks;
   `to_chunks` produces the *canonical* form and not merely some fixpoint (an
@@ -1426,8 +1514,8 @@ Alongside the behavioural suite, add the task 1.2.1 unit and property tests:
   under `crates/world/tests/fixtures/golden/` with a decode test. This is the
   only test in the suite capable of failing when the encoding drifts across
   builds. The regenerated fixtures cannot do it — they are current-version by
-  construction — and the round-trip properties cannot either, because they prove
-  symmetry within one compilation rather than durability across versions.
+  construction — and the round-trip properties cannot either, because they
+  prove symmetry within one compilation rather than durability across versions.
   Refresh these deliberately, never as a reflex.
 - A `trybuild` compile-fail case under `crates/world/tests/ui/` proving that
   `Scene` cannot be constructed by struct literal, so validation cannot be
@@ -1545,32 +1633,33 @@ the doubled `{"runs":{"runs":[…]}}`, and `#[serde(flatten)]` — which would h
 flattened the payload into the entry — is banned by `Constraints` because it
 buffers through serde's `Content`.
 
-**Runs are named-field structs, not two-element arrays.** `{"length": 4,
-"index": 1}`, never `[4, 1]`. The reason is in the decision log; the practical
-consequence is that JSON runs are roughly four times the size of the compact
-form, which is what Spike A2 must measure against the 1 MiB tolerance.
+**Runs are named-field structs, not two-element arrays.**
+`{"length": 4, "index": 1}`, never `[4, 1]`. The reason is in the decision log;
+the practical consequence is that JSON runs are roughly four times the size of
+the compact form, which is what Spike A2 must measure against the 1 MiB
+tolerance.
 
 **The index formula.** Runs are chunk-local and Z-major: within a chunk of side
-`s`, chunk-local `(x, y, z)` sits at `z * s * s + y * s + x`, which for `s = 32`
-is `z * 1024 + y * 32 + x`. Read the eight runs as four rows of stone — four
-voxels of stone then twenty-eight of air — at `y = 0, 1, 2, 3` on the `z = 0`
-layer, then air for the remaining 32,668 positions. The counts sum to 32,768,
-the chunk volume, and validation rejects any chunk whose runs do not. Runs are
-canonical: no zero-length run, and no two adjacent runs sharing an index.
-Validation rejects the non-canonical form rather than silently normalizing it,
-so a generator bug is visible rather than absorbed.
+`s`, chunk-local `(x, y, z)` sits at `z * s * s + y * s + x`, which for
+`s = 32` is `z * 1024 + y * 32 + x`. Read the eight runs as four rows of stone
+— four voxels of stone then twenty-eight of air — at `y = 0, 1, 2, 3` on the
+`z = 0` layer, then air for the remaining 32,668 positions. The counts sum to
+32,768, the chunk volume, and validation rejects any chunk whose runs do not.
+Runs are canonical: no zero-length run, and no two adjacent runs sharing an
+index. Validation rejects the non-canonical form rather than silently
+normalizing it, so a generator bug is visible rather than absorbed.
 
 **Nothing is elided.** Every defaulted field appears. Committed fixtures are
 byte-identical to what this crate's own encoder produces for the same document,
 which is what `make scenes-check` asserts. This worked example is shown
 pretty-printed because it is a hand-written test fixture and a teaching aid;
 the *generated* fixtures under `assets/scenes/` are compact, for the reason in
-the decision log. Two writers exist for this
-format — the Python generator and Rust's serializer — and if the generator
-omits defaults that Rust re-emits, the two produce different bytes for the same
-scene from the first commit. That divergence is invisible to a canonical-bytes
-test, which only proves `document -> bytes` is stable, and it surfaces later as
-an unreviewable whole-file diff the first time anything re-emits a fixture.
+the decision log. Two writers exist for this format — the Python generator and
+Rust's serializer — and if the generator omits defaults that Rust re-emits, the
+two produce different bytes for the same scene from the first commit. That
+divergence is invisible to a canonical-bytes test, which only proves
+`document -> bytes` is stable, and it surfaces later as an unreviewable
+whole-file diff the first time anything re-emits a fixture.
 `#[serde(skip_serializing_if)]` is *not* the escape, being banned by
 `Constraints` for the content-hash reason; emitting the explicit form is.
 
@@ -1581,8 +1670,8 @@ compilation error in unrelated crates.
 ### Stage C1: the voxel type registry and scene document model (task 1.2.1)
 
 Create the module tree under `crates/world/src/`. AGENTS.md caps a file at 400
-lines, so each module carries a budget below; if one is going to breach it, split
-it when you notice, not in Stage D.
+lines, so each module carries a budget below; if one is going to breach it,
+split it when you notice, not in Stage D.
 
 `grid/` is a **peer** of `scene/`, holding the runtime voxel structure and the
 coordinate types. `scene/` may depend on `grid/`; `grid/` never depends on
@@ -1644,8 +1733,9 @@ The codec modules:
   version first — into a deliberately *permissive* structure, not
   `deny_unknown_fields` — and rejects an unsupported one with its own
   diagnostic before attempting the full deserialization. Without the probe, a
-  future document fails against today's structure with `unknown field
-  'fog_volume'` instead of "unsupported version 1.1; this build supports 1.0".
+  future document fails against today's structure with
+  `unknown field 'fog_volume'` instead of "unsupported version 1.1; this build
+  supports 1.0".
 - `codec/json.rs` — decodes through `serde_path_to_error` over
   `serde_json::Deserializer`, carrying the structural path and, where
   `serde_json` supplies them, the line and column. Encodes **compactly** with
@@ -1661,8 +1751,8 @@ The source module carries the path rules, which are the port's contract and not
 an adapter's business. A resource path is relative to the scene document's own
 directory, and an absolute path or one containing `..` is rejected by the port
 rather than by an adapter — `cap_std` already stops `DirSceneSource` escaping
-its root, but `MemorySceneSource` has no such protection, and the trust boundary
-in `Constraints` covers both. Concretely, `DirSceneSource` loading
+its root, but `MemorySceneSource` has no such protection, and the trust
+boundary in `Constraints` covers both. Concretely, `DirSceneSource` loading
 `assets/scenes/keep-interior.scene.json` is rooted at `assets/scenes/`, so the
 fixtures name their knowledge resources `knowledge/<file>.trig`. Note that this
 root also exposes `assets/scenes/src/` — the authoring sources — as readable
@@ -1687,9 +1777,9 @@ Open with the red step: wire the remaining behavioural scenarios to
 `#[scenario]` functions, add one corrupt fixture per corruption class under
 `crates/world/tests/fixtures/corrupt/`, and add the `insta` snapshot assertions
 over the rendered diagnostic report — one snapshot per class. The snapshot
-captures report text with paths normalized, so it is a contract about diagnostic
-wording, ordering, and codes rather than a dump of the document. Observe them
-failing, then implement:
+captures report text with paths normalized, so it is a contract about
+diagnostic wording, ordering, and codes rather than a dump of the document.
+Observe them failing, then implement:
 
 - `scene/validation/diagnostics.rs` — `SceneDiagnostic`, a `thiserror` enum with
   one variant per corruption class, each carrying a stable machine-readable
@@ -1702,8 +1792,8 @@ failing, then implement:
   that must walk the voxel payload share a single traversal per chunk rather
   than taking one traversal each — but as an iterator feeding several
   single-purpose accumulators, never as one function doing four jobs, which the
-  `clippy.toml` complexity ceiling forbids. Every rule is a pure function of the
-  document; the one rule set that needs the source port lives in
+  `clippy.toml` complexity ceiling forbids. Every rule is a pure function of
+  the document; the one rule set that needs the source port lives in
   `rules/resources.rs` and is the only place infrastructure is reachable.
 - `scene/validation/mod.rs` — the phase orchestration described below, and the
   only path to a `Scene`.
@@ -1724,17 +1814,18 @@ property, not an optimization:
    prototype resolution, IRI syntax, and — in the one impure rule set —
    knowledge-resource presence.
 
-Diagnostics accumulate within a phase and a failing phase stops the next, so the
-promise this step makes is *every problem in the earliest failing phase*. The
-unqualified "every problem" an earlier draft promised is not implementable: it
-would oblige the loader to fully decode a document declaring a four-billion-entry
-palette so that the later rules could also run.
+Diagnostics accumulate within a phase and a failing phase stops the next, so
+the promise this step makes is *every problem in the earliest failing phase*.
+The unqualified "every problem" an earlier draft promised is not implementable:
+it would oblige the loader to fully decode a document declaring a
+four-billion-entry palette so that the later rules could also run.
 
 Prototype resolution is iterative against an explicit worklist with a depth
-bound, never recursive. Cycle detection alone does not save a recursive resolver
-from an *acyclic* chain ten thousand deep, and the resulting stack overflow is a
-signal rather than a `Result` — uncatchable, and a direct contradiction of the
-"never panics" contract in precisely the place a hand-edited file reaches.
+bound, never recursive. Cycle detection alone does not save a recursive
+resolver from an *acyclic* chain ten thousand deep, and the resulting stack
+overflow is a signal rather than a `Result` — uncatchable, and a direct
+contradiction of the "never panics" contract in precisely the place a
+hand-edited file reaches.
 
 Every diagnostic must locate its subject in terms an author can act on. "Voxel
 run 41,203 is invalid" is useless in a 134-million-voxel scene. Positional
@@ -1747,41 +1838,42 @@ The corruption classes, each with its own diagnostic variant, its own code, and
 its own fixture under `crates/world/tests/fixtures/corrupt/`:
 
 unsupported document version; unknown document field; zero, overflowing, or
-non-chunk-aligned dimensions; chunk size not the design's 32; palette entry zero
-not air; empty palette; duplicate voxel-type name; palette longer than 65,536
-entries; chunk coordinate outwith the declared extent; duplicate chunk
+non-chunk-aligned dimensions; chunk size not the design's 32; palette entry
+zero not air; empty palette; duplicate voxel-type name; palette longer than
+65,536 entries; chunk coordinate outwith the declared extent; duplicate chunk
 coordinate; chunk entries out of sorted order; voxel run referencing an index
 outwith the palette; run counts not summing to the chunk volume; adjacent runs
 sharing an index; a run of count zero; light emission outwith 0–15; spawn
 position outwith the grid; unknown prototype name; prototype inheritance cycle;
 prototype chain deeper than the bound; concept IRI outwith the supplied
-namespaces; malformed IRI; knowledge resource absent; knowledge resource present
-but unreadable; scene named-graph IRI missing or malformed.
+namespaces; malformed IRI; knowledge resource absent; knowledge resource
+present but unreadable; scene named-graph IRI missing or malformed.
 
 "Unknown document field" earns its place: with `deny_unknown_fields` it is the
-single most likely real authoring fault, and it is the one class an earlier draft
-of this list omitted entirely.
+single most likely real authoring fault, and it is the one class an earlier
+draft of this list omitted entirely.
 
 Two classes ship as **warnings** rather than errors, carried on `LoadedScene`
 rather than failing the load: a spawn inside a non-passable voxel, and a spawn
 with no supporting voxel beneath it and no explicit airborne flag. They are
 warnings because a scene can legitimately want either, and they exist because
-they are the two cheapest checks that catch the "loads clean, is nonsense" class
-in `Risks`. `scene-check --strict` promotes warnings to failure, and continuous
-integration runs strict.
+they are the two cheapest checks that catch the "loads clean, is nonsense"
+class in `Risks`. `scene-check --strict` promotes warnings to failure, and
+continuous integration runs strict.
 
 Two fixture directories, with different assertions:
 
 - `tests/fixtures/corrupt/` holds *authoring mistakes* — one per class above,
-  hand-written, tiny, literal, one fault each. These are never generated: routing
-  them through the fixture compiler would make the fault an artefact of the
-  compiler rather than of the document.
+  hand-written, tiny, literal, one fault each. These are never generated:
+  routing them through the fixture compiler would make the fault an artefact of
+  the compiler rather than of the document.
 - `tests/fixtures/hostile/` holds *resource attacks* — a prototype chain past
-  the depth bound, a palette declaring more entries than it contains, run counts
-  overflowing the chunk volume, deeply nested JSON, a truncated MessagePack
-  payload, and a MessagePack payload declaring a gigantic array length. The
-  assertion differs: not "produces this diagnostic" but "terminates, within a
-  bound, without panicking and without allocating more than the stated cap".
+  the depth bound, a palette declaring more entries than it contains, run
+  counts overflowing the chunk volume, deeply nested JSON, a truncated
+  MessagePack payload, and a MessagePack payload declaring a gigantic array
+  length. The assertion differs: not "produces this diagnostic" but
+  "terminates, within a bound, without panicking and without allocating more
+  than the stated cap".
 
 Also add the operator tool — `crates/world/src/check/` with a thin
 `crates/world/examples/scene-check.rs` wrapper. It is not merely a printer:
@@ -1820,26 +1912,27 @@ Fixtures are authored as layered text and compiled to JSON.
 
 Authoring sources live under `assets/scenes/src/<name>/`: a `scene.toml`
 declaring dimensions, chunk size, palette, lighting, entities, and knowledge;
-`legend.toml` mapping single characters to palette names; and `layers/z###.txt`,
-one text raster per populated Z layer, with unlisted layers implicitly air.
+`legend.toml` mapping single characters to palette names; and
+`layers/z###.txt`, one text raster per populated Z layer, with unlisted layers
+implicitly air.
 
-`scene.toml` also declares `content_origin` and `content_extent`: the sub-box the
-layer rasters cover, inside the scene's declared class extent. Without it a
+`scene.toml` also declares `content_origin` and `content_extent`: the sub-box
+the layer rasters cover, inside the scene's declared class extent. Without it a
 reviewer opening a swamp layer file sees a 256-wide raster floating in a
-1024-wide grid — 94 per cent declared air, an artefact of the declaration rather
-than of the content. With it the rasters stay the size of the thing that was
-authored while the scene still declares its design §7.1 class. This is an
+1024-wide grid — 94 per cent declared air, an artefact of the declaration
+rather than of the content. With it the rasters stay the size of the thing that
+was authored while the scene still declares its design §7.1 class. This is an
 authoring-layer concept only: the document's chunk-keyed payload already stores
 nothing for empty chunks, so it needs no equivalent field.
 
-`scene.toml` accepts human units where the document stores integers — `azimuth =
-"17.45deg"` compiles to `1745` — which is the promised mitigation for the
-all-integer document's authoring cost.
+`scene.toml` accepts human units where the document stores integers —
+`azimuth = "17.45deg"` compiles to `1745` — which is the promised mitigation
+for the all-integer document's authoring cost.
 
 The layer format is specified here rather than left to the implementer, because
 it is the largest artefact in the step and an earlier draft named only the file
-names. A worked example, for a fixture whose `content_origin` is `[8, 8, 0]` and
-whose `content_extent` is `[6, 4, 2]`:
+names. A worked example, for a fixture whose `content_origin` is `[8, 8, 0]`
+and whose `content_extent` is `[6, 4, 2]`:
 
 `legend.toml`:
 
@@ -1896,8 +1989,8 @@ The rules, each of which an implementer would otherwise have to guess:
 `scripts/build_fixture_scenes.py` compiles those sources to
 `assets/scenes/<name>.scene.json`, emitting chunk-keyed payloads with uniform
 chunks elided and chunk entries sorted by coordinate. It follows the scripting
-standards: an inline `uv` metadata block, Cyclopts for the interface, and pytest
-tests under `scripts/tests/`.
+standards: an inline `uv` metadata block, Cyclopts for the interface, and
+pytest tests under `scripts/tests/`.
 
 The generator also emits `assets/scenes/<name>.provenance.json`, mapping each
 chunk coordinate to the authoring layer file and line it came from, so
@@ -1906,8 +1999,8 @@ human wrote. It is the highest-leverage operational feature in this step for
 roughly forty lines of Python.
 
 `make scenes` runs the generator; `make scenes-check` regenerates into a
-temporary directory and compares, and is what continuous integration runs. Three
-guards, all load-bearing:
+temporary directory and compares, and is what continuous integration runs.
+Three guards, all load-bearing:
 
 1. **Fixture staleness.** The regenerated JSON must match the committed JSON
    byte for byte. A hand-edited fixture, or a generator change nobody re-ran,
@@ -1915,21 +2008,22 @@ guards, all load-bearing:
    silently and the sources become decoration.
 2. **Schema staleness.** The same for the committed JSON Schema.
 3. **Cross-language agreement.** Rust decodes the Python-emitted golden document
-   and re-encodes it byte-identically. This is what makes the Python generator's
-   independence real rather than theatre: two implementations of one schema with
-   no sync mechanism drift, and `deny_unknown_fields` plus this test is the
-   mechanism.
+   and re-encodes it byte-identically. This is what makes the Python
+   generator's independence real rather than theatre: two implementations of
+   one schema with no sync mechanism drift, and `deny_unknown_fields` plus this
+   test is the mechanism.
 
 Byte-identical regeneration is only meaningful if the generator is
 deterministic, so pin what makes it so: sorted keys, fixed separators, fixed
 indent, a fixed trailing newline, and a single defined run-splitting rule. The
-first flaky comparison gets a skip marker, and then the control is gone silently.
+first flaky comparison gets a skip marker, and then the control is gone
+silently.
 
 The freshness check runs under `make scenes-check`, **not** inside `cargo test`.
-`make test` is currently pure Cargo; a Rust test shelling out to `uv run` would
-break `cargo test --workspace` for any contributor without a Python toolchain and
-would add a subprocess to the coverage-measured surface, against this plan's own
-promise of no new coverage-ignore entry.
+`make test` is currently pure Cargo; a Rust test shelling out to `uv run`
+would break `cargo test --workspace` for any contributor without a Python
+toolchain and would add a subprocess to the coverage-measured surface, against
+this plan's own promise of no new coverage-ignore entry.
 
 The generator is deliberately not a build script: fixtures are committed
 artefacts so that a contributor who has no `uv` can still build, test, and run
@@ -1948,8 +2042,8 @@ guide's palettes:
   late-afternoon sun path.
 - `swamp-fragment` — Wilderness class, 1024 x 1024 x 128, of which one populated
   fragment. Mud, water, a plank boardwalk, moss, and bioluminescent emissive
-  voxels. Palette band: Haunted Swamp (eerie and desaturated); twilight sun path
-  with a fog volume declared for phase 3.
+  voxels. Palette band: Haunted Swamp (eerie and desaturated); twilight sun
+  path with a fog volume declared for phase 3.
 
 A fourth fixture ships alongside them, and it is deliberately ugly:
 `bare-cell`, one chunk, a palette of air plus one material, no entities, no
@@ -1957,8 +2051,8 @@ lighting bands, no knowledge section, and — if the format permits it —
 dimensions that are not a multiple of the chunk size. The three named fixtures
 are a monoculture: all derive from design Table 1, so all are origin-anchored
 multiples of 32 carrying every optional section. Whatever those three happen to
-share becomes an unstated engine assumption that surfaces at phase 6 or 9 when a
-fourth scene appears. And if the format turns out *not* to permit a
+share becomes an unstated engine assumption that surfaces at phase 6 or 9 when
+a fourth scene appears. And if the format turns out *not* to permit a
 non-multiple extent, that is a constraint worth learning now rather than at
 step 2.1.1.
 
@@ -1968,10 +2062,10 @@ Fewer tracked bytes, and it guarantees the corruption is the only difference —
 exactly what the diagnostic assertions want.
 
 Each of the three named fixtures also declares a `knowledge` section naming a
-small TriG file under `assets/scenes/knowledge/` and the scene's own named-graph
-IRI, so the knowledge-resource check has something real to succeed against. The
-TriG files are not parsed at this step — only their presence is confirmed — and
-phase 5 takes over their content.
+small TriG file under `assets/scenes/knowledge/` and the scene's own
+named-graph IRI, so the knowledge-resource check has something real to succeed
+against. The TriG files are not parsed at this step — only their presence is
+confirmed — and phase 5 takes over their content.
 
 Two things are deliberately **not** in scope here, and are recorded so a later
 reader does not mistake their absence for an oversight:
@@ -1984,25 +2078,25 @@ reader does not mistake their absence for an oversight:
   validates document integrity, not level design. The distinction is stated in
   the world-plane architecture document so the boundary is deliberate.
 - **MagicaVoxel `.vox` import.** Design §7.4 promises it, and `dot_vox` 5.2.0 is
-  maintained and would make it cheap. It is deferred because `.vox` caps a model
-  at 255 palette colours and 256 voxels per axis, so it can never be the
+  maintained and would make it cheap. It is deferred because `.vox` caps a
+  model at 255 palette colours and 256 voxels per axis, so it can never be the
   canonical authoring input for a 1024-extent scene with a 16-bit palette — it
   is a prop-and-stamp importer, which is what design §7.4 actually says. The
   natural home is a later content-tooling step, and the format this step ships
   is a viable target for it.
 
-Validation for this stage: `make scenes` is idempotent, the fixture scenarios go
-green, and `cargo run -p thysalion-world --example scene-check` reports `ok` for
-all three. Record the measured JSON size, decoded footprint, and load time for
-each fixture in `Artefacts and notes`, against the tolerances. Commit task 1.2.3
-here, with `make all` passing.
+Validation for this stage: `make scenes` is idempotent, the fixture scenarios
+go green, and `cargo run -p thysalion-world --example scene-check` reports `ok`
+for all three. Record the measured JSON size, decoded footprint, and load time
+for each fixture in `Artefacts and notes`, against the tolerances. Commit task
+1.2.3 here, with `make all` passing.
 
 ### Stage D: documentation, ADR 006, refactor, and cleanup
 
 - Write `docs/adr-006-scene-document-model.md`. It must record, at minimum: the
   format staying in `thysalion-world` behind an optional `bevy` feature, with
-  the revised reversal trigger, resolving ADR 005's forwarded open question; the
-  two-stage document-to-domain shape as the mechanism for all-or-nothing
+  the revised reversal trigger, resolving ADR 005's forwarded open question;
+  the two-stage document-to-domain shape as the mechanism for all-or-nothing
   loading; the all-integer document; named-field MessagePack and why
   `to_vec_named` is load-bearing for correctness rather than only for
   evolvability; the reserved air index; chunk-keyed sparse storage with its own
@@ -2015,24 +2109,24 @@ here, with `make all` passing.
 
   Two further things belong in it that are easy to omit. First, that enum
   variants encode as their *name* in both encodings — so reordering variants is
-  safe and renaming one is a wire break — and that a `#[non_exhaustive]` enum is
-  still intolerant of unknown variants on the wire, `#[serde(other)]` being
+  safe and renaming one is a wire break — and that a `#[non_exhaustive]` enum
+  is still intolerant of unknown variants on the wire, `#[serde(other)]` being
   unavailable for externally tagged enums. Second, why each surveyed incumbent
-  format loses: Sponge Schematic v3 (gzipped binary NBT, which forfeits the JSON
-  authoring encoding design §7.3 requires, and blockstate-string palette entries
-  carrying none of passability, slope, emission, simulation coefficients, or
-  concept IRI); MagicaVoxel `.vox` (geometry and colour only, 255 colours, a
-  256-per-axis model cap — an interchange for props, not a scene format);
-  OpenVDB (built for sparse *float* fields, with only a partial and dormant Rust
-  reader); and Apache Arrow or Parquet, for the reasons below. Recording that
-  survey is what stops it being redone at phase 8.
+  format loses: Sponge Schematic v3 (gzipped binary NBT, which forfeits the
+  JSON authoring encoding design §7.3 requires, and blockstate-string palette
+  entries carrying none of passability, slope, emission, simulation
+  coefficients, or concept IRI); MagicaVoxel `.vox` (geometry and colour only,
+  255 colours, a 256-per-axis model cap — an interchange for props, not a scene
+  format); OpenVDB (built for sparse *float* fields, with only a partial and
+  dormant Rust reader); and Apache Arrow or Parquet, for the reasons below.
+  Recording that survey is what stops it being redone at phase 8.
 
   Arrow and Parquet deserve their own paragraph, because lille's own map-format
   document proposed exactly this — §9 floats "an optional Apache Arrow encoding
   (dictionary-encoded block IDs + sparse tensor)" — so the idea has provenance
   in this project's lineage and will be raised again if it is not answered.
-  They are columnar analytics formats, and the mismatch is in four places.
-  A scene is one small, deeply nested, heterogeneous record plus one large
+  They are columnar analytics formats, and the mismatch is in four places. A
+  scene is one small, deeply nested, heterogeneous record plus one large
   homogeneous array; Parquet is excellent at the second and clumsy at the
   first, and a one-row table of nested structs is not what its tooling is for.
   Parquet is binary only, so design §7.3's JSON authoring encoding would need a
@@ -2043,17 +2137,16 @@ here, with `make all` passing.
   promises, which design §12.3's content hashes require. And the win Parquet
   offers — predicate pushdown and column pruning over large datasets — is one
   this project cannot spend: scenes load whole, and design §6.3 makes the
-  whole-scene load a performance contract rather than a query.
-  The narrower observation is that Arrow's dictionary encoding is what the
-  palette already is, and its run-end encoding is what the chunk payload
-  already is, so adopting the framework would buy two things this format has
-  in a few dozen lines. Where Arrow *would* fit is the replay corpus of
-  roadmap step 1.3.2 and invariant I1: many homogeneous rows, analytical
-  queries, no authoring surface. That is worth revisiting there, and is
-  recorded as such rather than dismissed.
-  Minecraft Anvil's bit-packed palette indices are noted not as a rejected
-  format but as a deferred optimization with a trigger, since design §7.2 fixes
-  the index at 16 bits and narrowing it is a design amendment.
+  whole-scene load a performance contract rather than a query. The narrower
+  observation is that Arrow's dictionary encoding is what the palette already
+  is, and its run-end encoding is what the chunk payload already is, so
+  adopting the framework would buy two things this format has in a few dozen
+  lines. Where Arrow *would* fit is the replay corpus of roadmap step 1.3.2 and
+  invariant I1: many homogeneous rows, analytical queries, no authoring
+  surface. That is worth revisiting there, and is recorded as such rather than
+  dismissed. Minecraft Anvil's bit-packed palette indices are noted not as a
+  rejected format but as a deferred optimization with a trigger, since design
+  §7.2 fixes the index at 16 bits and narrowing it is a design amendment.
 
   Reference the ADR from ADR 005's open question and from design §7.
 - Amend `docs/thysalion-design.md` §7.2 and §7.3 where this plan departs from
@@ -2065,13 +2158,13 @@ here, with `make all` passing.
   and to say which parts were taken and which were improved on (see
   `Surprises & discoveries`). Two amendments are easy to forget and are called
   out for that reason: §7.2 still specifies `passable: [bool; 6]` and must be
-  changed to the six-field struct this plan substitutes, and §10.5 must gain the
-  fixed-point *scale* it currently omits, not merely the width.
+  changed to the six-field struct this plan substitutes, and §10.5 must gain
+  the fixed-point *scale* it currently omits, not merely the width.
 - Add `docs/world-plane-architecture.md` documenting the internally facing
   interfaces of `thysalion-world`: the scene module tree, the `SceneSource`
-  port and its adapters, the loader and library, and the diagnostic
-  vocabulary — with the field-by-field scene format reference and a worked
-  minimal example. Index it in `docs/contents.md`.
+  port and its adapters, the loader and library, and the diagnostic vocabulary
+  — with the field-by-field scene format reference and a worked minimal
+  example. Index it in `docs/contents.md`.
 - Update `docs/repository-layout.md` for `assets/`, `crates/world/examples/`,
   the fixture generator script, and the amended coverage-ignore boundary.
 - Update `docs/developers-guide.md` with a "Scene fixtures" section: where
@@ -2145,43 +2238,43 @@ criteria.
 Task 1.2.1 — "a hand-written JSON scene round-trips through the model and the
 MessagePack encoding without loss". Red: the round-trip property test fails
 because `SceneDocument` does not exist. Green: it passes for the checked-in
-hand-written minimal scene and for every generated document `proptest` produces.
-Observable: `cargo test -p thysalion-world round_trip` reports the property
-passing over its full case budget.
+hand-written minimal scene and for every generated document `proptest`
+produces. Observable: `cargo test -p thysalion-world round_trip` reports the
+property passing over its full case budget.
 
 Task 1.2.2 — "corrupt fixture variants each produce a distinct diagnostic and
 leave no scene state behind". Red: each corrupt-fixture scenario fails because
 the loader does not exist. Green: each corrupt fixture yields its own named
 diagnostic, the accepted `insta` snapshots pin the report wording, the
-multi-fault fixture reports all three problems in one load, a failed load leaves
-the loader able to load a good scene, and the `trybuild` case proves `Scene` is
-unconstructible except through validation. Observable: running the
+multi-fault fixture reports all three problems in one load, a failed load
+leaves the loader able to load a good scene, and the `trybuild` case proves
+`Scene` is unconstructible except through validation. Observable: running the
 `scene-check` example against each corrupt fixture prints its distinct report,
 naming the chunk and chunk-local position of the fault, and exits non-zero.
 
 Task 1.2.3 — "all three load through the validator". Green: the three fixture
-scenarios pass in the behavioural suite and `scene-check` reports `ok` for each,
-each within the load-time tolerance and the fixture-size tolerance, with the
-measurements recorded.
-The roadmap's second clause — each fixture referenced by a demo or continuous
-integration suite by the end of phase 6 — is satisfied for now by the
-behavioural suite, and is a phase-6 obligation, not this step's.
+scenarios pass in the behavioural suite and `scene-check` reports `ok` for
+each, each within the load-time tolerance and the fixture-size tolerance, with
+the measurements recorded. The roadmap's second clause — each fixture
+referenced by a demo or continuous integration suite by the end of phase 6 — is
+satisfied for now by the behavioural suite, and is a phase-6 obligation, not
+this step's.
 
 The test stack is large, so here is why each layer is present and where it is
 required rather than chosen. `rstest` and `rstest-bdd` are AGENTS.md's mandated
 unit and behavioural frameworks. `proptest` is mandated where a change
 "introduces an invariant over a range of inputs" — round-trip parity and codec
-fixpoint are exactly that, and they are the only two properties here. `insta` is
-mandated where "multivariant output format consistency is relevant to the
+fixpoint are exactly that, and they are the only two properties here. `insta`
+is mandated where "multivariant output format consistency is relevant to the
 requirements", which is precisely the roadmap's "each produces a distinct
 diagnostic". `trybuild` is the established precedent in this workspace for
-pinning a compile-time contract, and the contract being pinned — that validation
-cannot be bypassed — is load-bearing. The Python `pytest` suite is mandated by
-the scripting standards for any helper script. Nothing here is optional, and
-nothing beyond this is added: there is no `criterion` benchmark suite, no `kani`
-or `verus` proof, and no mutation testing, because no invariant in this step
-warrants that rigour. Load time is measured with `hyperfine` once per fixture
-and recorded, not tracked continuously.
+pinning a compile-time contract, and the contract being pinned — that
+validation cannot be bypassed — is load-bearing. The Python `pytest` suite is
+mandated by the scripting standards for any helper script. Nothing here is
+optional, and nothing beyond this is added: there is no `criterion` benchmark
+suite, no `kani` or `verus` proof, and no mutation testing, because no
+invariant in this step warrants that rigour. Load time is measured with
+`hyperfine` once per fixture and recorded, not tracked continuously.
 
 Three acceptance criteria come from documents outwith the roadmap and are easy
 to miss:
@@ -2222,10 +2315,10 @@ Quality criteria for "done":
 
 Every step is re-runnable. `make scenes` regenerates fixture JSON
 deterministically from the tracked authoring sources, so a corrupted fixture is
-recovered by regenerating it. `cargo insta review` is the only interactive step;
-a rejected snapshot leaves the previous one in place. Nothing in this step
-deletes tracked files or writes outwith the repository, and the Stage A spikes
-happen in a scratch directory that is discarded.
+recovered by regenerating it. `cargo insta review` is the only interactive
+step; a rejected snapshot leaves the previous one in place. Nothing in this
+step deletes tracked files or writes outwith the repository, and the Stage A
+spikes happen in a scratch directory that is discarded.
 
 If a stage's validation fails and five attempts do not resolve it, stop and
 escalate per `Tolerances` rather than loosening a test or adding a suppression.
@@ -2276,8 +2369,8 @@ newtype payload reads exactly as the worked example in Stage B specifies.
 
 ### Spike A2 measurements
 
-A 1024 x 1024 x 128 declared extent with sixty-four populated chunks in an
-8 x 8 footprint, each carrying a three-layer ground slab plus 140 scattered
+A 1024 x 1024 x 128 declared extent with sixty-four populated chunks in an 8 x
+8 footprint, each carrying a three-layer ground slab plus 140 scattered
 vertical features — deliberately busy content, chosen so the measurement is
 pessimistic rather than flattering.
 
@@ -2618,9 +2711,9 @@ Documentation to read before starting, in this order:
 - [scripting-standards.md](../scripting-standards.md) — required before writing
   the fixture generator.
 - [rust-testing-with-rstest-fixtures.md](../rust-testing-with-rstest-fixtures.md)
-  and
-  [reliable-testing-in-rust-via-dependency-injection.md](../reliable-testing-in-rust-via-dependency-injection.md)
-  — the fixture and injection idioms this step's tests follow.
+  — the fixture idioms this step's tests follow.
+- [reliable-testing-in-rust-via-dependency-injection.md](../reliable-testing-in-rust-via-dependency-injection.md)
+  — the injection idioms the `SceneSource` port and its adapters follow.
 - [rust-doctest-dry-guide.md](../rust-doctest-dry-guide.md) — before writing the
   Rustdoc examples AGENTS.md requires.
 - [complexity-antipatterns-and-refactoring-strategies.md](../complexity-antipatterns-and-refactoring-strategies.md)
@@ -2661,8 +2754,8 @@ Agent skills to load, and when:
 
 ## Revision note (2026-07-28)
 
-The draft was stress-tested through a six-lens design review before any code was
-written. Four lenses reported; two (scaling, and long-term viability) were
+The draft was stress-tested through a six-lens design review before any code
+was written. Four lenses reported; two (scaling, and long-term viability) were
 completed by the plan author after their reviewers were interrupted, and their
 conclusions have therefore had less independent scrutiny than the rest.
 
@@ -2675,13 +2768,14 @@ What changed, and why it matters to the remaining work:
   against a 1 MiB tolerance.
 - **A compatibility policy exists.** The draft cited `#[non_exhaustive]` as
   enforcing wire additivity, which it cannot do. Source and wire compatibility
-  are now separated in `Purpose`, the version rule is a major/minor pair with an
-  accepted range, the serde attribute policy is a `Constraint`, and golden bytes
-  are the enforcing test.
+  are now separated in `Purpose`, the version rule is a major/minor pair with
+  an accepted range, the serde attribute policy is a `Constraint`, and golden
+  bytes are the enforcing test.
 - **Content hashing is designed in.** Design §12.3's save-archive hashes were
   missed entirely, and the naive fix breaks on this step's own two-encoding
-  premise. `Scene::content_hash` and four canonicality rules land now, because a
-  save archive written against a non-canonical format cannot be repaired later.
+  premise. `Scene::content_hash` and four canonicality rules land now, because
+  a save archive written against a non-canonical format cannot be repaired
+  later.
 - **`grid/` is a peer of `scene/`.** The runtime voxel structure is state-plane
   data, not a file-format detail, and four later phases would otherwise import
   it through a path that says the opposite.
@@ -2719,8 +2813,8 @@ tolerance makes a post-fixture API change an escalation.
 
 A second adversarial review verified the plan's serde, Clippy, `schemars`, and
 `miette` claims empirically against the pinned toolchain rather than from
-memory. Most of the first review's findings were confirmed. Four things it found
-that the first pass had not, and that had survived into the revised plan:
+memory. Most of the first review's findings were confirmed. Four things it
+found that the first pass had not, and that had survived into the revised plan:
 
 - **The worked minimal JSON did not deserialize.** `ChunkPayload` is an
   externally-tagged enum, and the example wrote a run array directly beside
@@ -2730,11 +2824,12 @@ that the first pass had not, and that had survived into the revised plan:
   declared, and the uniform case is shown.
 - **`clippy.toml` had never been read.** It sets
   `cognitive-complexity-threshold = 9` against a denied lint,
-  `too-many-lines-threshold = 70` per function, `too-many-arguments-threshold =
-  4`, and `excessive-nesting-threshold = 4` — and this plan *mandated* a fused
-  per-chunk traversal checking four properties, which violates the complexity
-  ceiling by construction. The traversal is now one pass feeding several
-  single-purpose accumulators, and the thresholds are in `Constraints`.
+  `too-many-lines-threshold = 70` per function,
+  `too-many-arguments-threshold = 4`, and `excessive-nesting-threshold = 4` —
+  and this plan *mandated* a fused per-chunk traversal checking four
+  properties, which violates the complexity ceiling by construction. The
+  traversal is now one pass feeding several single-purpose accumulators, and
+  the thresholds are in `Constraints`.
 - **The operator tool sat on an unresolvable trilemma.** `make lint` lints
   examples, `clippy::print_stdout` is denied, and the plan forbade new
   suppressions. `writeln!` on a `Stdout` handle resolves it without a
@@ -2746,34 +2841,34 @@ that the first pass had not, and that had survived into the revised plan:
   generator would omit, so the two produce different bytes for the same scene
   from the first commit — invisible to a canonical-bytes test, which only proves
   `document -> bytes` is stable. Fixtures are now committed in fully explicit
-  form, byte-identical to `serde_json::to_string_pretty`, and the worked example
-  shows that form.
+  form, byte-identical to `serde_json::to_string_pretty`, and the worked
+  example shows that form.
 
 Also folded in: a palette-reorder hazard with a committed palette manifest as
 its guard; the layered-text authoring format specified to the same standard as
 the minimal JSON, with a worked example; the fixed-point scale for
 `SimProperties` pinned at Q8.8, since design §10.5 mandates a width and no
 scale; the scope tolerance corrected so it does not fire on Stage C3 by
-construction; the IRI prefix table and depth bound moved ahead of the rules that
-validate against them; `Scenario Outline` in place of a `Scenario` carrying an
-`Examples:` table, which would not parse; path-safety rules on the port; a
-uniform chunk no longer materializing a 64 KiB array and undoing the elision it
-exists for; and `hyperfine` pointed at a built binary rather than at
+construction; the IRI prefix table and depth bound moved ahead of the rules
+that validate against them; `Scenario Outline` in place of a `Scenario`
+carrying an `Examples:` table, which would not parse; path-safety rules on the
+port; a uniform chunk no longer materializing a 64 KiB array and undoing the
+elision it exists for; and `hyperfine` pointed at a built binary rather than at
 `cargo run`, which was measuring Cargo's freshness check against a 250 ms
 tolerance.
 
-One severity claim is corrected rather than the decision it supported. The first
-revision note called the tuple-struct `VoxelRun` a defect. It is not: it encodes
-identically under both `to_vec` and `to_vec_named` and round-trips correctly in
-both formats today. The objection is purely about evolution, and the named
-struct stands on that ground alone.
+One severity claim is corrected rather than the decision it supported. The
+first revision note called the tuple-struct `VoxelRun` a defect. It is not: it
+encodes identically under both `to_vec` and `to_vec_named` and round-trips
+correctly in both formats today. The objection is purely about evolution, and
+the named struct stands on that ground alone.
 
 Two open questions are recorded for ADR 006 rather than resolved here.
 `chunk_size` is a document field with exactly one legal value, policed by its
-own diagnostic — either it is a real degree of freedom, in which case the design's
-32-cubed assumption needs auditing, or it should be a schema constant. And the
-`VoxelGrid` that this step decodes may be a transient buffer that phase 2 copies
-into `bevy_voxel_world`'s own storage and discards, which would make the dense
-materialization double work at exactly the moment design §6.3 turns
+own diagnostic — either it is a real degree of freedom, in which case the
+design's 32-cubed assumption needs auditing, or it should be a schema constant.
+And the `VoxelGrid` that this step decodes may be a transient buffer that phase
+2 copies into `bevy_voxel_world`'s own storage and discards, which would make
+the dense materialization double work at exactly the moment design §6.3 turns
 Loading-to-Active into a performance contract. Step 2.1.1 owns that answer;
 `VoxelGrid`'s private fields keep it cheap to change.
