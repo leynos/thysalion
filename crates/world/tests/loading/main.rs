@@ -17,10 +17,14 @@ mod support;
 #[path = "../support/mod.rs"]
 mod fixtures;
 
+#[path = "../support/scenes.rs"]
+mod scenes;
+
 use fixtures::minimal_document;
 use rstest_bdd_macros::{given, scenario, then, when};
+use scenes::FIXTURE_NAMES;
 use smol_str::SmolStr;
-use support::{FIXTURE_NAMES, LoaderHarness, LoaderSession};
+use support::{LoaderHarness, LoaderSession};
 use thysalion_world::{
     codec::Encoding,
     scene::{

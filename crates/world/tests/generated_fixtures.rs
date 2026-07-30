@@ -18,8 +18,7 @@
 
 use std::sync::Arc;
 
-use camino::{Utf8Path, Utf8PathBuf};
-use cap_std::{ambient_authority, fs_utf8::Dir};
+use camino::Utf8PathBuf;
 use serde::Deserialize;
 use thysalion_world::{
     codec::{Encoding, decode_document, encode_document},
@@ -28,43 +27,10 @@ use thysalion_world::{
     source::DirSceneSource,
 };
 
-/// Where the compiled fixtures live, relative to the repository root.
-const SCENES: &str = "assets/scenes";
+#[path = "support/scenes.rs"]
+mod scenes_support;
 
-/// Every committed fixture, and what it exists to prove.
-///
-/// The three named scenes are sized per design §7.1, Table 1. `bare-cell` is
-/// the deliberately ugly fourth: the other three all derive from one table, so
-/// whatever they happen to share would otherwise become an unstated engine
-/// assumption that surfaces at phase 6 or 9.
-const FIXTURES: &[&str] = &[
-    "bare-cell",
-    "keep-interior",
-    "market-town-block",
-    "swamp-fragment",
-];
-
-/// Opens `assets/scenes` as a capability.
-///
-/// # Panics
-///
-/// Panics when the directory is missing, which is a broken checkout.
-fn scenes() -> Dir {
-    let root = repository_root().join(SCENES);
-    match Dir::open_ambient_dir(&root, ambient_authority()) {
-        Ok(directory) => directory,
-        Err(error) => panic!("the fixture scenes must exist at {root}: {error}"),
-    }
-}
-
-/// The repository root, two levels above this crate.
-fn repository_root() -> Utf8PathBuf {
-    let crate_root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    crate_root
-        .parent()
-        .and_then(Utf8Path::parent)
-        .map_or_else(|| crate_root.clone(), Utf8Path::to_owned)
-}
+use scenes_support::{FIXTURE_NAMES as FIXTURES, SCENES, scene_dir as scenes};
 
 /// Loads a fixture through the real loader and the real filesystem adapter.
 ///

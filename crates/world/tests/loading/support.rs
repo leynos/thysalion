@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use cap_std::{ambient_authority, fs_utf8::Dir};
+use cap_std::fs_utf8::Dir;
 use rstest_bdd_harness::{HarnessAdapter, HarnessResult, ScenarioRunRequest};
 use thysalion_world::{
     codec::{Encoding, encode_document},
@@ -34,17 +34,6 @@ pub struct LoaderSession {
     /// The outcome of loading each shipped fixture, by name.
     pub fixtures: Vec<(String, Result<LoadedScene, SceneLoadError>)>,
 }
-
-/// Where the compiled fixture scenes live, relative to the repository root.
-pub const SCENES: &str = "assets/scenes";
-
-/// Every fixture the repository ships.
-pub const FIXTURE_NAMES: &[&str] = &[
-    "bare-cell",
-    "keep-interior",
-    "market-town-block",
-    "swamp-fragment",
-];
 
 impl LoaderSession {
     /// A session whose source holds the one knowledge resource the fixtures
@@ -72,14 +61,14 @@ impl LoaderSession {
     ///
     /// Panics when `assets/scenes` is missing, which is a broken checkout.
     pub fn load_fixture(&mut self, name: &str) {
-        let root = repository_root().join(SCENES);
-        let Ok(directory) = Dir::open_ambient_dir(&root, ambient_authority()) else {
-            panic!("the fixture scenes must exist at {root}");
-        };
+        let directory = crate::scenes::scene_dir();
         let Ok(replica) = directory.try_clone() else {
             panic!("the fixture directory must be cloneable");
         };
-        let loader = SceneLoader::new(Arc::new(DirSceneSource::new(directory, SCENES)));
+        let loader = SceneLoader::new(Arc::new(DirSceneSource::new(
+            directory,
+            crate::scenes::SCENES,
+        )));
         let path = Utf8PathBuf::from(format!("{name}.scene.json"));
         let outcome = loader.load(&path);
         if let Ok(loaded) = outcome.as_ref() {
@@ -180,15 +169,6 @@ impl LoaderSession {
 
     /// Removes a resource, so a scene that names it becomes dangling.
     pub fn forget(&mut self, path: &str) { self.source.remove(Utf8Path::new(path)); }
-}
-
-/// The repository root, two levels above this crate.
-fn repository_root() -> Utf8PathBuf {
-    let crate_root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    crate_root
-        .parent()
-        .and_then(Utf8Path::parent)
-        .map_or_else(|| crate_root.clone(), Utf8Path::to_owned)
 }
 
 /// Runs each scenario against a fresh loader session.
