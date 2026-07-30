@@ -49,3 +49,16 @@ Feature: Scene loading and validation
     When the scene is loaded
     Then loading succeeds
     And the warnings name the obstructed spawn
+
+  Scenario: Every shipped fixture scene loads clean
+    Given the shipped fixture scenes
+    When each fixture scene is loaded from disk
+    Then every fixture scene loads
+    And no fixture scene reports a warning
+
+  Scenario: A fixture scene survives a MessagePack round trip
+    Given the shipped fixture scene "keep-interior"
+    When the fixture is loaded from disk
+    And the document is re-encoded as MessagePack and loaded
+    Then loading succeeds
+    And the loaded scene equals the scene loaded from JSON

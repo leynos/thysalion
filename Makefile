@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit demo
+.PHONY: help all clean test build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit demo scenes scenes-check scripts-test
 
 SHELL := bash
 
@@ -31,12 +31,15 @@ NIXIE ?= nixie
 TYPOS_VERSION ?= 1.48.0
 TYPOS := uv tool run typos@$(TYPOS_VERSION)
 WHITAKER ?= $(or $(shell command -v whitaker 2>/dev/null),$(wildcard $(USER_WHITAKER)),whitaker)
+SCENE_BUILDER ?= uv run --script scripts/build_fixture_scenes.py
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
 
 all: check-fmt lint test ## Perform a comprehensive check of code
 	+$(MAKE) spelling
+	+$(MAKE) scripts-test
+	+$(MAKE) scenes-check
 
 clean: ## Remove build artifacts
 	$(CARGO) clean
@@ -105,6 +108,23 @@ spelling: ## Enforce en-GB-oxendict spelling in Markdown prose
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
+
+scenes: ## Compile assets/scenes/src/ into the committed fixture scenes
+	$(SCENE_BUILDER)
+
+# Regenerates into a temporary directory and compares. This is what stops a
+# hand-edited fixture, or a generator change nobody re-ran, from going
+# unnoticed until the authoring sources become decoration.
+#
+# Not run inside `cargo test`: `make test` is pure Cargo, and a Rust test
+# shelling out to `uv run` would break `cargo test --workspace` for any
+# contributor without a Python toolchain and would add a subprocess to the
+# coverage-measured surface.
+scenes-check: ## Verify the committed fixture scenes match their sources
+	$(SCENE_BUILDER) --check
+
+scripts-test: ## Run the Python script test suites
+	uv run --with pytest --with cyclopts python -m pytest scripts/tests -q
 
 audit: rust-audit ## Audit dependencies for known vulnerabilities
 

@@ -11,13 +11,14 @@
 
 use std::sync::Arc;
 
-use camino::Utf8Path;
+use camino::{Utf8Path, Utf8PathBuf};
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use rstest_bdd_harness::{HarnessAdapter, HarnessResult, ScenarioRunRequest};
 use thysalion_world::{
     codec::{Encoding, encode_document},
     loader::{LoadedScene, SceneLoadError, SceneLoader},
     scene::{Scene, document::SceneDocument},
-    source::MemorySceneSource,
+    source::{DirSceneSource, MemorySceneSource},
 };
 
 /// The document under test, its source, and the outcome of the last load.
@@ -30,7 +31,20 @@ pub struct LoaderSession {
     pub outcome: Option<Result<LoadedScene, SceneLoadError>>,
     /// A scene loaded from JSON earlier in the scenario, for comparison.
     pub from_json: Option<Scene>,
+    /// The outcome of loading each shipped fixture, by name.
+    pub fixtures: Vec<(String, Result<LoadedScene, SceneLoadError>)>,
 }
+
+/// Where the compiled fixture scenes live, relative to the repository root.
+pub const SCENES: &str = "assets/scenes";
+
+/// Every fixture the repository ships.
+pub const FIXTURE_NAMES: &[&str] = &[
+    "bare-cell",
+    "keep-interior",
+    "market-town-block",
+    "swamp-fragment",
+];
 
 impl LoaderSession {
     /// A session whose source holds the one knowledge resource the fixtures
@@ -43,6 +57,51 @@ impl LoaderSession {
             document: None,
             outcome: None,
             from_json: None,
+            fixtures: Vec::new(),
+        }
+    }
+
+    /// Loads a shipped fixture through the real filesystem adapter.
+    ///
+    /// Deliberately the real adapter and the real directory rather than the
+    /// in-memory source the other scenarios use. These scenarios exist to prove
+    /// the *committed artefacts* load, which an in-memory copy of them could
+    /// not: it would prove the constructor agrees with itself.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `assets/scenes` is missing, which is a broken checkout.
+    pub fn load_fixture(&mut self, name: &str) {
+        let root = repository_root().join(SCENES);
+        let Ok(directory) = Dir::open_ambient_dir(&root, ambient_authority()) else {
+            panic!("the fixture scenes must exist at {root}");
+        };
+        let Ok(replica) = directory.try_clone() else {
+            panic!("the fixture directory must be cloneable");
+        };
+        let loader = SceneLoader::new(Arc::new(DirSceneSource::new(directory, SCENES)));
+        let path = Utf8PathBuf::from(format!("{name}.scene.json"));
+        let outcome = loader.load(&path);
+        if let Ok(loaded) = outcome.as_ref() {
+            self.document = Some(loaded.scene.to_document());
+            self.adopt_resources(loaded, &replica);
+        }
+        self.fixtures.push((name.to_owned(), outcome));
+    }
+
+    /// Copies a loaded fixture's knowledge resources into the in-memory source.
+    ///
+    /// A scenario that loads a fixture from disk and then re-encodes it needs
+    /// the same resources reachable through the in-memory source, or the
+    /// re-encoded document fails the resource check and the scenario reports a
+    /// missing TriG file when what it was testing was the encoding. Copying
+    /// them keeps the round-trip scenario about the round trip.
+    fn adopt_resources(&mut self, loaded: &LoadedScene, directory: &Dir) {
+        for source in loaded.scene.knowledge().sources() {
+            let Ok(bytes) = directory.read(source) else {
+                panic!("a loaded fixture's resources must still be readable: {source}");
+            };
+            self.source.insert(source, bytes);
         }
     }
 
@@ -121,6 +180,15 @@ impl LoaderSession {
 
     /// Removes a resource, so a scene that names it becomes dangling.
     pub fn forget(&mut self, path: &str) { self.source.remove(Utf8Path::new(path)); }
+}
+
+/// The repository root, two levels above this crate.
+fn repository_root() -> Utf8PathBuf {
+    let crate_root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    crate_root
+        .parent()
+        .and_then(Utf8Path::parent)
+        .map_or_else(|| crate_root.clone(), Utf8Path::to_owned)
 }
 
 /// Runs each scenario against a fresh loader session.

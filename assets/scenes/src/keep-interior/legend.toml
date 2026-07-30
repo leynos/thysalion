@@ -1,0 +1,8 @@
+# One character per palette name. Every character in a raster must appear here;
+# an unlisted one is an error, never a silent air.
+"." = "air"
+"#" = "stone-block"
+"=" = "oak-plank"
+"^" = "stone-stair"
+"h" = "hearth-stone"
+"*" = "wall-sconce"

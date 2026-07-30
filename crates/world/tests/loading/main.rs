@@ -20,7 +20,7 @@ mod fixtures;
 use fixtures::minimal_document;
 use rstest_bdd_macros::{given, scenario, then, when};
 use smol_str::SmolStr;
-use support::{LoaderHarness, LoaderSession};
+use support::{FIXTURE_NAMES, LoaderHarness, LoaderSession};
 use thysalion_world::{
     codec::Encoding,
     scene::{
@@ -300,3 +300,62 @@ fn a_failed_load_leaves_the_loader_usable() {}
 
 #[scenario(path = "tests/features/scene_loading.feature", index = 7, harness = LoaderHarness)]
 fn a_spawn_inside_a_wall_warns_without_failing() {}
+
+#[scenario(path = "tests/features/scene_loading.feature", index = 8, harness = LoaderHarness)]
+fn every_shipped_fixture_scene_loads_clean() {}
+
+#[scenario(path = "tests/features/scene_loading.feature", index = 9, harness = LoaderHarness)]
+fn a_fixture_scene_survives_a_messagepack_round_trip() {}
+
+#[given("the shipped fixture scenes")]
+fn given_shipped_fixtures(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+    session.fixtures.clear();
+}
+
+#[given("the shipped fixture scene \"keep-interior\"")]
+fn given_named_fixture(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+    session.fixtures.clear();
+}
+
+#[when("each fixture scene is loaded from disk")]
+fn when_each_fixture_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+    for name in FIXTURE_NAMES {
+        session.load_fixture(name);
+    }
+}
+
+#[when("the fixture is loaded from disk")]
+fn when_fixture_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+    session.load_fixture("keep-interior");
+}
+
+#[then("every fixture scene loads")]
+fn then_every_fixture_loads(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+    assert_eq!(
+        session.fixtures.len(),
+        FIXTURE_NAMES.len(),
+        "every shipped fixture must have been attempted"
+    );
+    for (name, outcome) in &session.fixtures {
+        if let Err(error) = outcome {
+            panic!("{name} must load: {error}");
+        }
+    }
+}
+
+#[then("no fixture scene reports a warning")]
+fn then_no_fixture_warns(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+    // Continuous integration runs strict, so a warning in a shipped fixture is
+    // a warning every later phase inherits: these are the scenes phase 2
+    // renders, phase 3 lights, and phase 4 paths across.
+    for (name, outcome) in &session.fixtures {
+        let Ok(loaded) = outcome else {
+            continue;
+        };
+        assert!(
+            !loaded.has_warnings(),
+            "{name} must carry no warnings, got {:?}",
+            loaded.warnings
+        );
+    }
+}

@@ -1,0 +1,10 @@
+# The market town block's named graph. See keep-interior.trig for why this is a
+# placeholder rather than a modelling decision.
+
+@prefix thy: <https://thysalion.df12.net/ontology#> .
+@prefix scene: <https://thysalion.df12.net/scene/> .
+
+scene:market-town-block {
+    scene:market-town-block a thy:Scene ;
+        thy:sceneClass thy:TownDistrictClass .
+}

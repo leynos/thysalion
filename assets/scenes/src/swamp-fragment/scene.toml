@@ -1,0 +1,94 @@
+# The Wilderness scene class (design section 7.1, Table 1), of which one
+# populated fragment: mud, standing water, a plank boardwalk over it, moss, and
+# bioluminescent fungus.
+#
+# Palette band: Haunted Swamp — eerie and desaturated. Lighting: twilight.
+#
+# The extreme case for the sparse payload. The declared extent is 134 million
+# voxels; the fragment populates a few hundred of them, and the emitted document
+# stores exactly the chunks that hold something. A dense encoding of this scene
+# would be 256 MiB.
+
+[scene]
+name = "swamp-fragment"
+dimensions = [1024, 1024, 128]
+chunk_size = 32
+content_origin = [320, 448, 0]
+content_extent = [24, 18, 5]
+
+[[palette]]
+name = "air"
+material = "air"
+passable = true
+
+[[palette]]
+name = "swamp-mud"
+material = "ground"
+moisture_capacity = 49152
+concept = "thy:SwampMud"
+
+[[palette]]
+name = "bog-water"
+material = "water"
+passable = true
+moisture_capacity = 65535
+concept = "thy:BogWater"
+
+[[palette]]
+name = "rotting-plank"
+material = "timber"
+fuel = 3072
+ignition_point = 46080
+moisture_capacity = 40960
+concept = "thy:RottingPlank"
+
+[[palette]]
+name = "moss-clump"
+material = "natural"
+fuel = 2048
+ignition_point = 40960
+moisture_capacity = 32768
+passable = true
+concept = "thy:Moss"
+
+[[palette]]
+name = "ghost-fungus"
+material = "natural"
+fuel = 1024
+ignition_point = 38912
+moisture_capacity = 45056
+concept = "thy:GhostFungus"
+
+[palette.emission]
+intensity = 7
+colour = [126, 214, 178]
+
+[lighting]
+# Twilight. A fog volume belongs here and is deferred to phase 3, which owns
+# the lighting semantics and is the phase with a use for the values; the
+# document has no field for one yet, and inventing one this step cannot
+# consume would be a wire-format change with no reader.
+probe_spacing = "2m"
+
+[lighting.sun_path]
+azimuth = "296.75deg"
+elevation = "-3.5deg"
+
+[[lighting.ambient_bands]]
+name = "twilight"
+at = "-3.5deg"
+colour = [58, 70, 68]
+
+[[lighting.ambient_bands]]
+name = "blue-hour"
+at = "-9deg"
+colour = [38, 48, 62]
+
+[[entities.spawns]]
+name = "boardwalk-start"
+at = [322, 456, 1]
+facing = "pos_x"
+
+[knowledge]
+graph = "thy:scene/swamp-fragment"
+sources = ["knowledge/swamp-fragment.trig"]

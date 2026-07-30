@@ -1,0 +1,111 @@
+# The Town district scene class (design section 7.1, Table 1), of which one
+# populated block: cobbled street, timber-framed facades, tiled roofs, a well,
+# stalls under awnings, and banners.
+#
+# Palette band: Market Town — warm and inviting. Lighting: late-afternoon sun.
+#
+# The declared extent is 512 x 512 and the content box is 24 x 20. That ratio is
+# the point of `content_origin` and `content_extent`: a raster covering the
+# declared extent would be a quarter of a megabyte of text per layer, and 99.8
+# per cent of it would be air that nobody authored.
+#
+# The origin is deliberately *not* chunk-aligned. Every other fixture's content
+# happens to fall inside one 32-cube, so without this one nothing shipped would
+# exercise a content box straddling a chunk boundary — and the multi-chunk sort
+# order, which the canonical encoding and therefore the content hash depend on,
+# would be tested only by the generator's own suite.
+
+[scene]
+name = "market-town-block"
+dimensions = [512, 512, 96]
+chunk_size = 32
+content_origin = [110, 120, 0]
+content_extent = [24, 20, 7]
+
+[[palette]]
+name = "air"
+material = "air"
+passable = true
+
+[[palette]]
+name = "cobblestone"
+material = "ground"
+moisture_capacity = 6144
+concept = "thy:Cobblestone"
+
+[[palette]]
+name = "stone-block"
+material = "stone"
+moisture_capacity = 3277
+concept = "thy:StoneBlock"
+
+[[palette]]
+name = "oak-plank"
+material = "timber"
+fuel = 5120
+ignition_point = 43520
+moisture_capacity = 8192
+concept = "thy:OakPlank"
+
+[[palette]]
+name = "clay-tile"
+material = "roofing"
+moisture_capacity = 2048
+concept = "thy:ClayTile"
+
+[[palette]]
+name = "canvas-awning"
+material = "cloth"
+fuel = 7168
+ignition_point = 35840
+moisture_capacity = 12288
+concept = "thy:Awning"
+
+[[palette]]
+name = "well-water"
+material = "water"
+passable = true
+moisture_capacity = 65535
+concept = "thy:Water"
+
+[[palette]]
+name = "hanging-lantern"
+material = "timber"
+fuel = 4096
+ignition_point = 43520
+concept = "thy:Lantern"
+
+[palette.emission]
+intensity = 9
+colour = [255, 205, 130]
+
+[lighting]
+probe_spacing = "2m"
+
+[lighting.sun_path]
+azimuth = "232.5deg"
+elevation = "27.25deg"
+
+[[lighting.ambient_bands]]
+name = "afternoon"
+at = "27.25deg"
+colour = [168, 152, 126]
+
+[[lighting.ambient_bands]]
+name = "golden-hour"
+at = "8deg"
+colour = [198, 146, 92]
+
+[[entities.spawns]]
+name = "market-start"
+at = [122, 130, 1]
+facing = "neg_y"
+
+[[entities.spawns]]
+name = "well-keeper"
+at = [119, 126, 1]
+facing = "pos_x"
+
+[knowledge]
+graph = "thy:scene/market-town-block"
+sources = ["knowledge/market-town-block.trig"]
