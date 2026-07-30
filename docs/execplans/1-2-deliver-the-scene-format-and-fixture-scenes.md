@@ -470,8 +470,14 @@ travel with the C1 commit.
     `tests/fixtures/corrupt/` with an `insta` snapshot each and a
     class-to-fixture contract table; and ten hostile inputs with wall-clock
     termination bounds. 164 tests across the workspace, `make all` green.
-- [ ] Stage C3: the three fixture scenes and their generator (task 1.2.3) —
-  opens with its own red step; third commit.
+- [x] (2026-07-30) Stage C3: the fixture scenes and their generator
+  (task 1.2.3). Delivered: `scripts/build_fixture_scenes.py` with its 25-test
+  pytest suite; the layered-text authoring format under `assets/scenes/src/`;
+  four compiled fixtures with provenance sidecars; `make scenes`,
+  `make scenes-check`, and `make scripts-test`, all three wired into
+  `make all`; the cross-language agreement test in
+  `crates/world/tests/generated_fixtures.rs`; and two behavioural scenarios
+  over the shipped artefacts. Measurements in `Artefacts and notes`.
 - [ ] Stage D: documentation, ADR 006, design-document amendments, refactor,
   and cleanup — fourth commit.
 
@@ -1225,6 +1231,35 @@ travel with the C1 commit.
   than a file that is missing, and git cannot portably check in a file that
   exists and refuses to be read; a stub `SceneSource` covers it. Date/Author:
   2026-07-30, during Stage C2b.
+
+- Decision: the generator emits JSON keys in **declaration** order, not sorted.
+  Rationale: the plan named "sorted keys" as a determinism input, and
+  declaration order is equally deterministic while buying a strictly stronger
+  guard. `serde` writes struct fields in declaration order, so matching it lets
+  `rust_re_encodes_the_python_output_byte_identically` compare bytes rather
+  than compare decoded values — and a byte comparison catches a field the two
+  sides encode differently but both happen to parse. `prototypes` is still
+  sorted explicitly, because its Rust counterpart is a `BTreeMap`. Date/Author:
+  2026-07-30, during Stage C3.
+
+- Decision: `market-town-block`'s content origin is `[110, 120, 0]`, which is
+  deliberately not chunk-aligned. Rationale: authored at a chunk-aligned
+  origin, every one of the four fixtures happened to fit inside a single
+  32-cube, so nothing shipped exercised a content box straddling a chunk
+  boundary — and the multi-chunk sort order, which the canonical encoding and
+  therefore design §12.3's content hash depend on, was tested only by the
+  generator's own suite. This is the same monoculture argument that produced
+  `bare-cell`, found by reading the measurements rather than by a failing test.
+  Date/Author: 2026-07-30, during Stage C3.
+
+- Decision: prototype `facing` and `airborne` having been removed in Stage C2a,
+  the generator's palette expansion supplies document defaults instead — full
+  impassability, no slope, no emission, an inert material — so an authoring
+  source declares only what differs. The *document* still has no defaults of
+  its own and every field remains mandatory: an omitted field in a document is
+  ambiguous between "the author meant the default" and "a tool dropped it",
+  whereas an omitted field in an authoring source is unambiguous because the
+  generator is the only reader. Date/Author: 2026-07-30, during Stage C3.
 
 ## Outcomes & retrospective
 
@@ -2452,6 +2487,28 @@ Three of the four go/no-go criteria pass with room to spare. The fourth — JSON
 size — fails, and the escape this plan prescribed (short `serde` renames) does
 not fix it: at 2.04 MiB it is still twice the tolerance. See the decision log
 entry on JSON encoding style for the resolution and the reasoning.
+
+### Fixture measurements (Stage C3)
+
+Taken with `scene-check --json --stats` at commit time. The tolerance is 1 MiB
+of JSON per fixture; the largest is 12.8 KiB, so there is roughly two orders of
+magnitude of headroom before the compact-encoding decision needs revisiting.
+
+| Fixture             | JSON     | MessagePack | Decoded | Chunks | Runs | Non-air of declared |
+| ------------------- | -------- | ----------- | ------- | ------ | ---- | ------------------- |
+| `bare-cell`         | 1,328 B  | 937 B       | 64 KiB  | 1      | 16   | 20 of 32,768        |
+| `keep-interior`     | 12,155 B | 8,400 B     | 64 KiB  | 1      | 414  | 1,454 of 1,048,576  |
+| `market-town-block` | 12,844 B | 8,856 B     | 256 KiB | 4      | 408  | 867 of 25,165,824   |
+| `swamp-fragment`    | 4,835 B  | 3,376 B     | 64 KiB  | 1      | 104  | 468 of 134,217,728  |
+
+The last column is the sparse payload's whole argument. `swamp-fragment`
+declares 134 million voxels and stores 3.4 KiB, because an absent chunk is
+entirely air and costs nothing. A dense encoding of the same extent would be
+256 MiB.
+
+`decoded` counts only densely stored chunks: a uniform chunk holds one index
+rather than 32,768 copies of it. None of these fixtures happens to contain a
+uniform chunk, so the figure is `chunks x 32,768 x 2` throughout.
 
 ## Interfaces and dependencies
 
