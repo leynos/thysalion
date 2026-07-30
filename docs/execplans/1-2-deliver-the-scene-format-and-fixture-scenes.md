@@ -463,10 +463,13 @@ travel with the C1 commit.
     `scene/validation/mod.rs`; the `Scene` aggregate with `content_hash`; and
     `SceneLoader` with `LoadedScene` and `SceneLoadError`. All eight
     behavioural scenarios green, `make all` passing.
-  - [ ] C2b, the reporter and the operator tool: `validation/report.rs`, the
-    `scene-check` example with its four exit codes, the hand-written corrupt
-    fixtures with their `insta` snapshots, and the hostile fixtures with their
-    termination assertions.
+  - [x] (2026-07-30) C2b, the reporter and the operator tool. Delivered:
+    `scene/validation/report/` with the text and JSON renderers and
+    `SceneStats`; `check/` with the four exit codes, the option parser, and the
+    `scene-check` example wrapper; twenty-nine corrupt fixtures under
+    `tests/fixtures/corrupt/` with an `insta` snapshot each and a
+    class-to-fixture contract table; and ten hostile inputs with wall-clock
+    termination bounds. 164 tests across the workspace, `make all` green.
 - [ ] Stage C3: the three fixture scenes and their generator (task 1.2.3) —
   opens with its own red step; third commit.
 - [ ] Stage D: documentation, ADR 006, design-document amendments, refactor,
@@ -1168,6 +1171,60 @@ travel with the C1 commit.
   it, by `source::check_resource_path`, so it is a document fault and deserves
   its own name. Adding a code is not a contract change; renaming one would be.
   Date/Author: 2026-07-30, during Stage C2.
+
+- Decision: a document that fails to parse exits **1** (invalid), not 2 (source
+  failure). Rationale: the plan's exit-code table names 2 for "input or source
+  failure", which reads as covering a parse failure, but the bytes were read
+  perfectly well — a field name mistyped under `deny_unknown_fields` is a wrong
+  *document*, and telling a contributor their file is unreadable sends them
+  looking for a filesystem problem that is not there. Only an unreachable
+  document or an unrecognized extension is a source failure. The `serde` path
+  (`palette[2].emission.intensity`) is the locator in place of a
+  `DocumentLocation`, because a parse failure yields no document to locate a
+  fault within — which is also why "unknown document field" is not a
+  `SceneDiagnostic` despite appearing in the plan's corruption-class list.
+  Date/Author: 2026-07-30, during Stage C2b.
+
+- Decision: `SceneStats` is a member of the report rather than something the
+  tool concatenates. Rationale: the first attempt spliced a rendered stats
+  object into the report's rendered JSON by finding its closing brace. Two JSON
+  documents in one stream is not JSON, and a string-splicing merge is a parser
+  nobody wants to own. `#[serde(flatten)]` was the other option and is banned
+  by this plan's constraints. The stats member is always present, `null` when
+  not requested, so a consumer never has to ask whether a key exists.
+  Date/Author: 2026-07-30, during Stage C2b.
+
+- Decision: the corrupt fixtures' shared skeleton was written by a one-off
+  script, not typed twenty-nine times. Rationale: the plan forbids routing them
+  through the *fixture compiler*, and the reason is circularity — that compiler
+  is what they exist to validate. A throwaway script that is not part of the
+  build, is never re-run by a test, and produces committed literal documents
+  does not create that circularity. Twenty-nine near-identical documents typed
+  by hand has a materially higher error rate than a scripted skeleton, and the
+  mitigation is in the test: every fixture must report its own *distinct* code
+  and exactly one problem, so a fault in the skeleton makes all twenty-nine
+  agree on the wrong answer and fails loudly. Date/Author: 2026-07-30, during
+  Stage C2b.
+
+- Decision: chunk sort order is checked with `>` rather than `>=`. Rationale:
+  equality *is* the duplicate case, already reported by its own rule, so `>=`
+  emitted two diagnostics for one authoring mistake. Found by the
+  exactly-one-problem assertion over the corrupt fixtures, which is the test
+  that earns its keep here: a report of forty consequences buries the four
+  causes. Date/Author: 2026-07-30, during Stage C2b.
+
+- Decision: four diagnostic classes have no checked-in corrupt fixture, and the
+  completeness test names them explicitly rather than passing quietly. Three
+  are resource bounds — `palette.too-large` needs 65,537 entries,
+  `voxels.too-many-chunks` needs 16.8 million, `voxels.too-many-runs` needs
+  65,537 — which run to megabytes as files and whose interesting property is
+  termination rather than wording, so they are hostile inputs constructed in
+  memory. `voxels.too-many-chunks` is exercised by *lowering* `Bounds`, which
+  is what makes the injected bounds worth having. The fourth,
+  `knowledge.resource-unreadable`, needs a source that fails on read rather
+  than a file that is missing, and git cannot portably check in a file that
+  exists and refuses to be read; a stub `SceneSource` covers it. Date/Author:
+  2026-07-30, during Stage C2b.
 
 ## Outcomes & retrospective
 
