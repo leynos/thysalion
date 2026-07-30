@@ -458,6 +458,86 @@ travel with the C1 commit.
 
 ## Surprises & discoveries
 
+- Observation: the workspace denies `clippy::integer_division` *and*
+  `clippy::integer_division_remainder_used`, so the `/` and `%` operators are
+  unavailable on integers anywhere in this crate — including the chunk
+  coordinate arithmetic that is the whole point of the grid module.
+  Evidence: fourteen lint errors across `grid/coords.rs` and `grid/extent.rs`
+  on the first clippy run.
+  Impact: the sanctioned escape is the method form. `div_euclid`, `rem_euclid`,
+  and `is_multiple_of` are method calls rather than operators, so neither lint
+  fires, and they are arguably the better spelling anyway: Euclidean semantics
+  are explicit where `/` on a signed type quietly is not. No suppression was
+  needed. Worth stating in the developers' guide, because the next person to
+  write coordinate maths in a plane crate will hit it within minutes.
+- Observation: `allow-expect-in-tests = true` does not cover helper functions,
+  exactly as AGENTS.md warns — but the obvious remedy collides with another
+  denied lint. Making a fixture fallible forces its callers to return `Result`,
+  and `clippy::panic_in_result_fn` then forbids those callers from using
+  `assert!` or `assert_eq!`, which is most of what a test does.
+  Evidence: converting `small_chunk()` to return `Result` turned one lint error
+  into seven.
+  Impact: the resolution is a `const` fixture validated at compile time —
+  `const SMALL_CHUNK: ChunkSize = match ChunkSize::new(4) { Ok(s) => s, Err(_)
+  => panic!(...) }` — which fails the build rather than the run and leaves the
+  tests free to assert. Where a fixture genuinely cannot be `const`, the helper
+  returns `Result` and the *test body* unwraps it, keeping the `expect` where
+  the allowance applies. Both patterns belong in the developers' guide.
+- Observation: Whitaker enforces the `cap_std` rule from AGENTS.md in test code
+  too, not only in production code.
+  Evidence: `no_std_fs_operations` denied `std::fs::read` and
+  `std::fs::create_dir_all` in `tests/golden_bytes.rs`.
+  Impact: correct, and worth knowing before writing a fixture reader. The
+  golden test opens `CARGO_MANIFEST_DIR` once as a `cap_std::fs_utf8::Dir` and
+  reads through it, which also makes the filesystem surface of the test visible
+  in one place.
+- Observation: each `tests/*.rs` compiles as its own crate, so a shared
+  `mod support` that one test uses only partly is dead code in the others —
+  and `make test` runs with warnings denied.
+  Evidence: sixteen `dead_code` warnings in `golden_bytes` from the `proptest`
+  strategy module that only `document_round_trip` uses.
+  Impact: the generators live in `tests/support/strategy.rs` and are declared
+  with `#[path]` by the one test that needs them, rather than re-exported from
+  `support/mod.rs`. Suppressing the warning was the alternative and is worse:
+  `#[allow]` is denied outright, and `#[expect]` would itself go unfulfilled in
+  the crate that *does* use the module.
+- Observation: `schemars` does not implement `JsonSchema` for `SmolStr` unless
+  its `smol_str03` feature is enabled, and the document tree uses `SmolStr`
+  throughout.
+  Evidence: eight trait-bound errors on the first build.
+  Impact: the pin gains the feature. The alternative — a
+  `#[schemars(with = "String")]` on every string field — would have been noise
+  on a dozen fields and a trap for the next one added.
+- Observation: `clippy::doc_markdown` treats every camel-cased proper noun in
+  prose as a missing code reference, including `MessagePack`, which this
+  crate's documentation necessarily says often.
+  Evidence: ten errors, all in module documentation.
+  Impact: `clippy.toml` gains a `doc-valid-idents` list extending Clippy's
+  default with the proper nouns this project uses. Backticking them would be
+  actively wrong — they name formats and projects, not identifiers — and the
+  configuration key exists for precisely this case.
+- Observation: the module tree places `VoxelIndex` in `scene/palette.rs` while
+  also requiring that `grid/` never depend on `scene/`. `VoxelGrid` stores
+  voxel indices, so the two rules cannot both hold.
+  Evidence: the Stage C1 tree, read against its own stated dependency
+  direction.
+  Impact: `VoxelIndex` moves to `grid/voxel_index.rs` and `scene/` re-exports
+  it. That is the right home on the merits and not merely a fix: the grid
+  *stores* an index, the palette *interprets* one, and an index is meaningless
+  without a palette to resolve it against — which is exactly why the type
+  carries no palette identity and `Palette::get` is fallible. The dependency
+  direction `scene -> grid` is unchanged.
+- Observation: task 1.2.1's success criterion is a property of the *document*
+  alone — "a hand-written JSON scene round-trips through the model and the
+  MessagePack encoding without loss" — and needs no validated `Scene`.
+  Evidence: roadmap §1.2.1 against the Stage C1 and C2 split.
+  Impact: the stage boundary is sharper than the plan's module tree implies.
+  Stage C1 delivers the wire types, the grid, and the codec, and its tests are
+  round-trip, wire-shape, canonical-bytes, and golden-bytes. The domain types
+  (`Scene`, `Palette`, `VoxelType`), the diagnostics, and the loader belong to
+  Stage C2, where validation gives them a reason to exist. This keeps
+  `Palette::from_document` — which returns diagnostics — out of a stage that
+  has no diagnostics yet.
 - Observation: the behavioural specification asserted counts the worked example
   cannot produce — "4 palette entries" against a three-entry palette, and a
   non-air count left unstated.

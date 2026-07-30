@@ -6,3 +6,9 @@ excessive-nesting-threshold = 4        # default is off
 
 allow-expect-in-tests = true
 
+# Proper nouns that `clippy::doc_markdown` mistakes for code items because
+# they are camel-cased. The trailing `..` extends Clippy's default list rather
+# than replacing it. Backticking these in prose would be wrong: they name
+# formats and projects, not identifiers.
+doc-valid-idents = ["MessagePack", "MagicaVoxel", "OpenVDB", "TriG", "VoxelForge", ".."]
+
