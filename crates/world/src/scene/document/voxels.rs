@@ -93,3 +93,16 @@ pub struct ChunkEntryDocument {
     /// The chunk's contents.
     pub payload: ChunkPayloadDocument,
 }
+
+impl ChunkPayloadDocument {
+    /// How many runs the payload declares. A uniform chunk declares none.
+    ///
+    /// Used by the header phase to bound a chunk before anything decodes it.
+    #[must_use]
+    pub const fn run_count(&self) -> usize {
+        match self {
+            Self::Uniform(_) => 0,
+            Self::Runs(runs) => runs.len(),
+        }
+    }
+}

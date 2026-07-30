@@ -16,7 +16,7 @@ use smol_str::SmolStr;
 /// The vocabulary follows the material families in the reference style guide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-pub enum MaterialClassDocument {
+pub enum MaterialClass {
     /// Empty space. Palette index zero is always this class.
     Air,
     /// Masonry, rock, and cobble.
@@ -42,7 +42,7 @@ pub enum MaterialClassDocument {
 /// validation would then have to reject.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-pub enum SlopeDocument {
+pub enum SlopeDirection {
     /// No rise; the voxel is a full cube or a flat slab.
     Flat,
     /// Rises towards increasing `x`.
@@ -58,7 +58,7 @@ pub enum SlopeDocument {
 /// One of the six axis-aligned faces of a voxel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
-pub enum FaceDocument {
+pub enum Face {
     /// The face whose normal points towards increasing `x`.
     PosX,
     /// The face whose normal points towards decreasing `x`.
@@ -89,7 +89,7 @@ pub enum FaceDocument {
               alternative encodings were considered and rejected: an array loses the face names, \
               and a bitmask loses the legibility of a hand-authored `pos_x: true`."
 )]
-pub struct PassabilityDocument {
+pub struct Passability {
     /// Whether an agent may cross the `+x` face.
     pub pos_x: bool,
     /// Whether an agent may cross the `-x` face.
@@ -104,7 +104,7 @@ pub struct PassabilityDocument {
     pub neg_z: bool,
 }
 
-impl PassabilityDocument {
+impl Passability {
     /// Every face passable, as air is.
     #[must_use]
     pub const fn open() -> Self {
@@ -171,7 +171,7 @@ impl EmissionDocument {
 /// the material does not ignite.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct SimDocument {
+pub struct SimProperties {
     /// How much the material can burn, Q8.8.
     pub fuel: u16,
     /// Temperature at which the material ignites, Q8.8; `u16::MAX` never.
@@ -180,7 +180,7 @@ pub struct SimDocument {
     pub moisture_capacity: u16,
 }
 
-impl SimDocument {
+impl SimProperties {
     /// A material that neither burns nor holds moisture.
     #[must_use]
     pub const fn inert() -> Self {
@@ -199,15 +199,15 @@ pub struct VoxelTypeDocument {
     /// Unique name within the scene's palette.
     pub name: SmolStr,
     /// Material class, selecting the texture set and shading parameters.
-    pub material: MaterialClassDocument,
+    pub material: MaterialClass,
     /// Per-face passability for pathfinding.
-    pub passable: PassabilityDocument,
+    pub passable: Passability,
     /// Direction of rise for ramps and stairs.
-    pub slope: SlopeDocument,
+    pub slope: SlopeDirection,
     /// Emitted light.
     pub emission: EmissionDocument,
     /// Material-field coefficients.
-    pub sim: SimDocument,
+    pub sim: SimProperties,
     /// The ontology concept this voxel kind instantiates, when it has one.
     ///
     /// Checked for syntax and project-namespace membership only. Resolving it

@@ -27,23 +27,23 @@ mod voxels;
 
 use schemars::JsonSchema;
 pub use sections::{
-    AmbientBandDocument,
+    AmbientBand,
     EntitiesDocument,
     KnowledgeDocument,
-    LightingDocument,
+    Lighting,
     PrototypeDocument,
     SpawnDocument,
-    SunPathDocument,
+    SunPath,
 };
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 pub use voxel_type::{
     EmissionDocument,
-    FaceDocument,
-    MaterialClassDocument,
-    PassabilityDocument,
-    SimDocument,
-    SlopeDocument,
+    Face,
+    MaterialClass,
+    Passability,
+    SimProperties,
+    SlopeDirection,
     VoxelTypeDocument,
 };
 pub use voxels::{
@@ -120,7 +120,7 @@ pub struct SceneDocument {
     /// Prototypes and spawns.
     pub entities: EntitiesDocument,
     /// Sun path, ambient bands, and probe spacing.
-    pub lighting: LightingDocument,
+    pub lighting: Lighting,
     /// The scene's named graph and its TriG sources.
     pub knowledge: KnowledgeDocument,
 }

@@ -21,7 +21,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-use super::{voxel_type::FaceDocument, voxels::VoxelPosDocument};
+use super::{voxel_type::Face, voxels::VoxelPosDocument};
 
 /// A named prototype that spawns may extend.
 ///
@@ -30,15 +30,18 @@ use super::{voxel_type::FaceDocument, voxels::VoxelPosDocument};
 /// never recursively — cycle detection alone does not save a recursive
 /// resolver from an acyclic chain thousands deep, and the resulting stack
 /// overflow is a signal rather than a `Result`.
+///
+/// The inheritable field set is deliberately narrow. A prototype can only
+/// usefully default a field a spawn may omit, and [`SpawnDocument`] makes
+/// `facing` and `airborne` mandatory — a default for either could never take
+/// effect, so neither is offered. Phase 4's component vocabulary is what will
+/// give prototypes weight; until then `concept` is the field with a real
+/// authoring cost to amortize.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PrototypeDocument {
     /// The prototype this one extends, if any.
     pub extends: Option<SmolStr>,
-    /// Default facing for spawns using this prototype.
-    pub facing: Option<FaceDocument>,
-    /// Default airborne flag for spawns using this prototype.
-    pub airborne: Option<bool>,
     /// Default ontology concept for spawns using this prototype.
     pub concept: Option<SmolStr>,
 }
@@ -54,7 +57,7 @@ pub struct SpawnDocument {
     /// Where the entity stands, in voxels.
     pub at: VoxelPosDocument,
     /// Which way the entity faces.
-    pub facing: FaceDocument,
+    pub facing: Face,
     /// Whether the entity is expected to have no support beneath it.
     ///
     /// Load emits a warning for an unsupported spawn unless this is set, which
@@ -76,9 +79,14 @@ pub struct EntitiesDocument {
 }
 
 /// The authored sun path (design §9.4).
+///
+/// No `Document` suffix, and shared between the wire and the domain: this step
+/// enforces no invariant over a sun path, so there is no second form for a
+/// domain type to be. Phase 3 owns the lighting semantics and is the phase with
+/// a use for the values; when it adds a rule, the domain form arrives with it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct SunPathDocument {
+pub struct SunPath {
     /// Compass bearing of the sun at noon, in centi-degrees.
     pub azimuth_centidegrees: i32,
     /// Elevation of the sun at noon, in centi-degrees.
@@ -88,7 +96,7 @@ pub struct SunPathDocument {
 /// One time-of-day band in the scene's ambient palette (design §9.4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct AmbientBandDocument {
+pub struct AmbientBand {
     /// Band name, such as `dawn` or `blue-hour`.
     pub name: SmolStr,
     /// Sun elevation at which this band applies, in centi-degrees.
@@ -98,13 +106,15 @@ pub struct AmbientBandDocument {
 }
 
 /// The scene's lighting section.
+///
+/// Shared between the wire and the domain, for the reason given on [`SunPath`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct LightingDocument {
+pub struct Lighting {
     /// The authored sun path.
-    pub sun_path: SunPathDocument,
+    pub sun_path: SunPath,
     /// Ambient palette bands, in authoring order.
-    pub ambient_bands: Vec<AmbientBandDocument>,
+    pub ambient_bands: Vec<AmbientBand>,
     /// Probe-volume spacing override, in millimetres (design §9.3).
     pub probe_spacing_mm: u32,
 }

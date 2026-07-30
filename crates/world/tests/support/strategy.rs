@@ -18,25 +18,25 @@ use proptest::{
 };
 use smol_str::SmolStr;
 use thysalion_world::scene::document::{
-    AmbientBandDocument,
+    AmbientBand,
     ChunkCoordDocument,
     ChunkEntryDocument,
     ChunkPayloadDocument,
     EmissionDocument,
     EntitiesDocument,
     ExtentDocument,
-    FaceDocument,
+    Face,
     KnowledgeDocument,
-    LightingDocument,
-    MaterialClassDocument,
-    PassabilityDocument,
+    Lighting,
+    MaterialClass,
+    Passability,
     PrototypeDocument,
     SUPPORTED_VERSION,
     SceneDocument,
-    SimDocument,
-    SlopeDocument,
+    SimProperties,
+    SlopeDirection,
     SpawnDocument,
-    SunPathDocument,
+    SunPath,
     VoxelPosDocument,
     VoxelRunDocument,
     VoxelTypeDocument,
@@ -55,41 +55,41 @@ fn concept() -> impl Strategy<Value = Option<SmolStr>> {
     ]
 }
 
-fn material() -> impl Strategy<Value = MaterialClassDocument> {
+fn material() -> impl Strategy<Value = MaterialClass> {
     prop_oneof![
-        Just(MaterialClassDocument::Air),
-        Just(MaterialClassDocument::Stone),
-        Just(MaterialClassDocument::Timber),
-        Just(MaterialClassDocument::Roofing),
-        Just(MaterialClassDocument::Cloth),
-        Just(MaterialClassDocument::Ground),
-        Just(MaterialClassDocument::Natural),
-        Just(MaterialClassDocument::Water),
+        Just(MaterialClass::Air),
+        Just(MaterialClass::Stone),
+        Just(MaterialClass::Timber),
+        Just(MaterialClass::Roofing),
+        Just(MaterialClass::Cloth),
+        Just(MaterialClass::Ground),
+        Just(MaterialClass::Natural),
+        Just(MaterialClass::Water),
     ]
 }
 
-fn slope() -> impl Strategy<Value = SlopeDocument> {
+fn slope() -> impl Strategy<Value = SlopeDirection> {
     prop_oneof![
-        Just(SlopeDocument::Flat),
-        Just(SlopeDocument::PosX),
-        Just(SlopeDocument::NegX),
-        Just(SlopeDocument::PosY),
-        Just(SlopeDocument::NegY),
+        Just(SlopeDirection::Flat),
+        Just(SlopeDirection::PosX),
+        Just(SlopeDirection::NegX),
+        Just(SlopeDirection::PosY),
+        Just(SlopeDirection::NegY),
     ]
 }
 
-fn face() -> impl Strategy<Value = FaceDocument> {
+fn face() -> impl Strategy<Value = Face> {
     prop_oneof![
-        Just(FaceDocument::PosX),
-        Just(FaceDocument::NegX),
-        Just(FaceDocument::PosY),
-        Just(FaceDocument::NegY),
-        Just(FaceDocument::PosZ),
-        Just(FaceDocument::NegZ),
+        Just(Face::PosX),
+        Just(Face::NegX),
+        Just(Face::PosY),
+        Just(Face::NegY),
+        Just(Face::PosZ),
+        Just(Face::NegZ),
     ]
 }
 
-fn passability() -> impl Strategy<Value = PassabilityDocument> {
+fn passability() -> impl Strategy<Value = Passability> {
     (
         any::<bool>(),
         any::<bool>(),
@@ -98,16 +98,14 @@ fn passability() -> impl Strategy<Value = PassabilityDocument> {
         any::<bool>(),
         any::<bool>(),
     )
-        .prop_map(
-            |(pos_x, neg_x, pos_y, neg_y, pos_z, neg_z)| PassabilityDocument {
-                pos_x,
-                neg_x,
-                pos_y,
-                neg_y,
-                pos_z,
-                neg_z,
-            },
-        )
+        .prop_map(|(pos_x, neg_x, pos_y, neg_y, pos_z, neg_z)| Passability {
+            pos_x,
+            neg_x,
+            pos_y,
+            neg_y,
+            pos_z,
+            neg_z,
+        })
 }
 
 fn voxel_type() -> impl Strategy<Value = VoxelTypeDocument> {
@@ -128,7 +126,7 @@ fn voxel_type() -> impl Strategy<Value = VoxelTypeDocument> {
                     passable,
                     slope,
                     emission: EmissionDocument { intensity, colour },
-                    sim: SimDocument {
+                    sim: SimProperties {
                         fuel: sim.0,
                         ignition_point: sim.1,
                         moisture_capacity: sim.2,
@@ -181,35 +179,25 @@ fn spawn() -> impl Strategy<Value = SpawnDocument> {
 }
 
 fn prototype() -> impl Strategy<Value = PrototypeDocument> {
-    (
-        proptest::option::of(name()),
-        proptest::option::of(face()),
-        proptest::option::of(any::<bool>()),
-        concept(),
-    )
-        .prop_map(|(extends, facing, airborne, concept)| PrototypeDocument {
-            extends,
-            facing,
-            airborne,
-            concept,
-        })
+    (proptest::option::of(name()), concept())
+        .prop_map(|(extends, concept)| PrototypeDocument { extends, concept })
 }
 
-fn lighting() -> impl Strategy<Value = LightingDocument> {
+fn lighting() -> impl Strategy<Value = Lighting> {
     (
         -36_000i32..=36_000,
         -9_000i32..=9_000,
         vec((name(), -36_000i32..=36_000, any::<[u8; 3]>()), 0..3),
         1u32..10_000,
     )
-        .prop_map(|(azimuth, elevation, bands, spacing)| LightingDocument {
-            sun_path: SunPathDocument {
+        .prop_map(|(azimuth, elevation, bands, spacing)| Lighting {
+            sun_path: SunPath {
                 azimuth_centidegrees: azimuth,
                 elevation_centidegrees: elevation,
             },
             ambient_bands: bands
                 .into_iter()
-                .map(|(name, at, colour)| AmbientBandDocument {
+                .map(|(name, at, colour)| AmbientBand {
                     name,
                     at_centidegrees: at,
                     colour,

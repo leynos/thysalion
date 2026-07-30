@@ -21,16 +21,16 @@ use thysalion_world::scene::document::{
     EmissionDocument,
     EntitiesDocument,
     ExtentDocument,
-    FaceDocument,
+    Face,
     KnowledgeDocument,
-    LightingDocument,
-    MaterialClassDocument,
-    PassabilityDocument,
+    Lighting,
+    MaterialClass,
+    Passability,
     SceneDocument,
-    SimDocument,
-    SlopeDocument,
+    SimProperties,
+    SlopeDirection,
     SpawnDocument,
-    SunPathDocument,
+    SunPath,
     VoxelPosDocument,
     VoxelRunDocument,
     VoxelTypeDocument,
@@ -40,39 +40,39 @@ use thysalion_world::scene::document::{
 fn air() -> VoxelTypeDocument {
     VoxelTypeDocument {
         name: SmolStr::new("air"),
-        material: MaterialClassDocument::Air,
-        passable: PassabilityDocument::open(),
-        slope: SlopeDocument::Flat,
+        material: MaterialClass::Air,
+        passable: Passability::open(),
+        slope: SlopeDirection::Flat,
         emission: EmissionDocument::dark(),
-        sim: SimDocument::inert(),
+        sim: SimProperties::inert(),
         concept: None,
     }
 }
 
 /// A solid, fully impassable voxel type with no emission and inert material.
-fn solid(name: &str, material: MaterialClassDocument) -> VoxelTypeDocument {
+fn solid(name: &str, material: MaterialClass) -> VoxelTypeDocument {
     VoxelTypeDocument {
         name: SmolStr::new(name),
         material,
-        passable: PassabilityDocument::closed(),
-        slope: SlopeDocument::Flat,
+        passable: Passability::closed(),
+        slope: SlopeDirection::Flat,
         emission: EmissionDocument::dark(),
-        sim: SimDocument::inert(),
+        sim: SimProperties::inert(),
         concept: None,
     }
 }
 
 /// Air, stone, and a wall sconce: enough to exercise emission and concepts.
 fn minimal_palette() -> Vec<VoxelTypeDocument> {
-    let mut stone = solid("stone-block", MaterialClassDocument::Stone);
-    stone.sim = SimDocument {
+    let mut stone = solid("stone-block", MaterialClass::Stone);
+    stone.sim = SimProperties {
         fuel: 0,
         ignition_point: u16::MAX,
         moisture_capacity: 3277,
     };
     stone.concept = Some(SmolStr::new("thy:StoneBlock"));
 
-    let mut sconce = solid("wall-sconce", MaterialClassDocument::Stone);
+    let mut sconce = solid("wall-sconce", MaterialClass::Stone);
     sconce.emission = EmissionDocument {
         intensity: 12,
         colour: [255, 180, 90],
@@ -128,7 +128,7 @@ fn minimal_entities() -> EntitiesDocument {
             name: SmolStr::new("party-start"),
             prototype: None,
             at: VoxelPosDocument { x: 2, y: 2, z: 1 },
-            facing: FaceDocument::PosY,
+            facing: Face::PosY,
             airborne: false,
             concept: None,
         }],
@@ -136,9 +136,9 @@ fn minimal_entities() -> EntitiesDocument {
 }
 
 /// A mid-afternoon sun and default probe spacing.
-const fn minimal_lighting() -> LightingDocument {
-    LightingDocument {
-        sun_path: SunPathDocument {
+const fn minimal_lighting() -> Lighting {
+    Lighting {
+        sun_path: SunPath {
             azimuth_centidegrees: 13_500,
             elevation_centidegrees: 3_000,
         },

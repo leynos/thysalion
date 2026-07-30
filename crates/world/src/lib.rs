@@ -14,9 +14,11 @@
 //!
 //! - [`grid`] holds the runtime voxel structure and the coordinate types. It is what phase 2's
 //!   mesher and phase 4's pathfinder consume.
-//! - [`scene`] holds the authored scene: its wire document, and from roadmap task 1.2.2 the
-//!   validated domain form.
+//! - [`scene`] holds the authored scene: its wire document, its validated domain form, and the
+//!   validation rules that separate the two.
 //! - [`codec`] converts a document to and from its two encodings.
+//! - [`source`] is the driven port through which a scene reaches its resources, and [`loader`] is
+//!   the application service that composes the codec, the port, and validation into one call.
 //!
 //! `scene` may depend on `grid`; `grid` never depends on `scene` beyond the
 //! wire types it converts to and from. The direction matters because the grid
@@ -33,4 +35,6 @@
 
 pub mod codec;
 pub mod grid;
+pub mod loader;
 pub mod scene;
+pub mod source;
