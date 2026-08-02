@@ -74,6 +74,18 @@ scenes all later spikes and CI suites consume. See thysalion-design.md §7.
   - See thysalion-design.md §7.1 and §1.
   - Success: all three load through the validator; each is referenced by
     at least one demo or CI suite by the end of phase 6.
+- [ ] 1.2.4. Publish the scene document's JSON Schema as a versioned
+  artefact.
+  - Requires 1.2.1.
+  - Emit the schema from the document types' existing `schemars` derives,
+    stamp it with the document version, and commit it so external content
+    tooling can target the format as data rather than by depending on
+    `thysalion-world`.
+  - See thysalion-design.md §7.3 and §7.4, and
+    adr-006-scene-document-model.md.
+  - Success: CI regenerates the artefact and compares it byte for byte;
+    every fixture scene validates against it, and every corrupt fixture
+    whose fault is structural is rejected by it.
 
 ### 1.3. Stand up headless CI and the verification spine
 
@@ -556,8 +568,8 @@ spikes — the integration milestone's whole purpose. See thysalion-design.md §
 ## 10. Deferred extensions after the vertical slice
 
 Idea: if the vertical slice is trustworthy and boring to operate, the project
-can evaluate the design's deferred bets on product value instead of letting
-them destabilize the MVP.
+can evaluate and deliver the design's deferred bets on product value instead of
+letting them destabilize the MVP.
 
 ### 10.1. Re-open the deferred decisions on their recorded criteria
 
@@ -574,3 +586,31 @@ See thysalion-design.md §15 (Table 7) for the re-opening criteria.
 - [ ] 10.1.4. Revisit multiplayer lockstep, WASM builds, and formal proof
   of circuit rules as their criteria trigger.
   - See thysalion-design.md §15.
+
+### 10.2. Deliver the authoring pipeline beyond layered text
+
+Layered text and `scripts/build_fixture_scenes.py` carry the fixture scenes
+through the vertical slice. This step delivers the pipeline that replaces them
+once scenes outgrow what a contributor will hand-author. See
+thysalion-design.md §7.4.
+
+- [ ] 10.2.1. Build the Tiled layered-isometric authoring workflow.
+  - Requires phase 9 and 1.2.4.
+  - Layered isometric editing as built for lille, emitting the JSON
+    encoding against the published schema rather than against engine code.
+  - Success: a scene authored in Tiled loads through the validator, and the
+    layered-text fixtures re-author in it without loss.
+- [ ] 10.2.2. Deliver MagicaVoxel `.vox` import as palette-mapped voxel
+  stamps.
+  - Requires phase 9 and 1.2.4.
+  - Props and set-dressing only: `.vox` caps a model at 255 palette colours
+    and 256 voxels per axis, against a 1024-extent scene class and a 16-bit
+    palette, so it is interchange and never canonical authoring input.
+  - Success: an imported stamp maps onto the scene palette by name, and a
+    model breaching either cap is rejected with a diagnostic naming the cap.
+- [ ] 10.2.3. Deliver in-engine voxel editing for detail passes.
+  - Requires phase 9 and 2.1.3, whose re-mesh path this extends rather
+    than reinvents.
+  - See thysalion-design.md §8.1.
+  - Success: an edit re-meshes only its own chunk and the face-adjacent
+    chunks it touches, and round-trips through the scene format.
