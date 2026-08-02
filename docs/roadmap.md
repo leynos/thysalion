@@ -76,7 +76,7 @@ scenes all later spikes and CI suites consume. See thysalion-design.md §7.
     at least one demo or CI suite by the end of phase 6.
 - [ ] 1.2.4. Publish the scene document's JSON Schema as a versioned
   artefact.
-  - Requires 1.2.1.
+  - Requires 1.2.1 and 1.2.3.
   - Emit the schema from the document types' existing `schemars` derives,
     stamp it with the document version, and commit it so external content
     tooling can target the format as data rather than by depending on
@@ -606,11 +606,29 @@ thysalion-design.md §7.4.
   - Props and set-dressing only: `.vox` caps a model at 255 palette colours
     and 256 voxels per axis, against a 1024-extent scene class and a 16-bit
     palette, so it is interchange and never canonical authoring input.
-  - Success: an imported stamp maps onto the scene palette by name, and a
-    model breaching either cap is rejected with a diagnostic naming the cap.
+  - Resolve every occupied palette index to a scene `VoxelType` name through
+    an explicit, versioned mapping table carried beside the model. The
+    `RGBA` chunk supplies the colours that table keys on; the `NOTE` chunk
+    labels palette groups rather than single indices, so it may seed a
+    mapping but can never be the authority for one.
+  - Make that resolution total and deterministic: a colour absent from the
+    table, a name the scene palette does not define, and two indices
+    claiming one name are three distinct errors, and each rejects the whole
+    model rather than dropping or guessing a voxel.
+  - Success: a stamp imports only when every occupied index resolves; the
+    unmapped, undefined, duplicate, and cap-breaching cases each produce
+    their own diagnostic naming the offending index or cap, and a fixture
+    covers each.
 - [ ] 10.2.3. Deliver in-engine voxel editing for detail passes.
   - Requires phase 9 and 2.1.3, whose re-mesh path this extends rather
     than reinvents.
-  - See thysalion-design.md §8.1.
-  - Success: an edit re-meshes only its own chunk and the face-adjacent
-    chunks it touches, and round-trips through the scene format.
+  - See thysalion-design.md §8.1, and §14 for the invariant catalogue these
+    two properties join.
+  - Both properties quantify over every finite edit sequence, so establish
+    them with `proptest` rather than with worked examples: generate
+    arbitrary sequences weighted towards chunk boundaries, and shrink a
+    failure to a minimal sequence.
+  - Success: for any generated sequence, the set of re-meshed chunks is
+    exactly the edited chunks plus the face-adjacent chunks those edits
+    touch, and the edited scene round-trips through the scene format
+    unchanged.
