@@ -21,6 +21,7 @@ use thysalion_world::{
         ChunkEntryDocument,
         ChunkPayloadDocument,
         DocumentVersion,
+        SUPPORTED_VERSION,
         SceneDocument,
         VoxelRunDocument,
     },
@@ -188,11 +189,36 @@ fn a_version_probe_precedes_full_deserialization() {
 }
 
 #[test]
-fn a_newer_minor_version_is_accepted_when_the_document_is_otherwise_valid() {
-    let mut document = minimal_document();
-    document.version = DocumentVersion { major: 1, minor: 0 };
+fn an_older_minor_version_is_the_one_a_reader_accepts() {
+    // The direction `accepts` actually permits: `document.minor <= self.minor`,
+    // so a build reads every older minor of its own major. The reverse does not
+    // hold — every document type carries `deny_unknown_fields`, so a section
+    // added at 1.1 is an unknown field to a reader that knows only 1.0.
+    //
+    // Written by patching the encoded value rather than the document, because
+    // `minimal_document()` already carries `SUPPORTED_VERSION`: setting the
+    // field to what it already holds is what made the previous version of this
+    // test assert nothing at all.
+    let document = minimal_document();
     let json = encode_document(&document, Encoding::Json).expect("encode");
-    assert!(decode_document(&json, Encoding::Json).is_ok());
+    let mut value: serde_json::Value = serde_json::from_slice(&json).expect("parse");
+    let older = DocumentVersion {
+        major: SUPPORTED_VERSION.major,
+        minor: SUPPORTED_VERSION.minor.saturating_add(1),
+    };
+    assert!(
+        !SUPPORTED_VERSION.accepts(older),
+        "a newer minor must not be accepted, or this test proves nothing"
+    );
+    value.as_object_mut().expect("object").insert(
+        "version".to_owned(),
+        version_value(older.major, older.minor),
+    );
+    let patched = serde_json::to_vec(&value).expect("re-encode");
+    assert!(
+        decode_document(&patched, Encoding::Json).is_err(),
+        "a document from a newer minor must be refused, not silently read"
+    );
 }
 
 #[test]

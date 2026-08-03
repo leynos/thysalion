@@ -334,3 +334,17 @@ def test_check_mode_fails_on_a_missing_fixture(scene_source, tmp_path: Path) -> 
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     assert generator.check_all([source], output, scratch) == 1
+
+
+def test_a_zero_chunk_size_names_the_file_rather_than_dividing_by_it(
+    scene_source: typ.Callable[..., Path],
+) -> None:
+    """A non-positive chunk size is refused where it is read.
+
+    Every voxel coordinate is divided by it to find its chunk, so an unchecked
+    zero surfaces as a bare ZeroDivisionError naming nothing an author can open.
+    """
+    scene = MINIMAL_SCENE.replace("chunk_size = 32", "chunk_size = 0")
+    source = scene_source({"z000.txt": "..\n..\n"}, scene=scene)
+    with pytest.raises(generator.SourceError, match="chunk_size must be positive"):
+        generator.compile_scene(source)
