@@ -336,3 +336,89 @@ fn an_empty_input_is_refused_rather_than_treated_as_an_empty_scene() {
         assert!(outcome.is_err(), "{encoding}: empty input must not load");
     }
 }
+
+#[test]
+fn an_over_long_chunk_list_is_refused_without_describing_its_contents() {
+    // The chunk bound is the one that makes every later walk safe, so it must
+    // stop the scan rather than annotate it. Every entry here also breaches the
+    // per-chunk run bound; if the scan continued, each would be described.
+    let mut document = minimal_document();
+    let mut bounds = Bounds::DEFAULT;
+    bounds.max_chunks = 4;
+    bounds.max_runs_per_chunk = 2;
+    document.voxels = (0_u32..64)
+        .map(|index| ChunkEntryDocument {
+            at: ChunkCoordDocument {
+                x: index,
+                y: 0,
+                z: 0,
+            },
+            payload: ChunkPayloadDocument::Runs(
+                (0_u32..8)
+                    .map(|run| VoxelRunDocument {
+                        length: 4096,
+                        index: u16::from(run.is_multiple_of(2)),
+                    })
+                    .collect(),
+            ),
+        })
+        .collect();
+
+    let outcome = within_bound("64 chunks against a bound of 4", || {
+        load_with(&document, bounds)
+    });
+    // Exactly one: the list is too long, and that is the whole finding.
+    assert_eq!(
+        codes(&outcome),
+        vec![DiagnosticCode::TooManyChunks.as_str()],
+        "an over-long chunk list must not be described entry by entry"
+    );
+}
+
+#[test]
+fn many_over_long_chunks_are_summarized_rather_than_listed_or_dropped() {
+    // Within the chunk bound, so the scan runs — but the diagnostics it
+    // produces must stay bounded, because `SceneLoadError::Invalid` carries
+    // them and `scene-check` renders every one.
+    let mut document = minimal_document();
+    let mut bounds = Bounds::DEFAULT;
+    bounds.max_chunks = 64;
+    bounds.max_runs_per_chunk = 2;
+    document.voxels = (0_u32..40)
+        .map(|index| ChunkEntryDocument {
+            at: ChunkCoordDocument {
+                x: index,
+                y: 0,
+                z: 0,
+            },
+            payload: ChunkPayloadDocument::Runs(
+                (0_u32..8)
+                    .map(|run| VoxelRunDocument {
+                        length: 4096,
+                        index: u16::from(run.is_multiple_of(2)),
+                    })
+                    .collect(),
+            ),
+        })
+        .collect();
+
+    let outcome = within_bound("40 over-long chunks", || load_with(&document, bounds));
+    let reported = codes(&outcome)
+        .iter()
+        .filter(|code| **code == DiagnosticCode::TooManyRuns.as_str())
+        .count();
+    // Eight listed plus one summary. Not forty, and not silently eight.
+    assert_eq!(reported, 9, "got {:?}", codes(&outcome));
+    let Err(error) = outcome else {
+        panic!("40 over-long chunks must not load");
+    };
+    let rendered: Vec<String> = error
+        .diagnostics()
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+    assert!(
+        rendered.iter().any(|line| line.contains("32 further")),
+        "the unlisted remainder must be counted, got {rendered:?}"
+    );
+}

@@ -123,6 +123,17 @@ fn extent_diagnostic(error: &ExtentError, at: DocumentLocation) -> SceneDiagnost
     SceneDiagnostic::structural(code, at, error.to_string())
 }
 
+/// How many per-chunk run faults are listed before the rest are counted.
+///
+/// One diagnostic per offending chunk means a document declaring a hundred
+/// thousand over-limit chunks allocates a hundred thousand formatted strings,
+/// which `SceneLoadError::Invalid` then carries and `scene-check` renders —
+/// allocation in proportion to a declared quantity, which this phase exists to
+/// refuse. Eight is enough to show whether the fault is one chunk or the whole
+/// payload. The remainder are counted rather than dropped: a silent cap reads
+/// as "that was all of them".
+const REPORTED_RUN_FAULTS: usize = 8;
+
 /// Refuses declared collection sizes above the runtime bounds.
 fn check_collection_sizes(
     document: &SceneDocument,
@@ -139,21 +150,47 @@ fn check_collection_sizes(
                 bounds.max_chunks
             ),
         ));
+        // Refused already. Describing faults inside a chunk list that has just
+        // been rejected for its length is work proportional to the very
+        // quantity the bound exists to refuse, and it tells the reader nothing
+        // they can act on before shrinking the list.
+        return;
     }
+
+    // Past the bound above, the list is no longer than `max_chunks`, so this
+    // walk is bounded by policy rather than by the document.
+    let mut reported = 0_usize;
+    let mut unreported = 0_usize;
     for (ordinal, entry) in document.voxels.iter().enumerate() {
         let run_count = entry.payload.run_count();
-        if run_count > bounds.max_runs_per_chunk {
-            problems.push(SceneDiagnostic::structural(
-                DiagnosticCode::TooManyRuns,
-                DocumentLocation::new(
-                    DocumentSection::Voxels,
-                    u32::try_from(ordinal).unwrap_or(u32::MAX),
-                ),
-                format!(
-                    "{run_count} runs exceeds the per-chunk bound of {}",
-                    bounds.max_runs_per_chunk
-                ),
-            ));
+        if run_count <= bounds.max_runs_per_chunk {
+            continue;
         }
+        if reported == REPORTED_RUN_FAULTS {
+            unreported = unreported.saturating_add(1);
+            continue;
+        }
+        problems.push(SceneDiagnostic::structural(
+            DiagnosticCode::TooManyRuns,
+            DocumentLocation::new(
+                DocumentSection::Voxels,
+                u32::try_from(ordinal).unwrap_or(u32::MAX),
+            ),
+            format!(
+                "{run_count} runs exceeds the per-chunk bound of {}",
+                bounds.max_runs_per_chunk
+            ),
+        ));
+        reported = reported.saturating_add(1);
+    }
+    if unreported > 0 {
+        problems.push(SceneDiagnostic::structural(
+            DiagnosticCode::TooManyRuns,
+            DocumentLocation::section(DocumentSection::Voxels),
+            format!(
+                "{unreported} further chunk entries exceed the per-chunk bound of {}",
+                bounds.max_runs_per_chunk
+            ),
+        ));
     }
 }

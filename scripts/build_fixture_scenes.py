@@ -270,7 +270,12 @@ class Grid:
         return sorted(found, key=lambda at: (at[2], at[1], at[0]))
 
 
-def read_layers(source: Path, legend: Mapping[str, str], palette: Sequence[str], content: Box):
+def read_layers(
+    source: Path,
+    legend: Mapping[str, str],
+    palette: Sequence[str],
+    content: Box,
+) -> tuple[Grid, Provenance]:
     """Compiles the layer rasters into a grid and its provenance.
 
     Returns the grid and the provenance together because they are produced by
@@ -390,7 +395,7 @@ def build_palette(entries: Iterable[Mapping[str, typ.Any]], where: str) -> list[
             {
                 "name": name,
                 "material": entry.get("material", "stone"),
-                "passable": {face: passable for face in FACES},
+                "passable": dict.fromkeys(FACES, passable),
                 "slope": entry.get("slope", "flat"),
                 "emission": {
                     "intensity": int(emission.get("intensity", 0)),

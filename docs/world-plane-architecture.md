@@ -24,6 +24,8 @@ them, and the alternatives rejected, are recorded in
 | `loader`                                                                  | The application service that composes the three.                                                              |
 | `check`                                                                   | The `scene-check` operator tool, as a library.                                                                |
 
+*Table 1: the world crate's modules and what each owns.*
+
 `scene` may depend on `grid`; `grid` never depends on `scene` beyond the wire
 types it converts to and from. The direction matters because the grid outlives
 the document that produced it.
@@ -123,6 +125,9 @@ wording contract, so scraping it makes a message tweak break two things at once.
 | 2    | The document or one of its resources could not be read.              |
 | 64   | The command line was wrong (`EX_USAGE`).                             |
 
+*Table 2: `scene-check` exit codes. Four rather than two, so a broken tool
+cannot be read as a bad scene.*
+
 "Non-zero" cannot distinguish a bad scene from a broken tool, and a
 continuous-integration job that cannot tell them apart reports a mistyped
 fixture path as a validation failure.
@@ -148,6 +153,8 @@ reader is the generator itself.
 | `lighting`   | object           | Sun path, ambient bands, and probe spacing.                         |
 | `knowledge`  | object           | The scene's named graph and its TriG sources.                       |
 
+*Table 3: the scene document's top-level fields.*
+
 ### A palette entry
 
 | Field      | Type           | Meaning                                                                                                               |
@@ -160,6 +167,9 @@ reader is the generator itself.
 | `sim`      | object         | `fuel`, `ignition_point`, `moisture_capacity`, all Q8.8 fixed point. `ignition_point` of 65535 means "never ignites". |
 | `concept`  | string or null | An ontology concept as `prefix:local`. Checked for syntax and namespace only.                                         |
 
+*Table 4: one palette entry — everything the engine knows about a voxel
+kind.*
+
 Six named booleans rather than design §7.2's `[bool; 6]`. An array requires
 every reader to agree on the index-to-face mapping and offers no way to notice
 when one does not.
@@ -170,6 +180,8 @@ when one does not.
 | --------- | ----------- | ---------------------------------------------------------- |
 | `at`      | `{x, y, z}` | Chunk coordinate, counted in chunks rather than in voxels. |
 | `payload` | object      | Either `{"uniform": index}` or `{"runs": [...]}`.          |
+
+*Table 5: one chunk entry in the voxel payload.*
 
 A run is `{"length": n, "index": i}`. Runs are chunk-local **Z-major**: within
 a chunk of side `s`, chunk-local `(x, y, z)` sits at `z * s * s + y * s + x`.
@@ -254,6 +266,8 @@ unrecorded. This table is the countermeasure.
 | Version | Change                             |
 | ------- | ---------------------------------- |
 | 1.0     | Initial format (roadmap step 1.2). |
+
+*Table 6: document version history.*
 
 What a future bump would mean:
 

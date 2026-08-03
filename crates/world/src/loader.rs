@@ -259,11 +259,21 @@ fn decoded(error: CodecError, path: &Utf8Path) -> SceneLoadError {
                 ),
             )]),
         },
+        // An encoder failure on a *decode* path is this crate malfunctioning,
+        // not a fault in the bytes. The variant is reused because the enum is
+        // the loader's published contract, but the message must not claim the
+        // document is malformed: that is precisely the misclassification this
+        // function's doc comment warns about, and it would send a contributor
+        // hunting a syntax error that does not exist.
         CodecError::Encode { encoding, message } => SceneLoadError::Malformed {
             path: path.to_owned(),
             encoding,
-            pointer: String::new(),
-            message,
+            pointer: String::from("/"),
+            message: format!(
+                "the {encoding} encoder failed, which is a fault in this build rather than in the \
+                 document: {message}"
+            )
+            .into(),
         },
     }
 }

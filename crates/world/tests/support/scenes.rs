@@ -31,10 +31,15 @@ pub const FIXTURE_NAMES: &[&str] = &[
 #[must_use]
 pub fn repository_root() -> camino::Utf8PathBuf {
     let crate_root = camino::Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // Owned before the fallback rather than cloned before the walk, so the
+    // copy happens only on the branch that needs one. The borrow of
+    // `crate_root` has to end before it can be moved into `unwrap_or`, which
+    // is why the `map` is separate — and why `map_or` cannot be used here.
     crate_root
         .parent()
         .and_then(camino::Utf8Path::parent)
-        .map_or_else(|| crate_root.clone(), camino::Utf8Path::to_owned)
+        .map(camino::Utf8Path::to_owned)
+        .unwrap_or(crate_root)
 }
 
 /// Opens the compiled fixture directory as a capability.
