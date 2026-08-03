@@ -71,6 +71,15 @@ struct ReportShape {
     errors: Vec<DiagnosticShape>,
     warnings: Vec<DiagnosticShape>,
     stats: Option<StatsShape>,
+    failure: Option<FailureShape>,
+}
+
+/// A failure with no place in the document, as a consumer sees it.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FailureShape {
+    kind: String,
+    message: String,
 }
 
 /// One diagnostic as a consumer sees it.
@@ -391,4 +400,58 @@ fn no_document_is_a_usage_error() {
 #[test]
 fn the_usage_exit_code_is_the_sysexits_one() {
     assert_eq!(ExitCode::Usage.get(), 64);
+}
+
+#[test]
+fn a_missing_document_still_renders_parseable_json() {
+    // The regression this guards: a `SceneLoadError` carrying no diagnostics
+    // used to have its label and message appended *after* the rendered report,
+    // which under `--json` put a bare line after a closed object. Every
+    // consumer of this contract parses the whole stream, so that broke them on
+    // exactly the paths they most need to read — the ones where nothing loaded.
+    let outcome = check(
+        MemorySceneSource::new(),
+        options(|o| o.format = OutputFormat::Json),
+    );
+    assert_eq!(outcome.code, ExitCode::SourceFailure);
+    let report = parse_report(&outcome.output);
+    let Some(failure) = report.failure else {
+        panic!(
+            "a source failure must be reported, got:\n{}",
+            outcome.output
+        );
+    };
+    assert_eq!(failure.kind, "source failure");
+    assert!(!failure.message.is_empty());
+    // Not an error: an unreadable document has no place *within* a document,
+    // and the generator's suite reads `errors` as located faults.
+    assert!(report.errors.is_empty(), "{:?}", report.errors);
+}
+
+#[test]
+fn a_malformed_document_still_renders_parseable_json() {
+    let mut source = MemorySceneSource::new();
+    source.insert(DOCUMENT, b"{ this is not a scene ".to_vec());
+    let outcome = check(source, options(|o| o.format = OutputFormat::Json));
+    assert_eq!(outcome.code, ExitCode::Invalid);
+    let report = parse_report(&outcome.output);
+    let Some(failure) = report.failure else {
+        panic!(
+            "a malformed document must be reported, got:\n{}",
+            outcome.output
+        );
+    };
+    assert_eq!(failure.kind, "malformed document");
+}
+
+#[test]
+fn a_valid_scene_reports_no_failure() {
+    let outcome = check(
+        source_with(&minimal_document()),
+        options(|o| o.format = OutputFormat::Json),
+    );
+    // Present and null rather than absent, for the reason `stats` is: a
+    // consumer that must test for a key's existence reads `undefined` as a
+    // value one refactor later.
+    assert!(parse_report(&outcome.output).failure.is_none());
 }

@@ -44,6 +44,24 @@ pub struct Report {
     /// afterwards. Two JSON documents in one stream is not JSON, and splicing
     /// one object into another's rendered text is a parser nobody wants to own.
     pub stats: Option<SceneStats>,
+    /// A failure with no place in the document, when one occurred.
+    ///
+    /// A malformed document, an unreadable source, or an unrecognized
+    /// extension is not a diagnostic *about a place in the document*, so it
+    /// cannot go in `errors` without the generator's tests reading it as a
+    /// located fault. It belongs here rather than being appended to the
+    /// rendered output for the reason `stats` gives above: text spliced after
+    /// a closed JSON object is not JSON.
+    pub failure: Option<ReportFailure>,
+}
+
+/// A failure that has no position within the document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReportFailure {
+    /// What kind of failure it was, as the text form prefixes it.
+    pub kind: SmolStr,
+    /// The failure's own message.
+    pub message: SmolStr,
 }
 
 impl Report {
@@ -56,7 +74,18 @@ impl Report {
             errors: Vec::new(),
             warnings: Vec::new(),
             stats: None,
+            failure: None,
         }
+    }
+
+    /// Records a failure that has no position within the document.
+    #[must_use]
+    pub fn with_failure(mut self, kind: impl Into<SmolStr>, message: impl Into<SmolStr>) -> Self {
+        self.failure = Some(ReportFailure {
+            kind: kind.into(),
+            message: message.into(),
+        });
+        self
     }
 
     /// Adds the fatal problems from a failed load.
@@ -130,6 +159,9 @@ impl core::fmt::Display for Report {
             writeln!(f)?;
             write!(f, "{stats}")?;
         }
+        if let Some(failure) = self.failure.as_ref() {
+            writeln!(f, "{}: {}", failure.kind, failure.message)?;
+        }
         Ok(())
     }
 }
@@ -192,6 +224,9 @@ struct ReportJson<'a> {
     errors: Vec<DiagnosticJson<'a>>,
     /// Advisory findings, in document order.
     warnings: Vec<DiagnosticJson<'a>>,
+    /// A failure with no place in the document, or `null` when there was
+    /// none. Always present, for the same reason `stats` is.
+    failure: Option<FailureJson<'a>>,
     /// Size and count measurements, or `null` when they were not asked for.
     ///
     /// Always present, never omitted. A consumer that must ask whether a key
@@ -209,6 +244,25 @@ impl<'a> From<&'a Report> for ReportJson<'a> {
             errors: report.errors.iter().map(DiagnosticJson::from).collect(),
             warnings: report.warnings.iter().map(DiagnosticJson::from).collect(),
             stats: report.stats.as_ref(),
+            failure: report.failure.as_ref().map(FailureJson::from),
+        }
+    }
+}
+
+/// The JSON shape of a failure with no place in the document.
+#[derive(Debug, Serialize)]
+struct FailureJson<'a> {
+    /// What kind of failure it was.
+    kind: &'a str,
+    /// The failure's own message.
+    message: &'a str,
+}
+
+impl<'a> From<&'a ReportFailure> for FailureJson<'a> {
+    fn from(failure: &'a ReportFailure) -> Self {
+        Self {
+            kind: &failure.kind,
+            message: &failure.message,
         }
     }
 }

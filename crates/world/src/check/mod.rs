@@ -156,21 +156,23 @@ fn failed(error: &SceneLoadError, path: &Utf8Path, root: &str, options: Options)
         // document.
         _ => ExitCode::SourceFailure,
     };
-    let mut outcome = render(&Report::new(path, root), options, code);
-    // Appended rather than folded into the report: neither is a diagnostic
-    // *about a place in the document*, and putting one in the `errors` array
-    // would have the generator's tests read it as a located document fault.
-    outcome.output.push_str(label(code));
-    outcome.output.push_str(&error.to_string());
-    outcome.output.push('\n');
-    outcome
+    // Folded into the report rather than appended to its rendered output.
+    // Neither is a diagnostic *about a place in the document*, so neither
+    // belongs in the `errors` array — but appending text after a rendered
+    // report puts a bare line after a closed JSON object under `--json`, and
+    // that is not JSON any consumer can parse.
+    render(
+        &Report::new(path, root).with_failure(label(code), error.to_string()),
+        options,
+        code,
+    )
 }
 
-/// The prefix that names what kind of failure follows.
+/// The name of the kind of failure a report carries.
 const fn label(code: ExitCode) -> &'static str {
     match code {
-        ExitCode::Invalid => "malformed document: ",
-        _ => "source failure: ",
+        ExitCode::Invalid => "malformed document",
+        _ => "source failure",
     }
 }
 
@@ -186,6 +188,22 @@ fn render(report: &Report, options: Options, code: ExitCode) -> Outcome {
     }
 }
 
+/// The tool-failure object, or a last-resort literal if even that will not
+/// encode.
+///
+/// The fallback cannot arise — the value is one string — but this crate does
+/// not use `expect`, and a panic here would replace a legible failure with a
+/// backtrace.
+fn encode_tool_error(message: &str) -> String {
+    serde_json::to_string_pretty(&serde_json::json!({ "tool_error": message })).map_or_else(
+        |_| String::from("{\n  \"tool_error\": \"unrenderable\"\n}\n"),
+        |mut json| {
+            json.push('\n');
+            json
+        },
+    )
+}
+
 /// A failure in this crate rather than a fault in the document.
 ///
 /// Reports [`ExitCode::SourceFailure`] rather than `Invalid`, because a report
@@ -195,7 +213,11 @@ fn render(report: &Report, options: Options, code: ExitCode) -> Outcome {
 fn tool_failure(message: &str, options: Options) -> Outcome {
     let output = match options.format {
         OutputFormat::Text => format!("scene-check failed: {message}\n"),
-        OutputFormat::Json => format!("{{\n  \"tool_error\": {message:?}\n}}\n"),
+        // Encoded rather than formatted with `{:?}`. Rust's `Debug` escaping
+        // for `str` and JSON's string escaping agree on the common cases and
+        // diverge on some control characters, so a message carrying one would
+        // render this published contract unparseable.
+        OutputFormat::Json => encode_tool_error(message),
     };
     Outcome {
         output,

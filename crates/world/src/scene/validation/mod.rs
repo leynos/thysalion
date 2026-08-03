@@ -36,7 +36,7 @@ pub use diagnostics::{
     SceneDiagnostic,
     VoxelSite,
 };
-pub use report::{Report, SceneStats, Strictness};
+pub use report::{Report, ReportFailure, SceneStats, Strictness};
 
 use crate::{
     grid::VoxelGrid,
