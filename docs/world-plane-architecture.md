@@ -271,10 +271,12 @@ unrecorded. This table is the countermeasure.
 
 What a future bump would mean:
 
-- **Minor** — a field added. The field carries `#[serde(default)]`, and a reader
-  supporting an older minor of the same major still loads the document.
-  Anticipated: phase 3's fog volume in the lighting section, and phase 4's
-  component vocabulary on spawns.
+- **Minor** — a field added. The field carries `#[serde(default)]`, so a reader
+  of a *newer* minor still loads an older document of the same major. The
+  reverse does not hold: every document type carries `deny_unknown_fields`, so a
+  reader that knows only 1.0 refuses a 1.1 document rather than ignoring the
+  field it does not recognize. Anticipated: phase 3's fog volume in the lighting
+  section, and phase 4's component vocabulary on spawns.
 - **Major** — a field removed, retyped, or re-meant; an enum variant renamed; a
   closed vocabulary widened. A reader of an older major refuses the document
   rather than misreading it.

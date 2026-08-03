@@ -1016,11 +1016,14 @@ travel with the C1 commit.
   `DocumentVersion { major, minor }` rather than one monotonic integer.
   Rationale: the plan originally chose a plain integer on the grounds that a
   file format has one axis of change. Implementing the compatibility rule
-  showed it has two, and they need different handling: a reader must *accept* a
-  document whose minor version it does not know, because an added optional
-  section is readable by an older build, while it must *refuse* an unknown
-  major. One integer cannot express "newer, but still readable", so a build
-  would have to reject every future document or accept all of them. ADR 006
+  showed it has two, and they need different handling. A reader accepts any
+  document at or below its own minor within the same major — that is
+  `document.minor <= self.minor` in `SUPPORTED_VERSION.accepts` — so a newer
+  build reads every older document. It refuses a *newer* minor, because every
+  document type carries `deny_unknown_fields` and a section added at 1.1 is an
+  unknown field to a build that knows only 1.0. A different major is refused
+  outright. One integer cannot express "same shape, fewer sections", so a build
+  would have to reject every unequal version or accept all of them. ADR 006
   records the accepted-range policy and `SUPPORTED_VERSION.accepts` implements
   it. Date/Author: 2026-08-03, during review of this plan.
 - Decision: `schemars` emits a JSON Schema for the document, committed to the

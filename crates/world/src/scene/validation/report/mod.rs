@@ -117,6 +117,9 @@ impl Report {
     /// locally is not blocked by one.
     #[must_use]
     pub const fn is_acceptable(&self, strictness: Strictness) -> bool {
+        if self.failure.is_some() {
+            return false;
+        }
         match strictness {
             Strictness::Lenient => self.errors.is_empty(),
             Strictness::Strict => self.errors.is_empty() && self.warnings.is_empty(),
@@ -240,7 +243,11 @@ impl<'a> From<&'a Report> for ReportJson<'a> {
         Self {
             document: report.document.as_str(),
             source_root: &report.root,
-            ok: report.errors.is_empty(),
+            // Both, not just `errors`. A failure with no diagnostics — an
+            // unreadable source, a malformed document — is a fatal problem by
+            // this type's own definition, and a consumer trusting `ok` would
+            // otherwise read one as a pass while the process exits non-zero.
+            ok: report.errors.is_empty() && report.failure.is_none(),
             errors: report.errors.iter().map(DiagnosticJson::from).collect(),
             warnings: report.warnings.iter().map(DiagnosticJson::from).collect(),
             stats: report.stats.as_ref(),

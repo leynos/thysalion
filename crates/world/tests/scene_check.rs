@@ -423,6 +423,9 @@ fn a_missing_document_still_renders_parseable_json() {
     };
     assert_eq!(failure.kind, "source failure");
     assert!(!failure.message.is_empty());
+    // The field a consumer branches on. A failure is a fatal problem, so `ok`
+    // must not say otherwise while the process exits non-zero.
+    assert!(!report.ok);
     // Not an error: an unreadable document has no place *within* a document,
     // and the generator's suite reads `errors` as located faults.
     assert!(report.errors.is_empty(), "{:?}", report.errors);
@@ -442,6 +445,7 @@ fn a_malformed_document_still_renders_parseable_json() {
         );
     };
     assert_eq!(failure.kind, "malformed document");
+    assert!(!report.ok);
 }
 
 #[test]
@@ -453,5 +457,7 @@ fn a_valid_scene_reports_no_failure() {
     // Present and null rather than absent, for the reason `stats` is: a
     // consumer that must test for a key's existence reads `undefined` as a
     // value one refactor later.
-    assert!(parse_report(&outcome.output).failure.is_none());
+    let report = parse_report(&outcome.output);
+    assert!(report.failure.is_none());
+    assert!(report.ok);
 }
