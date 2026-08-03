@@ -9,3 +9,6 @@ __pycache__/
 
 # Demo-harness screenshot captures (F12 in any demo binary).
 screenshots/
+
+# `make coverage` writes its lcov report here; CI reads it from the same path.
+lcov.info

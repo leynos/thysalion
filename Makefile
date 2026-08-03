@@ -8,6 +8,7 @@ TARGET ?= thysalion
 USER_WHITAKER := $(HOME)/.local/bin/whitaker
 USER_BIN_PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(HOME)/.bun/bin
 CARGO ?= cargo
+RUSTC ?= rustc
 BUILD_JOBS ?=
 RUST_FLAGS ?=
 RUST_FLAGS := -D warnings $(RUST_FLAGS)
@@ -26,6 +27,18 @@ TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
 COVERAGE_LINKER_FLAGS ?= -fuse-ld=lld
 COVERAGE_RUST_FLAGS ?= $(RUST_FLAGS) -C link-arg=$(COVERAGE_LINKER_FLAGS)
+# `.cargo/config.toml` picks Cranelift and mold for fast dev builds. Both are
+# wrong for coverage, and in different ways: rustc refuses
+# `-C instrument-coverage` outright under Cranelift, and mold does not carry
+# the instrumentation sections llvm-cov reads. `COVERAGE_RUST_FLAGS` already
+# displaces mold, because `RUSTFLAGS` replaces the config's target flags
+# wholesale; the two variables below displace Cranelift, which no rustflag can
+# reach. Overridable so a host with its own working toolchain can opt out.
+COVERAGE_CODEGEN_BACKEND ?= llvm
+# `-fuse-ld=lld` needs an `ld.lld` on PATH, which a host may not have even
+# with clang installed. The rustup toolchain always ships one, so fall back to
+# it rather than requiring a system lld just to run the gate locally.
+COVERAGE_LLD_DIR ?= $(shell $(RUSTC) --print sysroot)/lib/rustlib/$(shell $(RUSTC) -vV | sed -n 's/^host: //p')/bin/gcc-ld
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 TYPOS_VERSION ?= 1.48.0
@@ -54,7 +67,10 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 
 coverage: ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"
-	CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
+	PATH="$(COVERAGE_LLD_DIR):$$PATH" \
+		CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
+		CARGO_UNSTABLE_CODEGEN_BACKEND=true \
+		CARGO_PROFILE_DEV_CODEGEN_BACKEND=$(COVERAGE_CODEGEN_BACKEND) \
 		RUSTFLAGS="$(COVERAGE_RUST_FLAGS)" \
 		CFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \

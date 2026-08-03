@@ -24,6 +24,22 @@ Development builds use Cranelift for debug code generation. On Linux targets,
 quickly. Coverage generation uses `lld` because LLVM coverage tooling expects
 LLVM-compatible linker behaviour.
 
+Both of those defaults are wrong for coverage, and `make coverage` displaces
+each of them rather than expecting the developer to. `RUSTFLAGS` replaces the
+config's target flags wholesale, which is what takes `mold` out of the picture;
+`mold` cannot be used here because it does not carry the instrumentation
+sections `llvm-cov` reads. Cranelift is displaced separately, through
+`CARGO_PROFILE_DEV_CODEGEN_BACKEND`, because no rustflag can reach a profile
+setting and rustc refuses `-C instrument-coverage` under Cranelift outright.
+`CARGO_UNSTABLE_CODEGEN_BACKEND` accompanies it so that the throwaway project
+`trybuild` generates — which sits under `CARGO_TARGET_DIR` and so may never see
+this repository's `.cargo/config.toml` — accepts the same override.
+
+A system `lld` is therefore convenient but not required: `COVERAGE_LLD_DIR`
+falls back to the `ld.lld` every rustup toolchain ships. Set
+`COVERAGE_CODEGEN_BACKEND` or `COVERAGE_LLD_DIR` to opt out on a host whose own
+toolchain already works.
+
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
 
