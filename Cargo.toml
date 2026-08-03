@@ -38,7 +38,7 @@ bevy = { version = "0.19", default-features = false, features = [
   "ui_bevy_render",
   "png",
 ] }
-cap-std = { version = "3", features = ["fs_utf8"] }
+cap-std = { version = "4", features = ["fs_utf8"] }
 camino = "1"
 # Scene format (roadmap step 1.2). `schemars` is pinned exactly because its
 # emitted schema structure may change between versions without that being a
