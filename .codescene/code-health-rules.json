@@ -1,0 +1,15 @@
+{
+  "usage": "Overrides only. Every rule absent from this file keeps its CodeScene default, deliberately: a broad ruleset here would silence findings nobody has looked at. Each entry names one file, one rule, and the reason.",
+  "rule_sets": [
+    {
+      "matching_content_path": "crates/world/src/scene/validation/diagnostics.rs",
+      "matching_content_path_doc": "SceneDiagnostic::structural, ::positioned, and ::resource are reported as Code Duplication because they share a shape: take a code, take a location, take a detail, build a variant. They are not duplication in any sense a reader benefits from removing. Each builds a *different* enum variant carrying a different field set - positioned adds a VoxelSite, resource adds a Utf8PathBuf - and the only mechanical way to merge three variant constructors is a declarative macro, which would hide which variant a call site produces. Diagnostics are the part of this crate a contributor reads when something has gone wrong, so legibility at the call site is worth more than the point of code health this costs. Scoped to this one file and this one rule rather than to `**` so that genuine duplication elsewhere, including elsewhere in the validation module, still fails the gate. Reassess if a fourth diagnostic shape is added: four constructors sharing a shape may be a signal the shape itself wants a type. Recorded 2026-08-03 during review of pull request 9.",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
+    }
+  ]
+}

@@ -280,6 +280,14 @@ pub enum SceneDiagnostic {
 }
 
 impl SceneDiagnostic {
+    // CodeScene reports these three constructors as Code Duplication, and the
+    // finding is suppressed for this file in `.codescene/code-health-rules.json`
+    // rather than refactored away. They share a shape — code, location, detail,
+    // build a variant — but not a meaning: each builds a different variant with
+    // a different field set, and merging three variant constructors needs a
+    // macro that would hide which variant a call site produces. Diagnostics are
+    // what a contributor reads when something has gone wrong, so the call sites
+    // stay legible. A fourth shape sharing this one is worth reassessing.
     /// A structural diagnostic.
     #[must_use]
     pub fn structural(
