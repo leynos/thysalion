@@ -22,6 +22,7 @@ import json
 import sys
 import typing as typ
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -31,7 +32,7 @@ if typ.TYPE_CHECKING:
 SCRIPT = Path(__file__).resolve().parents[1] / "build_fixture_scenes.py"
 
 
-def _load_module():
+def _load_module() -> ModuleType:
     """Imports the generator by path.
 
     The script carries an inline ``uv`` metadata block and a hyphenated command
@@ -88,7 +89,11 @@ MINIMAL_LEGEND = '"." = "air"\n"#" = "stone"\n'
 def scene_source(tmp_path: Path):
     """Writes a minimal authoring source and returns a mutator for its layers."""
 
-    def build(layers: Mapping[str, str], scene: str = MINIMAL_SCENE, legend: str = MINIMAL_LEGEND):
+    def build(
+        layers: Mapping[str, str],
+        scene: str = MINIMAL_SCENE,
+        legend: str = MINIMAL_LEGEND,
+    ) -> Path:
         source = tmp_path / "test"
         (source / "layers").mkdir(parents=True, exist_ok=True)
         (source / "scene.toml").write_text(scene, encoding="utf-8")

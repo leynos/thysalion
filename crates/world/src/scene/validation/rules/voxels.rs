@@ -21,6 +21,7 @@ use smol_str::SmolStr;
 use crate::{
     grid::{
         ChunkCoord,
+        ChunkInsertError,
         VoxelGrid,
         VoxelIndex,
         VoxelPos,
@@ -203,20 +204,28 @@ impl ChunkContext<'_> {
 
     /// Installs a decoded chunk, reporting a length the grid refuses.
     fn install(&self, grid: &mut VoxelGrid, chunk: Decoded, problems: &mut Vec<SceneDiagnostic>) {
-        match chunk {
+        let outcome = match chunk {
             Decoded::Uniform(index) => grid.insert_uniform(self.coord, index),
-            Decoded::Dense(voxels) => {
-                if let Err(rejected) = grid.insert_dense(self.coord, voxels) {
-                    problems.push(self.structural(
-                        DiagnosticCode::RunLengthMismatch,
-                        format!(
-                            "decoded {} voxels, but a chunk holds {}",
-                            rejected.len(),
-                            self.geometry.chunk_size.volume()
-                        ),
-                    ));
-                }
+            Decoded::Dense(voxels) => grid.insert_dense(self.coord, voxels),
+        };
+        let Err(refusal) = outcome else {
+            return;
+        };
+        match refusal {
+            ChunkInsertError::WrongLength { expected, found } => {
+                problems.push(self.structural(
+                    DiagnosticCode::RunLengthMismatch,
+                    format!("decoded {found} voxels, but a chunk holds {expected}"),
+                ));
             }
+            // Deliberately unreported. `check_placement` has already refused
+            // this chunk and owns the class; reporting the grid's refusal too
+            // gives one authoring mistake two diagnostics, which is exactly
+            // what the exactly-one-problem assertion over the corrupt fixtures
+            // exists to catch — and did catch, when this arm first reported.
+            // The grid still refuses the chunk, so the invalid state cannot
+            // reach `to_chunks` whether or not a rule speaks up.
+            ChunkInsertError::OutwithExtent { .. } => {}
         }
     }
 

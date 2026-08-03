@@ -22,7 +22,7 @@ use camino::Utf8PathBuf;
 use serde::Deserialize;
 use thysalion_world::{
     codec::{Encoding, decode_document, encode_document},
-    loader::SceneLoader,
+    loader::{LoadedScene, SceneLoader},
     scene::{Scene, validation::Strictness},
     source::DirSceneSource,
 };
@@ -39,11 +39,22 @@ use scenes_support::{FIXTURE_NAMES as FIXTURES, SCENES, scene_dir as scenes};
 /// Panics with the diagnostic report when the fixture does not load, because a
 /// committed fixture that fails validation is the single most useful failure
 /// this suite can produce and `assert!(result.is_ok())` is not it.
-fn load(name: &str) -> Scene {
+fn load(name: &str) -> Scene { loaded(name).1.scene }
+
+/// Loads a committed fixture, keeping the warnings and the path the strict
+/// check needs alongside the scene.
+///
+/// One constructor for both callers: rebuilding the loader inline in each is
+/// two chances for them to disagree about which source the fixtures come from.
+///
+/// # Panics
+///
+/// Panics with the diagnostic report when the fixture does not load.
+fn loaded(name: &str) -> (Utf8PathBuf, LoadedScene) {
     let loader = SceneLoader::new(Arc::new(DirSceneSource::new(scenes(), SCENES)));
     let path = Utf8PathBuf::from(format!("{name}.scene.json"));
     match loader.load(&path) {
-        Ok(found) => found.scene,
+        Ok(found) => (path, found),
         Err(error) => panic!("{name} must load: {error}\n{:#?}", error.diagnostics()),
     }
 }
@@ -78,12 +89,8 @@ fn every_fixture_is_strict_clean() {
     // wall must not reach the repository. These are the scenes every later
     // phase renders, lights, simulates, and tests against; a warning in one is
     // a warning every phase inherits.
-    let loader = SceneLoader::new(Arc::new(DirSceneSource::new(scenes(), SCENES)));
     for name in FIXTURES {
-        let path = Utf8PathBuf::from(format!("{name}.scene.json"));
-        let Ok(checked) = loader.load(&path) else {
-            panic!("{name} must load");
-        };
+        let (path, checked) = loaded(name);
         let report = thysalion_world::scene::validation::Report::new(&path, SCENES)
             .with_warnings(&checked.warnings);
         assert!(

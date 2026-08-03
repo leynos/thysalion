@@ -100,6 +100,35 @@ pub struct VoxelGrid {
     chunks: BTreeMap<ChunkCoord, ChunkStore>,
 }
 
+/// Why a chunk could not be installed in a grid.
+///
+/// Both cases would otherwise produce a grid whose `to_chunks` serializes a
+/// document the validator refuses — an invalid state reachable through a safe
+/// public API, which is the thing the two-stage document/domain split exists to
+/// prevent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum ChunkInsertError {
+    /// The coordinate lies outwith the grid's chunk extent.
+    #[error("chunk ({x}, {y}, {z}) lies outwith the grid")]
+    OutwithExtent {
+        /// Chunk index along the `x` axis.
+        x: u32,
+        /// Chunk index along the `y` axis.
+        y: u32,
+        /// Chunk index along the `z` axis.
+        z: u32,
+    },
+    /// A dense chunk was not exactly one chunk volume.
+    #[error("a dense chunk holds {expected} voxels, not {found}")]
+    WrongLength {
+        /// How many voxels one chunk holds.
+        expected: u64,
+        /// How many the caller supplied.
+        found: usize,
+    },
+}
+
 impl VoxelGrid {
     /// An entirely empty grid of the given bounds.
     #[must_use]
@@ -160,25 +189,61 @@ impl VoxelGrid {
             .sum()
     }
 
+    /// Whether `at` names a chunk this grid's extent contains.
+    const fn contains_chunk(&self, at: ChunkCoord) -> bool {
+        let (x, y, z) = self.extent.in_chunks(self.chunk_size);
+        at.x < x && at.y < y && at.z < z
+    }
+
     /// Inserts a uniform chunk, replacing whatever was there.
-    pub fn insert_uniform(&mut self, at: ChunkCoord, index: VoxelIndex) {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ChunkInsertError::OutwithExtent`] when `at` lies outwith the
+    /// grid. A grid that accepted one would serialize it through `to_chunks`,
+    /// producing a document whose own validator refuses it.
+    pub fn insert_uniform(
+        &mut self,
+        at: ChunkCoord,
+        index: VoxelIndex,
+    ) -> Result<(), ChunkInsertError> {
+        if !self.contains_chunk(at) {
+            return Err(ChunkInsertError::OutwithExtent {
+                x: at.x,
+                y: at.y,
+                z: at.z,
+            });
+        }
         self.chunks.insert(at, ChunkStore::Uniform(index));
+        Ok(())
     }
 
     /// Inserts a dense chunk, replacing whatever was there.
     ///
     /// # Errors
     ///
-    /// Returns the supplied vector unchanged when its length is not exactly
+    /// Returns [`ChunkInsertError::WrongLength`] when `voxels` is not exactly
     /// one chunk volume, so a caller cannot install a short chunk that would
-    /// read as air past its end.
+    /// read as air past its end, and
+    /// [`ChunkInsertError::OutwithExtent`] when `at` lies outwith the grid.
     pub fn insert_dense(
         &mut self,
         at: ChunkCoord,
         voxels: Vec<VoxelIndex>,
-    ) -> Result<(), Vec<VoxelIndex>> {
-        if u64::try_from(voxels.len()) != Ok(self.chunk_size.volume()) {
-            return Err(voxels);
+    ) -> Result<(), ChunkInsertError> {
+        if !self.contains_chunk(at) {
+            return Err(ChunkInsertError::OutwithExtent {
+                x: at.x,
+                y: at.y,
+                z: at.z,
+            });
+        }
+        let expected = self.chunk_size.volume();
+        if u64::try_from(voxels.len()) != Ok(expected) {
+            return Err(ChunkInsertError::WrongLength {
+                expected,
+                found: voxels.len(),
+            });
         }
         self.chunks
             .insert(at, ChunkStore::Dense(voxels.into_boxed_slice()));

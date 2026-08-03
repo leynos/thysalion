@@ -148,20 +148,25 @@ fn given_obstructed_spawn(#[from(rstest_bdd_harness_context)] session: &mut Load
     session.document = Some(with_obstructed_spawn());
 }
 
-#[when("the scene is loaded")]
-fn when_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+/// Loads as JSON and keeps the scene for a later comparison.
+///
+/// Shared by the two `When` steps that need it, so the round-trip's reference
+/// side cannot drift from the plain load it is compared against.
+fn load_json_and_keep(session: &mut LoaderSession) {
     session.load(Encoding::Json);
     if let Some(Ok(loaded)) = session.outcome.as_ref() {
         session.from_json = Some(loaded.scene.clone());
     }
 }
 
+#[when("the scene is loaded")]
+fn when_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+    load_json_and_keep(session);
+}
+
 #[when("the document is re-encoded as MessagePack and loaded")]
 fn when_loaded_as_msgpack(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    session.load(Encoding::Json);
-    if let Some(Ok(loaded)) = session.outcome.as_ref() {
-        session.from_json = Some(loaded.scene.clone());
-    }
+    load_json_and_keep(session);
     session.load(Encoding::MessagePack);
 }
 

@@ -144,7 +144,8 @@ fn an_all_air_chunk_is_omitted_entirely() {
     let size = SMALL_CHUNK;
     let extent = Extent::new(4, 4, 4, size).expect("aligned");
     let mut grid = VoxelGrid::empty(extent, size);
-    grid.insert_uniform(ChunkCoord::new(0, 0, 0), VoxelIndex::AIR);
+    grid.insert_uniform(ChunkCoord::new(0, 0, 0), VoxelIndex::AIR)
+        .expect("the origin chunk is within a 4x4x4 extent");
     assert!(
         grid.to_chunks().is_empty(),
         "an absent chunk already means air"
@@ -221,4 +222,30 @@ proptest! {
         let twice = collapse(&expand(&once, 64).expect("expand"));
         prop_assert_eq!(once, twice);
     }
+}
+
+#[rstest]
+fn a_chunk_outwith_the_extent_is_refused_by_both_mutators() {
+    // Without this the grid would serialize, through `to_chunks`, a document
+    // its own validator refuses — an invalid state reachable through a safe
+    // public API, which is what the document/domain split exists to prevent.
+    let size = SMALL_CHUNK;
+    let extent = Extent::new(4, 4, 4, size).expect("aligned");
+    let mut grid = VoxelGrid::empty(extent, size);
+    let volume = usize::try_from(size.volume()).expect("small");
+    let outwith = ChunkCoord::new(99, 0, 0);
+
+    assert!(
+        grid.insert_uniform(outwith, VoxelIndex::new(1)).is_err(),
+        "a uniform chunk outwith the extent must be refused"
+    );
+    assert!(
+        grid.insert_dense(outwith, vec![VoxelIndex::new(1); volume])
+            .is_err(),
+        "a dense chunk outwith the extent must be refused"
+    );
+    assert!(
+        grid.to_chunks().is_empty(),
+        "nothing refused may reach the serialized form"
+    );
 }

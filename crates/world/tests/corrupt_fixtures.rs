@@ -31,89 +31,14 @@ use thysalion_world::{
 /// Where the corrupt fixtures live, relative to the crate root.
 const FIXTURES: &str = "tests/fixtures/corrupt";
 
-/// Every fixture, and the diagnostic code it must produce.
-///
-/// `None` means the document does not parse at all, so there is no document to
-/// locate a fault within and the report carries a `serde` path instead of a
-/// code. Both such fixtures still fail as *invalid* rather than as unreadable:
-/// the bytes were read perfectly well.
-const CLASSES: &[(&str, Option<&str>)] = &[
-    // Header phase: refused before anything sizes an allocation.
-    ("unsupported-version", Some("scene.version.unsupported")),
-    ("chunk-size-not-design", Some("scene.chunk-size.not-design")),
-    ("zero-dimension", Some("scene.dimensions.zero")),
-    ("unaligned-dimensions", Some("scene.dimensions.unaligned")),
-    ("dimensions-overflow", Some("scene.dimensions.overflow")),
-    // Palette coherence.
-    ("empty-palette", Some("scene.palette.empty")),
-    ("palette-zero-not-air", Some("scene.palette.zero-not-air")),
-    (
-        "duplicate-voxel-type-name",
-        Some("scene.palette.duplicate-name"),
-    ),
-    (
-        "emission-out-of-range",
-        Some("scene.palette.emission-out-of-range"),
-    ),
-    ("concept-iri-invalid", Some("scene.concept.invalid")),
-    // The voxel payload.
-    (
-        "chunk-outwith-extent",
-        Some("scene.voxels.chunk-outwith-extent"),
-    ),
-    ("duplicate-chunk", Some("scene.voxels.duplicate-chunk")),
-    (
-        "chunks-out-of-order",
-        Some("scene.voxels.chunks-out-of-order"),
-    ),
-    (
-        "unknown-palette-index",
-        Some("scene.voxels.unknown-palette-index"),
-    ),
-    ("zero-length-run", Some("scene.voxels.zero-length-run")),
-    (
-        "adjacent-duplicate-runs",
-        Some("scene.voxels.adjacent-duplicate-runs"),
-    ),
-    (
-        "run-length-mismatch",
-        Some("scene.voxels.run-length-mismatch"),
-    ),
-    // Entities and their prototype chains.
-    (
-        "spawn-outwith-grid",
-        Some("scene.entities.spawn-outwith-grid"),
-    ),
-    (
-        "duplicate-spawn-name",
-        Some("scene.entities.duplicate-spawn-name"),
-    ),
-    (
-        "unknown-prototype",
-        Some("scene.entities.unknown-prototype"),
-    ),
-    ("prototype-cycle", Some("scene.entities.prototype-cycle")),
-    (
-        "prototype-too-deep",
-        Some("scene.entities.prototype-too-deep"),
-    ),
-    // Knowledge resources.
-    ("graph-iri-invalid", Some("scene.knowledge.graph-invalid")),
-    ("resource-absent", Some("scene.knowledge.resource-absent")),
-    (
-        "resource-unsafe-path",
-        Some("scene.knowledge.resource-unsafe-path"),
-    ),
-    // Documents that do not parse.
-    ("unknown-document-field", None),
-    ("truncated-json", None),
-];
+// The tables are inline data, not test logic, and this file is over the
+// 400-line cap without them. Declared by path rather than through
+// `support/mod.rs` for the reason that file gives: each integration test is its
+// own crate, so a helper reachable but unused is dead code under `-D warnings`.
+#[path = "support/corrupt_classes.rs"]
+mod corrupt_classes;
 
-/// The two advisory classes, which load and are refused only by `--strict`.
-const WARNINGS: &[(&str, &str)] = &[
-    ("spawn-obstructed", "scene.entities.spawn-obstructed"),
-    ("spawn-unsupported", "scene.entities.spawn-unsupported"),
-];
+use corrupt_classes::{CLASSES, WARNINGS};
 
 /// Opens the fixture directory as a capability, per AGENTS.md's filesystem
 /// policy. Ambient authority is taken once, here.
