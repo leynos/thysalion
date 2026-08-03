@@ -168,16 +168,25 @@ def parse_quantity(raw: object, unit: str, scale: int, where: str) -> int:
     """
     if isinstance(raw, int) and not isinstance(raw, bool):
         return raw
+    return round(parse_unit_suffixed(raw, unit, where) * scale)
+
+
+def parse_unit_suffixed(raw: object, unit: str, where: str) -> float:
+    """The numeric part of an authored quantity such as ``"17.45deg"``.
+
+    Separated from the scaling so that neither half has to carry the other's
+    branches: this one is entirely about refusing what an author might type,
+    and `parse_quantity` is entirely about what the document stores.
+    """
     if not isinstance(raw, str):
         raise SourceError(f"{where}: expected an integer or a string like '1.5{unit}'")
     text = raw.strip()
     if not text.endswith(unit):
         raise SourceError(f"{where}: {raw!r} does not end in {unit!r}")
     try:
-        value = float(text[: -len(unit)])
+        return float(text[: -len(unit)])
     except ValueError as error:
         raise SourceError(f"{where}: {raw!r} is not a number followed by {unit!r}") from error
-    return round(value * scale)
 
 
 def parse_legend(path: Path) -> dict[str, str]:
