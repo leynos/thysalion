@@ -69,14 +69,17 @@ scenes all later spikes and CI suites consume. See thysalion-design.md §7.
     and leave no scene state behind.
 - [x] 1.2.3. Author the fixture scenes used by all later phases.
   - Requires 1.2.2.
-  - A keep interior, a market-town block, and a swamp fragment, sized per
-    the scene classes and matching the reference art's palette bands.
-  - Four shipped, not three. `bare-cell` was added during the work because
-    the other three all derive from design §7.1's Table 1, so whatever they
-    happened to share would have become an unstated engine assumption that
-    surfaced at phase 6 or 9. It carries as little as the format permits:
-    one chunk, two palette entries, no entities, no ambient bands, no
-    knowledge resources.
+  - Four scenes shipped, not the three this task named:
+    `keep-interior`, `market-town-block`, `swamp-fragment`, and
+    `bare-cell`. The first three are sized per the scene classes and match
+    the reference art's palette bands.
+  - `bare-cell` was added during the work. The other three all derive from
+    design §7.1's Table 1, so anything they happened to share would have
+    hardened into an unstated engine assumption. That assumption would have
+    surfaced at phase 6 or 9, when the first scene drawn from outwith that
+    table appeared. `bare-cell` therefore carries as little as the format
+    permits: one chunk, two palette entries, no entities, no ambient bands,
+    and no knowledge resources.
   - See thysalion-design.md §7.1 and §1.
   - Success: all four load through the validator; each is referenced by
     at least one demo or CI suite by the end of phase 6.
@@ -205,7 +208,11 @@ thysalion-design.md §9.2 and §14 (I4).
   - Day/night scaling of the sky channel; `max(sky × day, block)`
     composition.
   - Success: dawn-to-night scrubbing in `demo-light-field` reproduces the
-    style guide's time-of-day strip across all four fixtures.
+    style guide's time-of-day strip across the three fixtures that author
+    ambient bands. `bare-cell` is exempt and must stay so: design §9.4
+    interpolates the time-of-day moods across a scene's authored bands, and
+    that fixture deliberately declares none, which is what makes it the one
+    scene proving the section is optional.
 
 ### 3.3. Deliver atmosphere and wetness
 
