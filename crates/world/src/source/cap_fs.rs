@@ -10,7 +10,7 @@ use camino::Utf8Path;
 use cap_std::fs_utf8::Dir;
 use smol_str::SmolStr;
 
-use super::{SceneSource, SceneSourceError, check_resource_path};
+use super::{MAX_RESOURCE_BYTES, SceneSource, SceneSourceError, check_resource_path};
 
 /// A source backed by a capability-scoped directory.
 #[derive(Debug)]
@@ -42,6 +42,19 @@ impl DirSceneSource {
 impl SceneSource for DirSceneSource {
     fn read(&self, path: &Utf8Path) -> Result<Vec<u8>, SceneSourceError> {
         check_resource_path(path)?;
+        // Sized before it is read. `Dir::read` allocates the whole file, and
+        // validation discards the bytes once it knows the resource resolves.
+        // Zero when the metadata cannot be read: the `read` below then reports
+        // the real failure — absent, or unreadable — rather than this check
+        // guessing at a size it does not have.
+        let size = self.root.metadata(path).map_or(0, |found| found.len());
+        if size > MAX_RESOURCE_BYTES {
+            return Err(SceneSourceError::TooLarge {
+                path: path.to_owned(),
+                size,
+                limit: MAX_RESOURCE_BYTES,
+            });
+        }
         self.root.read(path).map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {
                 SceneSourceError::NotFound(path.to_owned())

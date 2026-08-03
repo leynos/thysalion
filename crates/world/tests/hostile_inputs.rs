@@ -25,6 +25,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use thysalion_world::{
     codec::{Encoding, encode_document},
     loader::{SceneLoadError, SceneLoader},
@@ -39,7 +40,13 @@ use thysalion_world::{
         },
         validation::{Bounds, DiagnosticCode},
     },
-    source::MemorySceneSource,
+    source::{
+        DirSceneSource,
+        MAX_RESOURCE_BYTES,
+        MemorySceneSource,
+        SceneSource as _,
+        SceneSourceError,
+    },
 };
 
 mod support;
@@ -450,4 +457,41 @@ fn a_second_document_appended_to_the_first_is_refused() {
             "{encoding}: got {message}"
         );
     }
+}
+
+#[test]
+fn a_knowledge_resource_above_the_bound_is_refused_before_it_is_read() {
+    // Validation reads each declared resource only to decide whether it
+    // resolves, and discards the bytes. Without a bound, a scene naming one
+    // enormous file inside its own root buys an allocation proportional to that
+    // file for a result nobody consumes.
+    //
+    // Written through `cap_std` rather than `std::fs`, which the workspace
+    // lints forbid: the point of the capability policy is that a reader sees
+    // every filesystem surface a module touches, and a test is not exempt.
+    // `CARGO_TARGET_TMPDIR` rather than a `tempfile` dependency, because the
+    // plan treats a new dependency as an escalation and Cargo already hands
+    // every integration test a scratch directory.
+    let scratch = camino::Utf8PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    let Ok(parent) = Dir::open_ambient_dir(&scratch, ambient_authority()) else {
+        panic!("the cargo scratch directory must be openable");
+    };
+    if parent.open_dir("resource-bound").is_err() {
+        parent
+            .create_dir("resource-bound")
+            .expect("the scratch subdirectory must be creatable");
+    }
+    let Ok(root) = parent.open_dir("resource-bound") else {
+        panic!("the scratch subdirectory must be openable");
+    };
+    let bytes = vec![b'#'; usize::try_from(MAX_RESOURCE_BYTES).unwrap_or(usize::MAX) + 1];
+    root.write("big.trig", &bytes)
+        .expect("the oversized resource must be writable");
+
+    let source = DirSceneSource::new(root, "resource-bound");
+    let outcome = source.read(camino::Utf8Path::new("big.trig"));
+    assert!(
+        matches!(outcome, Err(SceneSourceError::TooLarge { .. })),
+        "an oversized resource must be refused by size, got {outcome:?}"
+    );
 }

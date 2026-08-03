@@ -39,6 +39,22 @@ pub enum SceneSourceError {
     /// directory, which must never be reported as a missing resource.
     #[error("source root unavailable: {0}")]
     RootUnavailable(SmolStr),
+    /// The resource is larger than a source will read into memory.
+    ///
+    /// A bound rather than a best effort: `rules::resources::check` reads every
+    /// declared resource only to classify whether it is reachable, and then
+    /// discards the bytes. Without a ceiling, a scene naming one enormous file
+    /// inside its own root causes an allocation proportional to that file for
+    /// no result anybody uses.
+    #[error("{path} is {size} bytes, above the {limit}-byte resource bound")]
+    TooLarge {
+        /// The resource that was refused.
+        path: Utf8PathBuf,
+        /// Its size on disk, in bytes.
+        size: u64,
+        /// The bound it exceeded.
+        limit: u64,
+    },
     /// The path escapes the scene's directory, or is absolute.
     #[error("unsafe resource path {path}: {reason}")]
     UnsafePath {
@@ -48,6 +64,14 @@ pub enum SceneSourceError {
         reason: SmolStr,
     },
 }
+
+/// The largest knowledge resource any adapter will read into memory.
+///
+/// Eight mebibytes: comfortably above every TriG file the fixtures ship and far
+/// below anything that would trouble a machine running the engine. The bound
+/// exists because validation reads each declared resource only to decide
+/// whether it resolves, so an unbounded read is an allocation nothing consumes.
+pub const MAX_RESOURCE_BYTES: u64 = 8 * 1024 * 1024;
 
 /// Resolves scene-relative resource paths to bytes.
 ///

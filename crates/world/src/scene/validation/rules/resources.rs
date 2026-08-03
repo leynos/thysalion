@@ -54,8 +54,12 @@ const fn classify(error: &SceneSourceError) -> DiagnosticCode {
     match error {
         SceneSourceError::NotFound(_) => DiagnosticCode::KnowledgeResourceAbsent,
         SceneSourceError::UnsafePath { .. } => DiagnosticCode::KnowledgeResourceUnsafePath,
-        SceneSourceError::Unreadable { .. } | SceneSourceError::RootUnavailable(_) => {
-            DiagnosticCode::KnowledgeResourceUnreadable
-        }
+        // A resource above the bound is unreadable *by this build*, which is
+        // the same thing a reader can act on: the file is there and the engine
+        // will not take it. It is not absent, and saying so would send an
+        // author looking for a file that exists.
+        SceneSourceError::Unreadable { .. }
+        | SceneSourceError::RootUnavailable(_)
+        | SceneSourceError::TooLarge { .. } => DiagnosticCode::KnowledgeResourceUnreadable,
     }
 }
