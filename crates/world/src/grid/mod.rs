@@ -131,13 +131,32 @@ pub enum ChunkInsertError {
 
 impl VoxelGrid {
     /// An entirely empty grid of the given bounds.
-    #[must_use]
-    pub const fn empty(extent: Extent, chunk_size: ChunkSize) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExtentError::Unaligned`] when `extent` is not a whole number
+    /// of `chunk_size` chunks on every axis. `Extent::new` checks alignment
+    /// against the chunk size it was given, but nothing tied that chunk size to
+    /// this one: an extent of 32³ paired with a chunk size of 64 produced a
+    /// grid whose `contains` accepted the origin while `contains_chunk`
+    /// computed zero chunks and refused it. Two disagreeing notions of the same
+    /// geometry is not a state this type should be constructible in.
+    pub fn empty(extent: Extent, chunk_size: ChunkSize) -> Result<Self, ExtentError> {
+        let size = chunk_size.get();
+        for (length, axis) in [(extent.x(), 'x'), (extent.y(), 'y'), (extent.z(), 'z')] {
+            if !length.is_multiple_of(size) {
+                return Err(ExtentError::Unaligned {
+                    axis,
+                    length,
+                    chunk_size: size,
+                });
+            }
+        }
+        Ok(Self {
             extent,
             chunk_size,
             chunks: BTreeMap::new(),
-        }
+        })
     }
 
     /// The scene's bounds, in voxels.

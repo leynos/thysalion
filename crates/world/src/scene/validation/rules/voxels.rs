@@ -54,7 +54,18 @@ pub fn decode(
     palette: &Palette,
 ) -> Result<VoxelGrid, Vec<SceneDiagnostic>> {
     let mut problems = Vec::new();
-    let mut grid = VoxelGrid::empty(geometry.extent, geometry.chunk_size);
+    // Phase one produced both halves of this geometry from the same document
+    // and checked their alignment, so a disagreement here is impossible rather
+    // than merely unlikely — but the grid is the authority on its own
+    // invariant, and a rule that assumed instead of asking would be the place a
+    // later reordering broke silently.
+    let Ok(mut grid) = VoxelGrid::empty(geometry.extent, geometry.chunk_size) else {
+        return Err(vec![SceneDiagnostic::structural(
+            DiagnosticCode::DimensionsUnaligned,
+            DocumentLocation::section(DocumentSection::Dimensions),
+            "the extent is not a whole number of chunks",
+        )]);
+    };
     let mut seen: BTreeSet<ChunkCoord> = BTreeSet::new();
     let mut previous: Option<ChunkCoord> = None;
 

@@ -128,7 +128,7 @@ fn a_single_valued_dense_chunk_is_elided_to_a_uniform_payload() {
     // world must encode identically or their content hashes disagree.
     let size = SMALL_CHUNK;
     let extent = Extent::new(4, 4, 4, size).expect("aligned");
-    let mut grid = VoxelGrid::empty(extent, size);
+    let mut grid = VoxelGrid::empty(extent, size).expect("the extent is chunk-aligned");
     let volume = usize::try_from(size.volume()).expect("small");
     grid.insert_dense(ChunkCoord::new(0, 0, 0), vec![VoxelIndex::new(2); volume])
         .expect("one chunk volume");
@@ -143,7 +143,7 @@ fn a_single_valued_dense_chunk_is_elided_to_a_uniform_payload() {
 fn an_all_air_chunk_is_omitted_entirely() {
     let size = SMALL_CHUNK;
     let extent = Extent::new(4, 4, 4, size).expect("aligned");
-    let mut grid = VoxelGrid::empty(extent, size);
+    let mut grid = VoxelGrid::empty(extent, size).expect("the extent is chunk-aligned");
     grid.insert_uniform(ChunkCoord::new(0, 0, 0), VoxelIndex::AIR)
         .expect("the origin chunk is within a 4x4x4 extent");
     assert!(
@@ -156,7 +156,7 @@ fn an_all_air_chunk_is_omitted_entirely() {
 fn a_short_dense_chunk_is_refused() {
     let size = SMALL_CHUNK;
     let extent = Extent::new(4, 4, 4, size).expect("aligned");
-    let mut grid = VoxelGrid::empty(extent, size);
+    let mut grid = VoxelGrid::empty(extent, size).expect("the extent is chunk-aligned");
     let too_short = vec![VoxelIndex::new(1); 3];
     assert!(
         grid.insert_dense(ChunkCoord::new(0, 0, 0), too_short)
@@ -169,7 +169,7 @@ fn a_short_dense_chunk_is_refused() {
 fn a_position_outwith_the_extent_is_none_and_an_empty_chunk_is_air() {
     let size = SMALL_CHUNK;
     let extent = Extent::new(4, 4, 4, size).expect("aligned");
-    let grid = VoxelGrid::empty(extent, size);
+    let grid = VoxelGrid::empty(extent, size).expect("the extent is chunk-aligned");
     assert_eq!(grid.get(VoxelPos::new(0, 0, 0)), Some(VoxelIndex::AIR));
     assert_eq!(
         grid.get(VoxelPos::new(4, 0, 0)),
@@ -231,7 +231,7 @@ fn a_chunk_outwith_the_extent_is_refused_by_both_mutators() {
     // public API, which is what the document/domain split exists to prevent.
     let size = SMALL_CHUNK;
     let extent = Extent::new(4, 4, 4, size).expect("aligned");
-    let mut grid = VoxelGrid::empty(extent, size);
+    let mut grid = VoxelGrid::empty(extent, size).expect("the extent is chunk-aligned");
     let volume = usize::try_from(size.volume()).expect("small");
     let outwith = ChunkCoord::new(99, 0, 0);
 
@@ -247,5 +247,26 @@ fn a_chunk_outwith_the_extent_is_refused_by_both_mutators() {
     assert!(
         grid.to_chunks().is_empty(),
         "nothing refused may reach the serialized form"
+    );
+}
+
+#[rstest]
+fn a_grid_whose_extent_and_chunk_size_disagree_is_refused() {
+    // `Extent::new` checks alignment against the chunk size it is handed, but
+    // nothing tied that chunk size to the one `VoxelGrid::empty` is given. A
+    // 32-cube extent with a 64-voxel chunk produced a grid whose `contains`
+    // accepted the origin while `contains_chunk` computed zero chunks and
+    // refused it — two disagreeing notions of one geometry, inside a single
+    // value.
+    let small = ChunkSize::new(32).expect("32 is a valid chunk size");
+    let large = ChunkSize::new(64).expect("64 is a valid chunk size");
+    let extent = Extent::new(32, 32, 32, small).expect("aligned to 32");
+    assert!(
+        VoxelGrid::empty(extent, large).is_err(),
+        "an extent that is not a whole number of the grid's chunks must be refused"
+    );
+    assert!(
+        VoxelGrid::empty(extent, small).is_ok(),
+        "the chunk size it was aligned against must still be accepted"
     );
 }
