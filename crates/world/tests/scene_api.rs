@@ -71,18 +71,27 @@ fn validate(document: &SceneDocument) -> Result<(), Vec<SceneDiagnostic>> {
     thysalion_world::scene::validation::validate(document, &source(), &policy).map(|_| ())
 }
 
-#[test]
-fn a_parsed_identifier_exposes_its_parts() {
+/// Parses `raw` against the project namespaces, or fails the test.
+fn parsed(raw: &str) -> ConceptIri {
     let table = NamespaceTable::default();
-    let Ok(iri) = ConceptIri::parse("thy:OakDoor", &table) else {
-        panic!("`thy:OakDoor` must parse against the project namespaces");
-    };
-    assert_eq!(iri.as_str(), "thy:OakDoor");
-    assert_eq!(iri.prefix(), "thy");
-    assert_eq!(iri.local(), "OakDoor");
-    // `Display` is what a diagnostic interpolates, so it must not gain quoting
-    // or a prefix expansion that the wire form does not carry.
-    assert_eq!(iri.to_string(), "thy:OakDoor");
+    match ConceptIri::parse(raw, &table) {
+        Ok(iri) => iri,
+        Err(problem) => panic!("{raw} must parse against the project namespaces: {problem}"),
+    }
+}
+
+#[rstest]
+#[case::prefix("thy", |iri: &ConceptIri| iri.prefix().to_owned())]
+#[case::local("OakDoor", |iri: &ConceptIri| iri.local().to_owned())]
+#[case::whole("thy:OakDoor", |iri: &ConceptIri| iri.as_str().to_owned())]
+// `Display` is what a diagnostic interpolates, so it must not gain quoting or a
+// prefix expansion that the wire form does not carry.
+#[case::displayed("thy:OakDoor", |iri: &ConceptIri| iri.to_string())]
+fn a_parsed_identifier_exposes_its_parts(
+    #[case] expected: &str,
+    #[case] read: fn(&ConceptIri) -> String,
+) {
+    assert_eq!(read(&parsed("thy:OakDoor")), expected);
 }
 
 #[rstest]
@@ -112,11 +121,20 @@ fn an_unpublished_prefix_is_rejected_by_name() {
 }
 
 #[test]
-fn the_project_table_publishes_both_namespaces() {
+fn the_project_table_expands_the_prefixes_it_publishes() {
     let table = NamespaceTable::default();
     assert!(table.contains(THYSALION_PREFIX));
     assert_eq!(table.base(THYSALION_PREFIX), Some(THYSALION_BASE));
-    assert_eq!(table.base("zzz"), None);
+}
+
+#[test]
+fn the_project_table_has_no_base_for_an_unpublished_prefix() {
+    assert_eq!(NamespaceTable::default().base("zzz"), None);
+}
+
+#[test]
+fn the_project_table_lists_its_prefixes_in_sorted_order() {
+    let table = NamespaceTable::default();
     let prefixes: Vec<&str> = table.prefixes().collect();
     // Sorted, because the table is a `BTreeMap` and a report that lists the
     // permitted prefixes must not reorder between runs.
@@ -142,12 +160,16 @@ fn an_encoding_is_inferred_from_the_extension(
     assert_eq!(Encoding::from_path(Utf8Path::new(path)), expected);
 }
 
-#[test]
-fn each_encoding_names_itself() {
-    assert_eq!(Encoding::Json.extension(), "json");
-    assert_eq!(Encoding::MessagePack.extension(), "msgpack");
-    assert_eq!(Encoding::Json.to_string(), "JSON");
-    assert_eq!(Encoding::MessagePack.to_string(), "MessagePack");
+#[rstest]
+#[case::json(Encoding::Json, "json", "JSON")]
+#[case::message_pack(Encoding::MessagePack, "msgpack", "MessagePack")]
+fn each_encoding_names_itself(
+    #[case] encoding: Encoding,
+    #[case] extension: &str,
+    #[case] displayed: &str,
+) {
+    assert_eq!(encoding.extension(), extension);
+    assert_eq!(encoding.to_string(), displayed);
 }
 
 #[test]
@@ -155,12 +177,7 @@ fn a_chunk_coordinate_locates_its_origin_corner() {
     let Ok(chunk_size) = ChunkSize::new(32) else {
         panic!("32 is the design chunk size and must construct");
     };
-    // Constructed in reading order, whatever order the type sorts by: the
-    // Z-major sort order is a serialization concern, not a constructor one.
     let coord = ChunkCoord::new(1, 2, 3);
-    assert_eq!(coord.x, 1);
-    assert_eq!(coord.y, 2);
-    assert_eq!(coord.z, 3);
     assert_eq!(
         coord.origin(chunk_size),
         VoxelPos {

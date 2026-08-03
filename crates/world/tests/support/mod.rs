@@ -36,12 +36,16 @@ use thysalion_world::scene::document::{
     VoxelTypeDocument,
 };
 
-/// Air is index zero in every palette, and is the only fully passable entry.
-fn air() -> VoxelTypeDocument {
+/// A flat, unlit, inert voxel type — the shape every fixture entry starts from.
+///
+/// One builder rather than two near-identical literals: `air` and `solid`
+/// differ only in their passability, and a second copy of the five fields they
+/// share is a second place for a fixture to drift from the format.
+fn voxel_type(name: &str, material: MaterialClass, passable: Passability) -> VoxelTypeDocument {
     VoxelTypeDocument {
-        name: SmolStr::new("air"),
-        material: MaterialClass::Air,
-        passable: Passability::open(),
+        name: SmolStr::new(name),
+        material,
+        passable,
         slope: SlopeDirection::Flat,
         emission: EmissionDocument::dark(),
         sim: SimProperties::inert(),
@@ -49,17 +53,12 @@ fn air() -> VoxelTypeDocument {
     }
 }
 
+/// Air is index zero in every palette, and is the only fully passable entry.
+fn air() -> VoxelTypeDocument { voxel_type("air", MaterialClass::Air, Passability::open()) }
+
 /// A solid, fully impassable voxel type with no emission and inert material.
 fn solid(name: &str, material: MaterialClass) -> VoxelTypeDocument {
-    VoxelTypeDocument {
-        name: SmolStr::new(name),
-        material,
-        passable: Passability::closed(),
-        slope: SlopeDirection::Flat,
-        emission: EmissionDocument::dark(),
-        sim: SimProperties::inert(),
-        concept: None,
-    }
+    voxel_type(name, material, Passability::closed())
 }
 
 /// Air, stone, and a wall sconce: enough to exercise emission and concepts.

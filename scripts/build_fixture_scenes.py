@@ -282,32 +282,77 @@ def read_layers(
     one traversal: a second pass to rediscover which line placed which voxel
     would be a second chance to disagree with the first.
     """
-    indices = {name: number for number, name in enumerate(palette)}
-    grid = Grid()
-    provenance = Provenance()
-    directory = source / "layers"
+    placer = Placer(
+        content=content,
+        legend=legend,
+        indices={name: number for number, name in enumerate(palette)},
+    )
 
-    for offset, path in layer_files(directory):
-        if offset >= content.extent[2]:
-            raise SourceError(
-                f"{path}: layer {offset} lies outwith the content extent of {content.extent[2]}"
-            )
-        z = content.origin[2] + offset
+    for offset, path in layer_files(source / "layers"):
+        refuse_layer_outwith_extent(offset, path, content)
+        cursor_z = content.origin[2] + offset
         relative = f"layers/{path.name}"
         for line, row in raster_rows(path, content):
-            y = content.origin[1] + line - 1
-            for column, character in enumerate(row):
-                index = resolve(character, legend, indices, path, line)
-                if index == AIR_INDEX:
-                    continue
-                x = content.origin[0] + column
-                grid.set((x, y, z), index)
-                provenance.record(
-                    (x // DESIGN_CHUNK_SIZE, y // DESIGN_CHUNK_SIZE, z // DESIGN_CHUNK_SIZE),
-                    relative,
-                    line,
-                )
-    return grid, provenance
+            placer.place_row(row, path, LayerCursor(cursor_z, line, relative))
+
+    return placer.grid, placer.provenance
+
+
+def refuse_layer_outwith_extent(offset: int, path: Path, content: Box) -> None:
+    """Refuses a layer raster the content box has no room for."""
+    if offset >= content.extent[2]:
+        raise SourceError(
+            f"{path}: layer {offset} lies outwith the content extent of {content.extent[2]}"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class LayerCursor:
+    """Where one raster row lands, and which authored line put it there."""
+
+    z: int
+    line: int
+    relative: str
+
+
+@dataclass(slots=True)
+class Placer:
+    """Writes a raster row's voxels into the grid, recording who wrote them.
+
+    A type rather than another parameter list: placing one voxel needs the
+    content box, the legend, the palette indices, the grid, and the provenance,
+    and threading five of those through two more functions is exactly the shape
+    the argument cap exists to refuse. It also flattens ``read_layers``, whose
+    loop-inside-loop-inside-conditional was its own readability problem.
+    """
+
+    content: Box
+    legend: Mapping[str, str]
+    indices: Mapping[str, int]
+    grid: Grid = field(default_factory=Grid)
+    provenance: Provenance = field(default_factory=Provenance)
+
+    def place_row(self, row: str, path: Path, cursor: LayerCursor) -> None:
+        """Places every non-air character of ``row``."""
+        for column, character in enumerate(row):
+            index = resolve(character, self.legend, self.indices, path, cursor.line)
+            if index != AIR_INDEX:
+                self.place(column, cursor, index)
+
+    def place(self, column: int, cursor: LayerCursor, index: int) -> None:
+        """Places one voxel and records the line that authored it."""
+        x = self.content.origin[0] + column
+        y = self.content.origin[1] + cursor.line - 1
+        self.grid.set((x, y, cursor.z), index)
+        self.provenance.record(
+            (
+                x // DESIGN_CHUNK_SIZE,
+                y // DESIGN_CHUNK_SIZE,
+                cursor.z // DESIGN_CHUNK_SIZE,
+            ),
+            cursor.relative,
+            cursor.line,
+        )
 
 
 def resolve(
