@@ -67,6 +67,25 @@ impl LightEmission {
     ///
     /// Returns the offending intensity when it is above the scale. Validation
     /// rejects rather than clamping, so an authoring mistake stays visible.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::scene::palette::LightEmission;
+    ///
+    /// let sconce = LightEmission::new(12, [255, 180, 90])?;
+    /// assert_eq!(sconce.intensity(), 12);
+    /// assert_eq!(sconce.colour(), [255, 180, 90]);
+    /// assert!(sconce.is_emissive());
+    ///
+    /// // Nothing inert emits, whatever colour it is given.
+    /// assert!(!LightEmission::dark().is_emissive());
+    ///
+    /// // Above the 0-15 scale the intensity is returned, not clamped: an
+    /// // author who wrote 16 sees the value they wrote.
+    /// assert_eq!(LightEmission::new(16, [0, 0, 0]), Err(16));
+    /// # Ok::<(), u8>(())
+    /// ```
     pub const fn new(intensity: u8, colour: [u8; 3]) -> Result<Self, u8> {
         if intensity > Self::MAX_INTENSITY {
             return Err(intensity);
