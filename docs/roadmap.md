@@ -55,24 +55,30 @@ This step answers whether the authored-scene contract of the design can be
 loaded, validated, and shared by every demo. Its outcome supplies the fixture
 scenes all later spikes and CI suites consume. See thysalion-design.md §7.
 
-- [ ] 1.2.1. Implement the voxel type registry and scene document model.
+- [x] 1.2.1. Implement the voxel type registry and scene document model.
   - Palette entries with material class, per-face passability, slope,
     emission, simulation coefficients, and optional concept IRI.
   - See thysalion-design.md §7.2.
   - Success: a hand-written JSON scene round-trips through the model and
     the MessagePack encoding without loss.
-- [ ] 1.2.2. Implement scene loading with load-time validation.
+- [x] 1.2.2. Implement scene loading with load-time validation.
   - Reject unknown palette references, out-of-bounds spawns, and dangling
     knowledge IRIs with diagnostics; never partially load.
   - See thysalion-design.md §7.3.
   - Success: corrupt fixture variants each produce a distinct diagnostic
     and leave no scene state behind.
-- [ ] 1.2.3. Author the three fixture scenes used by all later phases.
+- [x] 1.2.3. Author the fixture scenes used by all later phases.
   - Requires 1.2.2.
   - A keep interior, a market-town block, and a swamp fragment, sized per
     the scene classes and matching the reference art's palette bands.
+  - Four shipped, not three. `bare-cell` was added during the work because
+    the other three all derive from design §7.1's Table 1, so whatever they
+    happened to share would have become an unstated engine assumption that
+    surfaced at phase 6 or 9. It carries as little as the format permits:
+    one chunk, two palette entries, no entities, no ambient bands, no
+    knowledge resources.
   - See thysalion-design.md §7.1 and §1.
-  - Success: all three load through the validator; each is referenced by
+  - Success: all four load through the validator; each is referenced by
     at least one demo or CI suite by the end of phase 6.
 - [ ] 1.2.4. Publish the scene document's JSON Schema as a versioned
   artefact.
@@ -133,7 +139,7 @@ See thysalion-design.md §8.1 and adr-001-meshed-voxel-rendering-pipeline.md.
   - Carry ambient occlusion and tint in vertex attributes; verify Bevy
     0.19/glam compatibility.
   - Success: triangle counts drop measurably versus the default mesher on
-    all three fixtures, with no visual regression in screenshots.
+    all four fixtures, with no visual regression in screenshots.
 - [ ] 2.1.3. Implement incremental chunk re-meshing on voxel edit.
   - Requires 2.1.2.
   - Async re-mesh of the edited chunk and face-adjacent neighbours; stale
@@ -199,7 +205,7 @@ thysalion-design.md §9.2 and §14 (I4).
   - Day/night scaling of the sky channel; `max(sky × day, block)`
     composition.
   - Success: dawn-to-night scrubbing in `demo-light-field` reproduces the
-    style guide's time-of-day strip across all three fixtures.
+    style guide's time-of-day strip across all four fixtures.
 
 ### 3.3. Deliver atmosphere and wetness
 
