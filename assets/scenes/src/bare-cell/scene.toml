@@ -1,0 +1,47 @@
+# The deliberately ugly fixture.
+#
+# The three named fixtures are a monoculture: all derive from design section
+# 7.1, Table 1, so all are origin-anchored multiples of 32 carrying every
+# optional section. Whatever those three happen to share becomes an unstated
+# engine assumption that surfaces at phase 6 or 9, when a fourth scene appears
+# and does not share it. This one shares as little as the format permits: one
+# chunk, two palette entries, no entities, no ambient bands, and no knowledge
+# resources at all.
+#
+# The 1.2 execution plan also asked for dimensions that are *not* a multiple of
+# the chunk size. The format does not permit them — `Extent::new` refuses an
+# unaligned axis, and the chunk-keyed payload has no way to express a partial
+# edge chunk — so this fixture is 32 x 32 x 32 and the constraint is recorded
+# in the plan's `Surprises & discoveries` instead. Learning it here is the
+# point; learning it at step 2.1.1 would not have been.
+
+[scene]
+name = "bare-cell"
+dimensions = [32, 32, 32]
+chunk_size = 32
+content_origin = [0, 0, 0]
+content_extent = [4, 4, 2]
+
+[[palette]]
+name = "air"
+material = "air"
+passable = true
+
+[[palette]]
+name = "stone-block"
+material = "stone"
+moisture_capacity = 3277
+concept = "thy:StoneBlock"
+
+[lighting]
+# No ambient bands, and an authored angle in human units rather than
+# centi-degrees: `45deg` compiles to 4500.
+probe_spacing = "2m"
+
+[lighting.sun_path]
+azimuth = "180deg"
+elevation = "45deg"
+
+[knowledge]
+graph = "thy:scene/bare-cell"
+sources = []

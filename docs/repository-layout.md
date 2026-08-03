@@ -22,6 +22,10 @@ omits build output such as `target/`.
 │       ├── ci.yml
 │       ├── coverage-main.yml
 │       └── release.yml
+├── assets/
+│   └── scenes/          # compiled fixture scenes (committed build artefacts)
+│       ├── src/          # layered-text authoring sources, the review surface
+│       └── knowledge/    # TriG knowledge sources the scenes reference
 ├── crates/
 │   ├── world/          # state plane: thysalion-world
 │   ├── sim/            # logic plane: thysalion-sim
@@ -37,6 +41,7 @@ omits build output such as `target/`.
 │   └── ...
 ├── references/         # concept art (Git LFS)
 ├── scripts/            # uv-run helper scripts
+│   └── tests/          # pytest suite for the helper scripts
 ├── src/
 │   ├── lib.rs
 │   └── main.rs
@@ -78,9 +83,22 @@ from the root `Cargo.toml`.
   `thysalion` release binary for six targets. The build is scoped
   `-p thysalion` so demo crates never enter the release graph; a workflow-shape
   test asserts the flag stays present.
+- `assets/scenes/`: The compiled fixture scenes (`*.scene.json`), their
+  provenance sidecars (`*.provenance.json`), and `assets/scenes/knowledge/`
+  (the TriG sources scenes reference). These are committed build artefacts,
+  deliberately: a contributor with no `uv` must still be able to build, test,
+  and run the demos. `make scenes` regenerates them from
+  `assets/scenes/src/<name>/`; `make scenes-check` verifies they still match.
+- `assets/scenes/src/<name>/`: The layered-text authoring sources for one
+  fixture scene — `scene.toml`, `legend.toml`, and `layers/z###.txt`. This is
+  the review surface; the compiled JSON under `assets/scenes/` is not (see the
+  developers' guide).
 - `crates/world/` (`thysalion-world`): State plane — voxel grid, scene
   documents, palettes (content from roadmap step 1.2). Designated dependency
   sink for shared state types: planes may depend on it, never the reverse.
+  `crates/world/examples/scene-check.rs` is a deliberately thin wrapper over
+  `thysalion_world::check`; the checked logic lives in the library so it stays
+  inside the coverage-measured surface.
 - `crates/sim/` (`thysalion-sim`): Logic plane — the DBSP circuit (content
   from phase 4).
 - `crates/knowledge/` (`thysalion-knowledge`): Knowledge plane — the
@@ -109,7 +127,10 @@ from the root `Cargo.toml`.
 - `references/`: Concept art stored via Git LFS (see the developers'
   guide).
 - `scripts/`: Python helper scripts run through `uv` (see
-  `docs/scripting-standards.md`).
+  `docs/scripting-standards.md`), including `build_fixture_scenes.py`, the
+  fixture-scene generator behind `make scenes` and `make scenes-check`.
+- `scripts/tests/`: The pytest suite for the helper scripts, run by
+  `make scripts-test`.
 - `src/lib.rs`: Composition-root library support and doctested examples.
 - `src/main.rs`: The `thysalion` application entrypoint.
 - `tests/`: Root-package integration tests, including the workflow-shape
@@ -146,6 +167,10 @@ from the root `Cargo.toml`.
   extending a Make target over documenting an ad hoc command.
 - Keep continuous integration workflow changes under `.github/workflows/`
   and dependency-update policy under `.github/dependabot.yml`.
+- Keep the coverage-ignore boundary in the Makefile
+  (`crates/(demos|harness/src/(overlay|screenshot|camera))`) unchanged by
+  scene-format work: the scene-check logic lives in `thysalion-world` rather
+  than in `crates/world/examples/scene-check.rs` precisely so it stays measured.
 - Do not commit generated build output such as `target/`, coverage
   artefacts, screenshot captures (`screenshots/`), or local editor state.
 

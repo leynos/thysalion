@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: spawn-obstructed.scene.json
+source root: tests/fixtures/corrupt
+0 error(s), 1 warning(s)
+
+warning scene.entities.spawn-obstructed at entities[0]
+  spawn "party-start" stands inside a voxel no face admits passage through

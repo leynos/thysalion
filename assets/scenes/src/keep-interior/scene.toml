@@ -1,0 +1,92 @@
+# The Interior scene class (design section 7.1, Table 1): a keep's great hall
+# over two storeys, so phase 2's cut-away has an upper floor to remove and
+# phase 3's lighting has both a hearth and wall sconces to propagate from.
+#
+# Palette band: Keep Interior — rich and regal. Lighting: torchlit evening.
+
+[scene]
+name = "keep-interior"
+dimensions = [128, 128, 64]
+chunk_size = 32
+# The hall sits away from the origin deliberately. A fixture anchored at
+# (0, 0, 0) cannot catch a chunk-coordinate calculation that forgets to divide.
+content_origin = [32, 32, 0]
+content_extent = [24, 16, 7]
+
+[[palette]]
+name = "air"
+material = "air"
+passable = true
+
+[[palette]]
+name = "stone-block"
+material = "stone"
+moisture_capacity = 3277
+concept = "thy:StoneBlock"
+
+[[palette]]
+name = "oak-plank"
+material = "timber"
+fuel = 5120
+ignition_point = 43520
+moisture_capacity = 8192
+concept = "thy:OakPlank"
+
+[[palette]]
+name = "stone-stair"
+material = "stone"
+slope = "pos_x"
+passable = true
+moisture_capacity = 3277
+concept = "thy:StoneStair"
+
+[[palette]]
+name = "hearth-stone"
+material = "stone"
+concept = "thy:Hearth"
+
+[[palette]]
+name = "wall-sconce"
+material = "stone"
+concept = "thy:WallSconce"
+
+[palette.emission]
+intensity = 12
+colour = [255, 180, 90]
+
+[lighting]
+# Torchlit evening: the sun is low and behind the keep, so the hearth and the
+# sconces are what actually light the hall.
+probe_spacing = "2m"
+
+[lighting.sun_path]
+azimuth = "285deg"
+elevation = "6.5deg"
+
+[[lighting.ambient_bands]]
+name = "dusk"
+at = "6.5deg"
+colour = [64, 56, 78]
+
+[[lighting.ambient_bands]]
+name = "night"
+at = "-12deg"
+colour = [22, 24, 40]
+
+[entities.prototypes.torch-bearer]
+concept = "thy:TorchBearer"
+
+[[entities.spawns]]
+name = "party-start"
+at = [43, 46, 1]
+facing = "neg_y"
+
+[[entities.spawns]]
+name = "hearth-watch"
+prototype = "torch-bearer"
+at = [38, 34, 1]
+facing = "pos_y"
+
+[knowledge]
+graph = "thy:scene/keep-interior"
+sources = ["knowledge/keep-interior.trig"]

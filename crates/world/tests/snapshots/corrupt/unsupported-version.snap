@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: unsupported-version.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.version.unsupported at version[0]
+  document version 2.0 is not readable by this build, which supports 1.0

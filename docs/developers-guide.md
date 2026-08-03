@@ -24,6 +24,22 @@ Development builds use Cranelift for debug code generation. On Linux targets,
 quickly. Coverage generation uses `lld` because LLVM coverage tooling expects
 LLVM-compatible linker behaviour.
 
+Both of those defaults are wrong for coverage, and `make coverage` displaces
+each of them rather than expecting the developer to. `RUSTFLAGS` replaces the
+config's target flags wholesale, which is what takes `mold` out of the picture;
+`mold` cannot be used here because it does not carry the instrumentation
+sections `llvm-cov` reads. Cranelift is displaced separately, through
+`CARGO_PROFILE_DEV_CODEGEN_BACKEND`, because no rustflag can reach a profile
+setting and rustc refuses `-C instrument-coverage` under Cranelift outright.
+`CARGO_UNSTABLE_CODEGEN_BACKEND` accompanies it so that the throwaway project
+`trybuild` generates — which sits under `CARGO_TARGET_DIR` and so may never see
+this repository's `.cargo/config.toml` — accepts the same override.
+
+A system `lld` is therefore convenient but not required: `COVERAGE_LLD_DIR`
+falls back to the `ld.lld` every rustup toolchain ships. Set
+`COVERAGE_CODEGEN_BACKEND` or `COVERAGE_LLD_DIR` to opt out on a host whose own
+toolchain already works.
+
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
 
@@ -102,6 +118,103 @@ Screenshots (`F12`, on key release) save to
 `screenshots/<slug>-<timestamp>-<sequence>.png` (git-ignored). Bevy screenshots
 can lag the camera by one frame (bevyengine/bevy issue 18230); let the view
 settle before capturing.
+
+## Scene fixtures
+
+Fixtures live in two places: layered-text sources under
+`assets/scenes/src/<name>/`, and their compiled output in `assets/scenes/`
+(`*.scene.json`, `*.provenance.json` sidecars, and `assets/scenes/knowledge/`
+TriG sources). The compiled documents are committed build artefacts,
+deliberately: a contributor with no `uv` must still be able to build, test, and
+run the demos. The authoring sources are the review surface; the compiled JSON
+is not. The format itself is decided in
+[ADR 006](adr-006-scene-document-model.md) and referenced in full in
+[World plane architecture](world-plane-architecture.md).
+
+### The authoring format
+
+`scene.toml` declares the scene's dimensions, chunk size, palette, lighting,
+entities, and knowledge, plus `content_origin` and `content_extent` — the
+sub-box the layer rasters cover inside the declared extent. `legend.toml` maps
+one character to one palette name. `layers/z###.txt` supplies one text raster
+per populated layer; an absent layer is air, and the files present need not be
+contiguous.
+
+### Raster rules
+
+- A raster covers the content sub-box only, never the declared extent.
+- Row 0 is `content_origin.y`, column 0 is `content_origin.x`, and `y`
+  increases downward as the file reads — this is how a layer looks viewed from
+  above.
+- `z<nnn>.txt` supplies the layer at `content_origin.z + nnn`.
+- Every character in a raster must appear in `legend.toml`; an unlisted
+  character is an error, never a silent air.
+- A short row is an error rather than being padded: padding would hide a
+  truncated edit.
+- Trailing whitespace is stripped before a row is measured.
+
+### Human units
+
+`scene.toml` accepts human units where the compiled document stores integers:
+`azimuth = "17.45deg"` compiles to `1745` centi-degrees, and
+`probe_spacing = "2m"` compiles to `2000` millimetres.
+
+### A worked example: `bare-cell`
+
+`assets/scenes/src/bare-cell/` is the smallest fixture: a 32 x 32 x 32 scene
+with a 4 x 4 x 2 content box at the origin. Its `legend.toml` maps `.` to air
+and `#` to `stone-block`:
+
+```toml
+"." = "air"
+"#" = "stone-block"
+```
+
+`layers/z000.txt`, the layer at `content_origin.z + 0`, is a solid stone floor:
+
+```text
+####
+####
+####
+####
+```
+
+`layers/z001.txt`, the layer at `content_origin.z + 1`, leaves a stone post at
+each corner and air between them — not a ring, which would need its edges
+filled. This is the raster `assets/scenes/src/bare-cell/layers/z001.txt`
+actually holds, so the two cannot drift:
+
+```text
+#..#
+....
+....
+#..#
+```
+
+### Regenerating fixtures
+
+`make scenes` compiles the sources into `assets/scenes/`. `make scenes-check`
+regenerates into a temporary directory and compares byte for byte, so a
+hand-edited fixture or a stale generator run cannot go unnoticed.
+`make scripts-test` runs the generator's own pytest suite under
+`scripts/tests/`. All three are wired into `make all`.
+
+### Checking a scene document
+
+`crates/world/examples/scene-check.rs` is a deliberately thin wrapper over
+`thysalion_world::check`:
+
+```sh
+cargo run -p thysalion-world --example scene-check -- \
+    assets/scenes/keep-interior.scene.json
+```
+
+It exits `0` for a valid scene, `1` when the document is wrong (it failed
+validation, or it failed to parse), `2` when the document or one of its
+resources could not be read, and `64` for a command-line usage error — a
+contributor scripting against the tool needs those codes to hand. See "Reading
+a diagnostic report" in [World plane architecture](world-plane-architecture.md)
+for how to read the tool's output.
 
 ## Binary assets and Git LFS
 

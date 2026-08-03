@@ -1,0 +1,8 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: truncated-json.scene.json
+source root: tests/fixtures/corrupt
+0 error(s), 0 warning(s)
+malformed document: truncated-json.scene.json: malformed JSON document at version.?: EOF while parsing a value at line 4 column 0

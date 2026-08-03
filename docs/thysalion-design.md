@@ -485,54 +485,112 @@ pub struct VoxelType {
     pub name: SmolStr,
     /// Material class selects texture set and PBR parameters.
     pub material: MaterialClass,
-    /// Per-face passability for pathfinding, indexed by face normal.
-    pub passable: [bool; 6],
-    /// Direction of rise for ramps and stairs; zero when flat.
-    pub slope_dir: IVec2,
+    /// Per-face passability for pathfinding, one named field per face.
+    pub passable: Passability,
+    /// Direction of rise for ramps and stairs; `Flat` when level.
+    pub slope: SlopeDirection,
     /// Emitted light: intensity 0–15 and colour, zero when inert.
     pub emission: LightEmission,
     /// Simulation coefficients for the material fields (§10.5).
     pub sim: SimProperties, // fuel, ignition point, moisture capacity…
     /// Knowledge-plane identity for this voxel kind, when it has one.
-    pub concept: Option<IriRef>, // e.g. thy:OakDoor
+    pub concept: Option<ConceptIri>, // e.g. thy:OakDoor
 }
 ```
 
-The per-face passability and slope encoding follow lille's map format, where
-they proved sufficient for 3-D pathfinding over ramps and ledges. The `concept`
-field is the bridge to the knowledge plane: a voxel type may name the ontology
-concept it instantiates, so that rules such as "guards notice broken doors"
-ground out in voxel-level facts (§11.2).
+Palette index zero is reserved for air in every scene, so an absent chunk and a
+long run of air agree without a lookup (§7.3). The palette is indexed by a
+16-bit value, so a scene holds at most 65,536 voxel types.
+
+Two encodings here were revised at roadmap step 1.2 and are recorded in
+[ADR 006](adr-006-scene-document-model.md).
+
+`passable` is six _named_ fields — `pos_x`, `neg_x`, `pos_y`, `neg_y`, `pos_z`,
+`neg_z` — rather than `[bool; 6]`. An array obliges every reader to agree on
+the index-to-face mapping and offers no way to notice when one does not;
+lille's equivalent used a dictionary keyed by unit-normal strings with no
+completeness guarantee, and was never implemented.
+
+`slope` is a closed set of four compass directions plus `Flat`, rather than an
+`IVec2`. A vector admits meaningless values such as `(7, -3)` that validation
+would then have to reject, and the set of meaningful ones is small and fixed.
+
+The per-face passability and slope encoding follow lille's map format
+_specification_, where they were designed for 3-D pathfinding over ramps and
+ledges. That specification was never implemented, so the encodings are
+inherited as a design rather than as proven code, and both were narrowed above.
+The `concept` field is the bridge to the knowledge plane: a voxel type may name
+the ontology concept it instantiates, so that rules such as "guards notice
+broken doors" ground out in voxel-level facts (§11.2). It is validated for
+syntax and project-namespace membership at load, and resolved against the
+ontology only by the knowledge plane (§11.5).
 
 ### 7.3. Scene format
 
-Scenes are single logical documents with three encodings — JSON for authoring
-and diffing, MessagePack for shipping, one structure for both — following
-lille's proven format, extended with lighting and knowledge fields:
+Scenes are single logical documents with two encodings — JSON for authoring and
+diffing, MessagePack for shipping, one structure for both — following lille's
+map-format specification, extended with lighting and knowledge fields:
 
-- `dimensions`, `chunk_size` — grid bounds.
-- `palette` — the ordered list of voxel types (§7.2).
-- `voxels` — palettized dense Z-major layers, run-length encoded.
-- `entities` — spawn list; entity definitions support prototype
-  inheritance (`extends` plus overrides), so an `archer` extends `guard` extends
-  `humanoid`.
+- `version` — a `{major, minor}` schema version with an accepted range. Probed
+  before the rest of the document is read, so a document from a future build
+  reports itself as unsupported rather than as a confusing unknown field.
+- `dimensions`, `chunk_size` — grid bounds. Every axis is a whole number of
+  chunks.
+- `palette` — the ordered list of voxel types (§7.2). Index zero is air.
+- `voxels` — a sorted list of _populated chunks_, each carrying either a single
+  repeated palette index or a canonical chunk-local Z-major run-length stream.
+  An absent chunk is entirely air.
+- `entities` — spawn list; spawns may extend named prototypes, resolved at load
+  so nothing downstream chases the indirection.
 - `lighting` — sun path parameters, ambient palette per time-of-day band
   (matching the concept art's seven biome palettes), probe-volume bounds and
   spacing overrides (§9.3).
 - `knowledge` — the scene's TriG files to load into the knowledge plane,
   and the IRI of the scene's own named graph (§11.5).
 
-Validation happens entirely at load: unknown palette references, out-of-bounds
-spawns, or dangling knowledge IRIs fail the load with a diagnostic, never a
-partially loaded scene.
+Every quantity is an integer. Angles are centi-degrees, lengths are
+millimetres, and the simulation coefficients of §10.5 are fixed point. The
+whole document tree therefore keeps equality, ordering, and hashing; the values
+JSON cannot represent cannot arise; and the two encodings cannot disagree about
+a float. The authoring cost is paid by the fixture generator, which accepts
+`azimuth = "17.45deg"`, not by the format.
+
+The voxel payload is chunk-keyed rather than — as an earlier revision of this
+section had it — dense Z-major layers over the whole extent. A global run
+stream fragments on every raster row of a spatially localized region and
+rewrites wholesale on a one-chunk edit; chunk-keying makes encoding, decoding,
+hashing, and diffing scale with populated volume rather than with declared
+extent. The wilderness scene class of §7.1 ships in kilobytes as a result,
+against 256 MiB dense. [ADR 006](adr-006-scene-document-model.md) records the
+reversal trigger.
+
+Validation happens entirely at load and is all-or-nothing: unknown palette
+references, out-of-bounds spawns, or dangling knowledge IRIs fail the load with
+a diagnostic, never a partially loaded scene. It runs in three ordered phases —
+header bounds, then bounded decode, then semantic rules — and reports every
+distinct problem in the earliest failing phase. The ordering is a correctness
+property: a document declaring a four-billion-entry palette is refused before
+anything sizes an allocation from the claim. The field-by-field reference, the
+diagnostic vocabulary, and the version-history table are in
+[world-plane-architecture.md](world-plane-architecture.md).
 
 ### 7.4. Authoring pipeline
 
 Scenes are authored in a Tiled-based workflow (layered isometric editing, as
 built for lille) plus direct in-engine voxel editing for detail passes; both
 emit the JSON encoding. MagicaVoxel `.vox` import is supported for props and
-set-dressing brought in as palette-mapped voxel stamps. The authoring pipeline
-is content tooling, not runtime: the engine consumes only the scene format.
+set-dressing brought in as palette-mapped voxel stamps. `.vox` is an
+interchange for props and cannot be the canonical authoring input: it caps a
+model at 255 palette colours and 256 voxels per axis, against a 1024-extent
+scene class and a 16-bit palette. The authoring pipeline is content tooling,
+not runtime: the engine consumes only the scene format.
+
+Until the Tiled workflow exists, the repository's fixture scenes are authored
+as layered text — one raster per populated layer, plus a character legend — and
+compiled to the JSON encoding by `scripts/build_fixture_scenes.py`. The
+compiled documents are committed, so a contributor without a Python toolchain
+can still build, test, and run the demonstrations; a continuous-integration
+check regenerates and compares them byte for byte.
 
 ## 8. Rendering plane
 
@@ -837,6 +895,14 @@ bit-exact by construction. Threshold comparisons execute on the same
 fixed-point values the snapshot stores, so a restored session reproduces every
 pending crossing on the same tick (I3, §14). Saves persist the circuit-side
 discrete state plus the exact field planes (§12.3).
+
+The fixed-point _scale_ is Q8.8: the stored 16-bit integer divided by 256,
+giving a range of 0 to 255.996 in steps of 1/256. Stating the width alone is
+not enough to make a snapshot portable — two builds agreeing on 16 bits and
+disagreeing on the scale would compare thresholds against different quantities
+— so the scale is fixed here and carried in the scene format's `sim`
+coefficients (§7.2). An `ignition_point` of `u16::MAX` means the material does
+not ignite.
 
 ### 10.6. State-growth budget
 

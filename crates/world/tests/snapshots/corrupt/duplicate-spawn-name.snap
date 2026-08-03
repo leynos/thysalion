@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: duplicate-spawn-name.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.entities.duplicate-spawn-name at entities[1]
+  two spawns are named "party-start"

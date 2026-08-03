@@ -1,0 +1,49 @@
+{
+  "version": {
+    "major": 1,
+    "minor": 0
+  },
+  "name": "empty-palette",
+  "dimensions": {
+    "x": 32,
+    "y": 32,
+    "z": 32
+  },
+  "chunk_size": 32,
+  "palette": [],
+  "voxels": [
+    {
+      "at": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "payload": {
+        "runs": [
+          {
+            "length": 32768,
+            "index": 1
+          }
+        ]
+      }
+    }
+  ],
+  "entities": {
+    "prototypes": {},
+    "spawns": []
+  },
+  "lighting": {
+    "sun_path": {
+      "azimuth_centidegrees": 13500,
+      "elevation_centidegrees": 3000
+    },
+    "ambient_bands": [],
+    "probe_spacing_mm": 2000
+  },
+  "knowledge": {
+    "graph": "thy:scene/corrupt",
+    "sources": [
+      "knowledge/corrupt.trig"
+    ]
+  }
+}

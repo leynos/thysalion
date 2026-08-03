@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: spawn-unsupported.scene.json
+source root: tests/fixtures/corrupt
+0 error(s), 1 warning(s)
+
+warning scene.entities.spawn-unsupported at entities[0]
+  spawn "party-start" has nothing beneath it and is not marked airborne

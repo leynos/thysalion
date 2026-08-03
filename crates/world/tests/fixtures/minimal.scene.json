@@ -1,0 +1,86 @@
+{
+  "version": { "major": 1, "minor": 0 },
+  "name": "minimal",
+  "dimensions": { "x": 64, "y": 32, "z": 32 },
+  "chunk_size": 32,
+  "palette": [
+    {
+      "name": "air",
+      "material": "air",
+      "passable": {
+        "pos_x": true, "neg_x": true, "pos_y": true,
+        "neg_y": true, "pos_z": true, "neg_z": true
+      },
+      "slope": "flat",
+      "emission": { "intensity": 0, "colour": [0, 0, 0] },
+      "sim": { "fuel": 0, "ignition_point": 65535, "moisture_capacity": 0 },
+      "concept": null
+    },
+    {
+      "name": "stone-block",
+      "material": "stone",
+      "passable": {
+        "pos_x": false, "neg_x": false, "pos_y": false,
+        "neg_y": false, "pos_z": false, "neg_z": false
+      },
+      "slope": "flat",
+      "emission": { "intensity": 0, "colour": [0, 0, 0] },
+      "sim": { "fuel": 0, "ignition_point": 65535, "moisture_capacity": 3277 },
+      "concept": "thy:StoneBlock"
+    },
+    {
+      "name": "wall-sconce",
+      "material": "stone",
+      "passable": {
+        "pos_x": false, "neg_x": false, "pos_y": false,
+        "neg_y": false, "pos_z": false, "neg_z": false
+      },
+      "slope": "flat",
+      "emission": { "intensity": 12, "colour": [255, 180, 90] },
+      "sim": { "fuel": 0, "ignition_point": 65535, "moisture_capacity": 0 },
+      "concept": "thy:WallSconce"
+    }
+  ],
+  "voxels": [
+    {
+      "at": { "x": 0, "y": 0, "z": 0 },
+      "payload": {
+        "runs": [
+          { "length": 4, "index": 1 }, { "length": 28, "index": 0 },
+          { "length": 4, "index": 1 }, { "length": 28, "index": 0 },
+          { "length": 4, "index": 1 }, { "length": 28, "index": 0 },
+          { "length": 4, "index": 1 }, { "length": 32668, "index": 0 }
+        ]
+      }
+    },
+    {
+      "at": { "x": 1, "y": 0, "z": 0 },
+      "payload": { "uniform": 1 }
+    }
+  ],
+  "entities": {
+    "prototypes": {},
+    "spawns": [
+      {
+        "name": "party-start",
+        "prototype": null,
+        "at": { "x": 2, "y": 2, "z": 1 },
+        "facing": "pos_y",
+        "airborne": false,
+        "concept": null
+      }
+    ]
+  },
+  "lighting": {
+    "sun_path": {
+      "azimuth_centidegrees": 13500,
+      "elevation_centidegrees": 3000
+    },
+    "ambient_bands": [],
+    "probe_spacing_mm": 2000
+  },
+  "knowledge": {
+    "graph": "thy:scene/minimal",
+    "sources": ["knowledge/minimal.trig"]
+  }
+}

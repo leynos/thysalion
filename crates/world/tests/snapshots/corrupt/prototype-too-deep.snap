@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: prototype-too-deep.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.entities.prototype-too-deep at entities[0]
+  the prototype chain reaching "link-32" is deeper than the bound of 32

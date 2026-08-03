@@ -1,0 +1,13 @@
+# The keep interior's named graph.
+#
+# Not parsed at roadmap step 1.2: load confirms this file resolves through the
+# scene source and no more. Phase 5 takes over its content, and the shape below
+# is a placeholder chosen to be valid TriG rather than a modelling decision.
+
+@prefix thy: <https://thysalion.df12.net/ontology#> .
+@prefix scene: <https://thysalion.df12.net/scene/> .
+
+scene:keep-interior {
+    scene:keep-interior a thy:Scene ;
+        thy:sceneClass thy:InteriorClass .
+}

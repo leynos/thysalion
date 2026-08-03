@@ -1,0 +1,11 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: adjacent-duplicate-runs.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.voxels.adjacent-duplicate-runs at voxels[0]
+  chunk (0, 0, 0) at local (0, 0, 0)
+  runs 0 and 1 share index 1

@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: graph-iri-invalid.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.knowledge.graph-invalid at knowledge[0]
+  concept "not a graph" is invalid: expected `prefix:local`

@@ -1,0 +1,11 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: run-length-mismatch.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.voxels.run-length-mismatch at voxels[0]
+  chunk (0, 0, 0) at local (0, 0, 0)
+  run lengths sum to 32767, but the chunk holds 32768 voxels

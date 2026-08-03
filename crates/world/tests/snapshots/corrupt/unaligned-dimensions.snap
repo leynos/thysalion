@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: unaligned-dimensions.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.dimensions.unaligned at dimensions[0]
+  extent axis x (33) is not a multiple of chunk size 32

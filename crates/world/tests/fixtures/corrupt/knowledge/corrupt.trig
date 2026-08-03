@@ -1,0 +1,11 @@
+# The knowledge resource every corrupt fixture names.
+#
+# Present and empty on purpose. Each fixture must carry exactly one fault, and
+# without this file every one of them would also report a missing knowledge
+# resource — which is how the two warning fixtures came to fail a check they
+# were written to pass. The `resource-absent` fixture names a different path
+# deliberately.
+#
+# Nothing parses this at roadmap step 1.2: load confirms it resolves through the
+# scene source and no more. Parsing TriG is the knowledge plane's work at step
+# 5.1.

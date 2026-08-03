@@ -1,0 +1,11 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: unknown-palette-index.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.voxels.unknown-palette-index at voxels[0]
+  chunk (0, 0, 0) at local (0, 0, 0)
+  palette index 9 does not resolve; the palette has 2 entries

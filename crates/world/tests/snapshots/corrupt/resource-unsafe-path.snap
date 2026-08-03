@@ -1,0 +1,11 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: resource-unsafe-path.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.knowledge.resource-unsafe-path at knowledge[0]
+  resource: ../../etc/passwd
+  unsafe resource path ../../etc/passwd: contains a parent-directory component

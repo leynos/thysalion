@@ -1,0 +1,8 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: unknown-document-field.scene.json
+source root: tests/fixtures/corrupt
+0 error(s), 0 warning(s)
+malformed document: unknown-document-field.scene.json: malformed JSON document at colour: unknown field `colour`, expected one of `version`, `name`, `dimensions`, `chunk_size`, `palette`, `voxels`, `entities`, `lighting`, `knowledge` at line 104 column 10

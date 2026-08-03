@@ -1,0 +1,8 @@
+"." = "air"
+"," = "cobblestone"
+"#" = "stone-block"
+"=" = "oak-plank"
+"^" = "clay-tile"
+"~" = "canvas-awning"
+"w" = "well-water"
+"*" = "hanging-lantern"

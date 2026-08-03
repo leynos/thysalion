@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit demo
+.PHONY: help all clean test build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit demo scenes scenes-check scripts-test
 
 SHELL := bash
 
@@ -8,6 +8,7 @@ TARGET ?= thysalion
 USER_WHITAKER := $(HOME)/.local/bin/whitaker
 USER_BIN_PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(HOME)/.bun/bin
 CARGO ?= cargo
+RUSTC ?= rustc
 BUILD_JOBS ?=
 RUST_FLAGS ?=
 RUST_FLAGS := -D warnings $(RUST_FLAGS)
@@ -26,17 +27,32 @@ TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
 COVERAGE_LINKER_FLAGS ?= -fuse-ld=lld
 COVERAGE_RUST_FLAGS ?= $(RUST_FLAGS) -C link-arg=$(COVERAGE_LINKER_FLAGS)
+# `.cargo/config.toml` picks Cranelift and mold for fast dev builds. Both are
+# wrong for coverage, and in different ways: rustc refuses
+# `-C instrument-coverage` outright under Cranelift, and mold does not carry
+# the instrumentation sections llvm-cov reads. `COVERAGE_RUST_FLAGS` already
+# displaces mold, because `RUSTFLAGS` replaces the config's target flags
+# wholesale; the two variables below displace Cranelift, which no rustflag can
+# reach. Overridable so a host with its own working toolchain can opt out.
+COVERAGE_CODEGEN_BACKEND ?= llvm
+# `-fuse-ld=lld` needs an `ld.lld` on PATH, which a host may not have even
+# with clang installed. The rustup toolchain always ships one, so fall back to
+# it rather than requiring a system lld just to run the gate locally.
+COVERAGE_LLD_DIR ?= $(shell $(RUSTC) --print sysroot)/lib/rustlib/$(shell $(RUSTC) -vV | sed -n 's/^host: //p')/bin/gcc-ld
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 TYPOS_VERSION ?= 1.48.0
 TYPOS := uv tool run typos@$(TYPOS_VERSION)
 WHITAKER ?= $(or $(shell command -v whitaker 2>/dev/null),$(wildcard $(USER_WHITAKER)),whitaker)
+SCENE_BUILDER ?= uv run --script scripts/build_fixture_scenes.py
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
 
 all: check-fmt lint test ## Perform a comprehensive check of code
 	+$(MAKE) spelling
+	+$(MAKE) scripts-test
+	+$(MAKE) scenes-check
 
 clean: ## Remove build artifacts
 	$(CARGO) clean
@@ -51,7 +67,10 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 
 coverage: ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"
-	CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
+	PATH="$(COVERAGE_LLD_DIR):$$PATH" \
+		CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
+		CARGO_UNSTABLE_CODEGEN_BACKEND=true \
+		CARGO_PROFILE_DEV_CODEGEN_BACKEND=$(COVERAGE_CODEGEN_BACKEND) \
 		RUSTFLAGS="$(COVERAGE_RUST_FLAGS)" \
 		CFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
@@ -105,6 +124,23 @@ spelling: ## Enforce en-GB-oxendict spelling in Markdown prose
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
+
+scenes: ## Compile assets/scenes/src/ into the committed fixture scenes
+	$(SCENE_BUILDER)
+
+# Regenerates into a temporary directory and compares. This is what stops a
+# hand-edited fixture, or a generator change nobody re-ran, from going
+# unnoticed until the authoring sources become decoration.
+#
+# Not run inside `cargo test`: `make test` is pure Cargo, and a Rust test
+# shelling out to `uv run` would break `cargo test --workspace` for any
+# contributor without a Python toolchain and would add a subprocess to the
+# coverage-measured surface.
+scenes-check: ## Verify the committed fixture scenes match their sources
+	$(SCENE_BUILDER) --check
+
+scripts-test: ## Run the Python script test suites
+	uv run --with pytest --with cyclopts python -m pytest scripts/tests -q
 
 audit: rust-audit ## Audit dependencies for known vulnerabilities
 

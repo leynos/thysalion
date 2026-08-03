@@ -154,4 +154,10 @@ coverage ratchet for every later pull request.
 - Open question forwarded to step 1.2: whether the scene format becomes
   a leaf `thysalion-scene` crate or stays inside `thysalion-world`, given
   palette entries carry optional knowledge-plane concept Internationalized
-  Resource Identifiers (design §7.2).
+  Resource Identifiers (design §7.2). **Resolved** by
+  [ADR 006](adr-006-scene-document-model.md): it stays in `thysalion-world`,
+  with `bevy` behind an optional feature. The coupling the question anticipated
+  does not arise — an identifier is validated for syntax and namespace
+  membership only, against a table the caller injects, so no dependency on
+  `oxigraph` or `thysalion-knowledge` follows. That record carries the reversal
+  trigger.

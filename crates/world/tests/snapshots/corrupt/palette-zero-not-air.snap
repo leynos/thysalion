@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: palette-zero-not-air.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.palette.zero-not-air at palette[0]
+  palette index zero is reserved for air, so an absent chunk and a long air run agree without a lookup

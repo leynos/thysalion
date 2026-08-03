@@ -1,0 +1,11 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: zero-length-run.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.voxels.zero-length-run at voxels[0]
+  chunk (0, 0, 0) at local (0, 0, 0)
+  run 0 has zero length

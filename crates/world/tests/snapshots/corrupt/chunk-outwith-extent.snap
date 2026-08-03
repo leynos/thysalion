@@ -1,0 +1,10 @@
+---
+source: crates/world/tests/corrupt_fixtures.rs
+expression: outcome.output
+---
+document: chunk-outwith-extent.scene.json
+source root: tests/fixtures/corrupt
+1 error(s), 0 warning(s)
+
+error scene.voxels.chunk-outwith-extent at voxels[0]
+  chunk (7, 0, 0) lies outwith the 1 x 1 x 1 chunk grid
