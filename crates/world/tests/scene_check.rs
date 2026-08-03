@@ -125,6 +125,22 @@ struct StatsShape {
     decoded_bytes: u64,
 }
 
+/// Runs the tool over a source holding no document at all, as `--json`.
+fn missing_document() -> Outcome {
+    check(
+        MemorySceneSource::new(),
+        options(|o| o.format = OutputFormat::Json),
+    )
+}
+
+/// The failure a report carries, or a panic naming what was rendered instead.
+fn failure_of(outcome: &Outcome) -> FailureShape {
+    match parse_report(&outcome.output).failure {
+        Some(failure) => failure,
+        None => panic!("a failure must be reported, got:\n{}", outcome.output),
+    }
+}
+
 /// Parses the `--json` output, failing loudly on a shape change.
 fn parse_report(output: &str) -> ReportShape {
     match serde_json::from_str(output) {
@@ -409,25 +425,21 @@ fn a_missing_document_still_renders_parseable_json() {
     // which under `--json` put a bare line after a closed object. Every
     // consumer of this contract parses the whole stream, so that broke them on
     // exactly the paths they most need to read — the ones where nothing loaded.
-    let outcome = check(
-        MemorySceneSource::new(),
-        options(|o| o.format = OutputFormat::Json),
-    );
+    let outcome = missing_document();
     assert_eq!(outcome.code, ExitCode::SourceFailure);
-    let report = parse_report(&outcome.output);
-    let Some(failure) = report.failure else {
-        panic!(
-            "a source failure must be reported, got:\n{}",
-            outcome.output
-        );
-    };
+    let failure = failure_of(&outcome);
     assert_eq!(failure.kind, "source failure");
     assert!(!failure.message.is_empty());
-    // The field a consumer branches on. A failure is a fatal problem, so `ok`
-    // must not say otherwise while the process exits non-zero.
+}
+
+#[test]
+fn a_missing_document_is_not_reported_as_a_document_fault() {
+    let report = parse_report(&missing_document().output);
+    // `ok` is the field a consumer branches on, and a failure is a fatal
+    // problem: it must not read as a pass while the process exits non-zero.
     assert!(!report.ok);
-    // Not an error: an unreadable document has no place *within* a document,
-    // and the generator's suite reads `errors` as located faults.
+    // Nor as an error: an unreadable document has no place *within* a
+    // document, and the generator's suite reads `errors` as located faults.
     assert!(report.errors.is_empty(), "{:?}", report.errors);
 }
 
