@@ -255,23 +255,23 @@ fn a_zero_chunk_size_is_refused_before_the_payload_is_sized_from_it() {
     assert!(carries(&diagnostics, DiagnosticCode::ZeroDimension));
 }
 
-#[test]
-fn a_chunk_edge_whose_cube_overflows_is_refused() {
-    // `ChunkSize::volume` is `const` and infallible, so it has nowhere to
-    // report an overflow: the edge has to be refused at construction or the
-    // cube panics in debug builds and wraps in release ones. Every real size is
-    // far below this — design §7.1 fixes 32.
-    assert!(ChunkSize::new(32).is_ok());
-    assert!(
-        ChunkSize::new(2_642_245).is_ok(),
-        "the largest cube that fits"
-    );
-    assert!(
-        ChunkSize::new(2_642_246).is_err(),
-        "the first that does not"
-    );
-    assert!(ChunkSize::new(u32::MAX).is_err());
-    assert!(ChunkSize::new(0).is_err());
+/// The bound is the run encoding, not the machine word: a chunk serializes as
+/// `VoxelRunDocument`s whose `length` is a `u32`, so a volume above `u32::MAX`
+/// has no canonical single-run form and `collapse` would wrap building one.
+/// `ChunkSize::volume` is `const` and infallible besides, so it has nowhere to
+/// report a failure of its own. Every real size is far below the limit — design
+/// §7.1 fixes 32.
+#[rstest]
+#[case::design(32, true)]
+#[case::largest_volume_a_run_length_can_express(1_625, true)]
+#[case::first_volume_it_cannot(1_626, false)]
+#[case::widest(u32::MAX, false)]
+#[case::zero(0, false)]
+fn a_chunk_edge_is_accepted_only_when_its_volume_is_run_encodable(
+    #[case] size: u32,
+    #[case] accepted: bool,
+) {
+    assert_eq!(ChunkSize::new(size).is_ok(), accepted, "size {size}");
 }
 
 #[test]

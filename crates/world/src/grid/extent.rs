@@ -28,8 +28,8 @@ pub enum ExtentError {
     /// The chunk size was zero.
     #[error("chunk size is zero")]
     ZeroChunkSize,
-    /// The chunk edge is so long that its cube does not fit a `u64`.
-    #[error("chunk size {size} has a volume that overflows")]
+    /// The chunk edge is so long that its cube cannot be run-encoded.
+    #[error("chunk size {size} has a volume above the u32 run-length limit")]
     ChunkVolumeOverflow {
         /// The offending edge length, in voxels.
         size: u32,
@@ -65,24 +65,29 @@ impl ChunkSize {
     ///
     /// Returns [`ExtentError::ZeroChunkSize`] when `size` is zero.
     /// Returns [`ExtentError::ChunkVolumeOverflow`] when the cube of `size`
-    /// will not fit a `u64`.
+    /// exceeds what a run length can express.
     pub const fn new(size: u32) -> Result<Self, ExtentError> {
         if size == 0 {
             return Err(ExtentError::ZeroChunkSize);
         }
-        // Checked here, once, rather than at every use. `volume` is called on
-        // each chunk lookup and is `const`, so it has nowhere to report a
-        // failure: an unchecked edge would panic in debug builds and wrap in
-        // release ones. Refusing the edge makes `volume` total by
-        // construction. Every legitimate size is far below the limit — design
-        // §7.1 fixes 32 — so nothing real is excluded.
+        // Bounded by the run encoding, not merely by `u64`. A chunk is
+        // serialized as `VoxelRunDocument`s whose `length` is a `u32`, so a
+        // volume above `u32::MAX` has no canonical single-run form and
+        // `collapse` would wrap while building one. Checking here, once, also
+        // makes `volume` total: it is `const` and infallible, so it has
+        // nowhere to report a failure of its own. Every legitimate size is far
+        // below the limit — design §7.1 fixes 32 — so nothing real is
+        // excluded.
         let edge = size as u64;
         let Some(square) = edge.checked_mul(edge) else {
             return Err(ExtentError::ChunkVolumeOverflow { size });
         };
-        let Some(_cube) = square.checked_mul(edge) else {
+        let Some(cube) = square.checked_mul(edge) else {
             return Err(ExtentError::ChunkVolumeOverflow { size });
         };
+        if cube > u32::MAX as u64 {
+            return Err(ExtentError::ChunkVolumeOverflow { size });
+        }
         Ok(Self(size))
     }
 
