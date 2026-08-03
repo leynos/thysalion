@@ -220,20 +220,28 @@ def raster_rows(path: Path, content: Box) -> Iterator[tuple[int, str]]:
     air.
     """
     width, height, _ = content.extent
-    rows = path.read_text(encoding="utf-8").splitlines()
-    stripped = [row.rstrip() for row in rows]
-    while stripped and not stripped[-1]:
-        stripped.pop()
+    stripped = trimmed_rows(path)
     if len(stripped) != height:
         raise SourceError(
             f"{path}: expected {height} rows for a content extent of {height}, got {len(stripped)}"
         )
     for offset, row in enumerate(stripped):
-        if len(row) != width:
-            raise SourceError(
-                f"{path}:{offset + 1}: expected {width} columns, got {len(row)}"
-            )
+        refuse_row_of_wrong_width(path, offset + 1, row, width)
         yield offset + 1, row
+
+
+def trimmed_rows(path: Path) -> list[str]:
+    """A raster's rows, without trailing spaces or blank lines at the end."""
+    stripped = [row.rstrip() for row in path.read_text(encoding="utf-8").splitlines()]
+    while stripped and not stripped[-1]:
+        stripped.pop()
+    return stripped
+
+
+def refuse_row_of_wrong_width(path: Path, line: int, row: str, width: int) -> None:
+    """Refuses a row that is not exactly the content width."""
+    if len(row) != width:
+        raise SourceError(f"{path}:{line}: expected {width} columns, got {len(row)}")
 
 
 @dataclass
@@ -335,9 +343,30 @@ class Placer:
     def place_row(self, row: str, path: Path, cursor: LayerCursor) -> None:
         """Places every non-air character of ``row``."""
         for column, character in enumerate(row):
-            index = resolve(character, self.legend, self.indices, path, cursor.line)
+            index = self.resolve(character, path, cursor.line)
             if index != AIR_INDEX:
                 self.place(column, cursor, index)
+
+    def resolve(self, character: str, path: Path, line: int) -> int:
+        """The palette index a raster character stands for.
+
+        A method rather than a free function taking five arguments: the legend
+        and the palette indices are state this type already holds, and passing
+        them through every call was what pushed the signature over the cap.
+
+        An unlisted character is an error, never a silent air. Silently treating
+        an unknown character as empty space is how a mistyped legend produces a
+        scene with holes in it that loads perfectly well.
+        """
+        name = self.legend.get(character)
+        if name is None:
+            raise SourceError(f"{path}:{line}: {character!r} is not in legend.toml")
+        index = self.indices.get(name)
+        if index is None:
+            raise SourceError(
+                f"{path}:{line}: legend names {name!r}, which is not in the palette"
+            )
+        return index
 
     def place(self, column: int, cursor: LayerCursor, index: int) -> None:
         """Places one voxel and records the line that authored it."""
@@ -353,28 +382,6 @@ class Placer:
             cursor.relative,
             cursor.line,
         )
-
-
-def resolve(
-    character: str,
-    legend: Mapping[str, str],
-    indices: Mapping[str, int],
-    path: Path,
-    line: int,
-) -> int:
-    """The palette index a raster character stands for.
-
-    An unlisted character is an error, never a silent air. Silently treating an
-    unknown character as empty space is how a mistyped legend produces a scene
-    with holes in it that loads perfectly well.
-    """
-    name = legend.get(character)
-    if name is None:
-        raise SourceError(f"{path}:{line}: {character!r} is not in legend.toml")
-    index = indices.get(name)
-    if index is None:
-        raise SourceError(f"{path}:{line}: legend names {name!r}, which is not in the palette")
-    return index
 
 
 def chunk_payload(grid: Grid, chunk: tuple[int, int, int], chunk_size: int) -> dict[str, object]:
