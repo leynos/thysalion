@@ -21,10 +21,25 @@ mod support;
 mod hostile;
 
 use hostile::within_bound;
+use rstest::{fixture, rstest};
 use support::minimal_document;
 
-#[test]
-fn deeply_nested_json_does_not_overflow_the_stack() {
+/// A loader over an empty source.
+///
+/// Every test here feeds bytes directly rather than reading a document, so the
+/// source is never consulted; sharing one constructor keeps five identical
+/// lines from drifting apart.
+#[fixture]
+fn loader() -> SceneLoader {
+    // Two statements rather than one expression: `#[fixture]` expands the body
+    // in a position where a bare braced expression trips `unused_braces`, and
+    // the workspace denies suppressions.
+    let source = MemorySceneSource::new();
+    SceneLoader::new(Arc::new(source))
+}
+
+#[rstest]
+fn deeply_nested_json_does_not_overflow_the_stack(loader: SceneLoader) {
     // `serde_json` bounds recursion depth itself, and the assertion is only that
     // this returns an error rather than aborting the process — a stack overflow
     // is not a `Result` and cannot be reported as one.
@@ -33,15 +48,14 @@ fn deeply_nested_json_does_not_overflow_the_stack() {
     bytes.extend(std::iter::repeat_n(b'[', depth));
     bytes.extend(std::iter::repeat_n(b']', depth));
 
-    let loader = SceneLoader::new(Arc::new(MemorySceneSource::new()));
     let outcome = within_bound("100,000 levels of nested JSON", || {
         loader.load_bytes(&bytes, Encoding::Json)
     });
     assert!(outcome.is_err(), "nested JSON must not load as a scene");
 }
 
-#[test]
-fn a_truncated_messagepack_payload_is_refused() {
+#[rstest]
+fn a_truncated_messagepack_payload_is_refused(loader: SceneLoader) {
     let document = minimal_document();
     let bytes = match encode_document(&document, Encoding::MessagePack) {
         Ok(bytes) => bytes,
@@ -51,15 +65,14 @@ fn a_truncated_messagepack_payload_is_refused() {
         panic!("the encoding must be long enough to halve");
     };
 
-    let loader = SceneLoader::new(Arc::new(MemorySceneSource::new()));
     let outcome = within_bound("a half-length MessagePack payload", || {
         loader.load_bytes(truncated, Encoding::MessagePack)
     });
     assert!(outcome.is_err(), "a truncated payload must not load");
 }
 
-#[test]
-fn a_messagepack_payload_declaring_a_gigantic_array_is_refused() {
+#[rstest]
+fn a_messagepack_payload_declaring_a_gigantic_array_is_refused(loader: SceneLoader) {
     // `0xdd` is `array32`, followed by a big-endian length. This claims four
     // billion elements and then supplies none. A decoder that pre-allocates from
     // the declared length exhausts memory before reading a byte of content,
@@ -67,24 +80,22 @@ fn a_messagepack_payload_declaring_a_gigantic_array_is_refused() {
     // trust.
     let bytes = vec![0xdd, 0xff, 0xff, 0xff, 0xff];
 
-    let loader = SceneLoader::new(Arc::new(MemorySceneSource::new()));
     let outcome = within_bound("a MessagePack array32 claiming 4.29 billion items", || {
         loader.load_bytes(&bytes, Encoding::MessagePack)
     });
     assert!(outcome.is_err(), "a gigantic declared array must not load");
 }
 
-#[test]
-fn an_empty_input_is_refused_rather_than_treated_as_an_empty_scene() {
-    let loader = SceneLoader::new(Arc::new(MemorySceneSource::new()));
+#[rstest]
+fn an_empty_input_is_refused_rather_than_treated_as_an_empty_scene(loader: SceneLoader) {
     for encoding in [Encoding::Json, Encoding::MessagePack] {
         let outcome = loader.load_bytes(&[], encoding);
         assert!(outcome.is_err(), "{encoding}: empty input must not load");
     }
 }
 
-#[test]
-fn a_second_document_appended_to_the_first_is_refused() {
+#[rstest]
+fn a_second_document_appended_to_the_first_is_refused(loader: SceneLoader) {
     // A document is one value, not the first value of a stream. Accepting a
     // prefix means a file holding two scenes — or one scene and the tail of an
     // interrupted write — loads as whichever came first, silently, and the
@@ -100,7 +111,6 @@ fn a_second_document_appended_to_the_first_is_refused() {
     for (encoding, one) in [(Encoding::Json, json), (Encoding::MessagePack, msgpack)] {
         let mut bytes = one.clone();
         bytes.extend_from_slice(&one);
-        let loader = SceneLoader::new(Arc::new(MemorySceneSource::new()));
         let outcome = loader.load_bytes(&bytes, encoding).map(|_| ());
         let Err(SceneLoadError::Malformed { message, .. }) = outcome else {
             panic!("{encoding}: a doubled document must be refused as malformed");

@@ -549,13 +549,20 @@ def compile_scene(source: Path) -> tuple[dict[str, object], dict[str, object]]:
     palette = build_palette(palette_entries, where)
     legend = parse_legend(source / "legend.toml")
     chunk_size = int(scene.get("chunk_size", DESIGN_CHUNK_SIZE))
-    if chunk_size <= 0:
-        # Checked where it is read, not where it is used. Every voxel
-        # coordinate is divided by this to find its chunk, so a zero reaches
-        # the division long before anything that could name the file, and the
-        # author gets a bare ZeroDivisionError instead of a message telling
-        # them which line of which scene.toml to open.
-        raise SourceError(f"{where}: chunk_size must be positive, got {chunk_size}")
+    if chunk_size != DESIGN_CHUNK_SIZE:
+        # The engine accepts exactly one chunk size. `ChunkSize::new` refuses
+        # anything whose cube outruns a u32 run length, and the header rule
+        # refuses everything that is not the design value, so a generator that
+        # emitted another size would produce a document the loader rejects —
+        # discovered by whoever ran the scene, not by whoever wrote the TOML.
+        #
+        # Checked here rather than only guarding the division, because every
+        # voxel coordinate is divided by this to find its chunk: an unchecked
+        # zero reached the division as a bare ZeroDivisionError naming nothing
+        # an author could open.
+        raise SourceError(
+            f"{where}: chunk_size must be {DESIGN_CHUNK_SIZE}, got {chunk_size}"
+        )
 
     grid, provenance = read_layers(source, legend, [entry["name"] for entry in palette], content)
 

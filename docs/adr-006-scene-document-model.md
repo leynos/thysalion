@@ -284,7 +284,8 @@ layering misses.
 The incumbent in the Minecraft-adjacent tooling ecosystem, and the closest
 thing to a standard sparse voxel interchange. Rejected on two counts. It is
 a gzipped, binary Named Binary Tag format, which forfeits the JSON authoring
-encoding design §7.3 requires. And its palette entries are blockstate strings, carrying
+encoding design §7.3 requires. And its palette entries are blockstate strings,
+carrying
 none of passability, slope, emission, simulation coefficients, or concept IRI —
 so the palette would have to be carried out of band, which is the whole of what
 makes this format worth having.

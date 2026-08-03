@@ -346,5 +346,22 @@ def test_a_zero_chunk_size_names_the_file_rather_than_dividing_by_it(
     """
     scene = MINIMAL_SCENE.replace("chunk_size = 32", "chunk_size = 0")
     source = scene_source({"z000.txt": "..\n..\n"}, scene=scene)
-    with pytest.raises(generator.SourceError, match="chunk_size must be positive"):
+    with pytest.raises(generator.SourceError, match="chunk_size must be 32"):
+        generator.compile_scene(source)
+
+
+@pytest.mark.parametrize("size", [0, 16, 31, 33, 64, 1626])
+def test_only_the_design_chunk_size_is_accepted(
+    scene_source: typ.Callable[..., Path],
+    size: int,
+) -> None:
+    """The engine accepts one chunk size, so the generator must not emit another.
+
+    A document carrying any other value is one the Rust header rule refuses, so
+    emitting it moves the failure from whoever wrote the TOML to whoever ran the
+    scene.
+    """
+    scene = MINIMAL_SCENE.replace("chunk_size = 32", f"chunk_size = {size}")
+    source = scene_source({"z000.txt": "..\n..\n"}, scene=scene)
+    with pytest.raises(generator.SourceError, match="chunk_size must be 32"):
         generator.compile_scene(source)
