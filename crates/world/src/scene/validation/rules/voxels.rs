@@ -238,7 +238,12 @@ impl ChunkContext<'_> {
         let code = match error {
             RunDecodeError::ZeroLength { .. } => DiagnosticCode::ZeroLengthRun,
             RunDecodeError::AdjacentDuplicate { .. } => DiagnosticCode::AdjacentDuplicateRuns,
-            RunDecodeError::LengthMismatch { .. } => DiagnosticCode::RunLengthMismatch,
+            // Reported as a length mismatch: from the document's side that is
+            // what it is — the declared volume is one this build cannot hold —
+            // and no corruption class exists for "your machine is too small".
+            RunDecodeError::LengthMismatch { .. } | RunDecodeError::Unallocatable { .. } => {
+                DiagnosticCode::RunLengthMismatch
+            }
         };
         self.positioned(code, VoxelPos::new(0, 0, 0), error.to_string())
     }

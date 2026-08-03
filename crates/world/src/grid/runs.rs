@@ -32,6 +32,20 @@ pub enum RunDecodeError {
         /// The shared palette index.
         index: u16,
     },
+    /// The decoded chunk will not fit this machine's address space, or the
+    /// allocator refused it.
+    ///
+    /// Distinct from `LengthMismatch`: the stream is internally consistent and
+    /// agrees with the declared volume. It is this target that cannot hold the
+    /// result — on a 32-bit build, two canonical `u32::MAX` runs describe a
+    /// volume larger than `usize::MAX`. Reported rather than aborted, because
+    /// `Vec::with_capacity` on an impossible size ends the process instead of
+    /// the load.
+    #[error("a chunk of {volume} voxels cannot be allocated on this target")]
+    Unallocatable {
+        /// The volume that could not be held.
+        volume: u64,
+    },
     /// The run lengths do not sum to the chunk volume.
     #[error("run lengths sum to {actual}, but the chunk holds {expected} voxels")]
     LengthMismatch {
@@ -59,8 +73,14 @@ pub fn expand(runs: &[VoxelRunDocument], volume: u64) -> Result<Vec<VoxelIndex>,
             expected: volume,
         });
     }
-    let capacity = usize::try_from(volume).unwrap_or(usize::MAX);
-    let mut out = Vec::with_capacity(capacity);
+    // Checked, then reserved fallibly. `usize::try_from(...).unwrap_or(MAX)`
+    // followed by `with_capacity` turns an impossible volume into an abort
+    // rather than a diagnostic, which is the one failure mode a loader must
+    // never have: the caller still owns a valid previous scene.
+    let capacity = usize::try_from(volume).map_err(|_| RunDecodeError::Unallocatable { volume })?;
+    let mut out = Vec::new();
+    out.try_reserve_exact(capacity)
+        .map_err(|_| RunDecodeError::Unallocatable { volume })?;
     for run in runs {
         let index = VoxelIndex::new(run.index);
         out.extend(core::iter::repeat_n(index, run.length as usize));
