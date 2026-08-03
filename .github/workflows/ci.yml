@@ -45,7 +45,7 @@ jobs:
             !**/target/**
             !**/dist/**
       - name: Setup uv
-        uses: astral-sh/setup-uv@c6081965dd0577ae48820cb8c288e12509571f0c
+        uses: astral-sh/setup-uv@7e7e21ddc30bd66316c7b9889405f485b5022c96
       - name: Check spelling
         run: make spelling
       - name: Install test runner
