@@ -18,10 +18,10 @@ comment says so.
 Roadmap step 1.2 ([roadmap.md](../roadmap.md) §1.2) fills it. After this change
 a contributor can take a scene written as a human-readable JSON document, load
 it through one validating loader, and get back either a fully-formed in-memory
-scene or a list of precise diagnostics and nothing else. Three fixture scenes —
-a keep interior, a market-town block, and a swamp fragment — ship with the
-repository and become the shared substrate every later spike renders, lights,
-simulates, and tests against.
+scene or a list of precise diagnostics and nothing else. Four fixture scenes —
+a keep interior, a market-town block, a swamp fragment, and the deliberately
+minimal `bare-cell` — ship with the repository and become the shared substrate
+every later spike renders, lights, simulates, and tests against.
 
 Concretely, after this change:
 
@@ -37,9 +37,12 @@ Concretely, after this change:
    prints `keep-interior: ok` and exits zero, and the same command against a
    corrupt fixture prints a located diagnostic report and exits with a code
    that distinguishes an invalid scene from a broken tool (task 1.2.2).
-4. All three fixture scenes under `assets/scenes/` load clean through the
+4. All four fixture scenes under `assets/scenes/` load clean through the
    validator, exercised by a behavioural suite that runs headless in continuous
-   integration (task 1.2.3).
+   integration (task 1.2.3). The roadmap task names three; `bare-cell` is the
+   fourth, added during the work because the other three all derive from design
+   §7.1's Table 1 and would otherwise make whatever they happen to share an
+   unstated engine assumption.
 
 The stability promise of this step is *one document, one loader, one set of
 diagnostics*. Every later phase — rendering (phase 2), lighting (phase 3),

@@ -24,7 +24,7 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use thysalion_world::{
     check::{self, ExitCode, Options, Outcome, OutputFormat},
     loader::SceneLoader,
-    scene::validation::Strictness,
+    scene::validation::{Bounds, Strictness},
     source::DirSceneSource,
 };
 
@@ -369,5 +369,31 @@ fn an_unreadable_resource_is_distinguished_from_an_absent_one() {
     assert!(
         codes.contains(&"scene.knowledge.resource-unreadable"),
         "expected an unreadable-resource diagnostic, got {codes:?}"
+    );
+}
+
+#[test]
+fn the_too_deep_fixture_outruns_the_bound_it_tests() {
+    // The fixture is a fixed 40-link chain and the bound is a constant it does
+    // not reference, so raising `max_prototype_depth` to 40 would leave the
+    // fixture loading clean and `prototype-too-deep` silently testing nothing.
+    // Asserted here rather than left to whoever changes the bound.
+    // Through the same capability handle every other test here uses: the
+    // workspace forbids `std::fs`, and a test is not exempt from the policy
+    // that a reader can see the whole filesystem surface a module touches.
+    let document = fixtures()
+        .read("prototype-too-deep.scene.json")
+        .expect("the fixture must be readable");
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&document).expect("the fixture must parse");
+    let links = parsed
+        .get("entities")
+        .and_then(|entities| entities.get("prototypes"))
+        .and_then(serde_json::Value::as_object)
+        .map_or(0, serde_json::Map::len);
+    assert!(
+        links > Bounds::DEFAULT.max_prototype_depth,
+        "the fixture's {links}-link chain must outrun the {}-deep bound it exists to breach",
+        Bounds::DEFAULT.max_prototype_depth
     );
 }

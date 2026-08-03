@@ -179,8 +179,10 @@ and `#` to `stone-block`:
 ####
 ```
 
-`layers/z001.txt`, the layer at `content_origin.z + 1`, is a hollow ring one
-layer up:
+`layers/z001.txt`, the layer at `content_origin.z + 1`, leaves a stone post at
+each corner and air between them — not a ring, which would need its edges
+filled. This is the raster `assets/scenes/src/bare-cell/layers/z001.txt`
+actually holds, so the two cannot drift:
 
 ```text
 #..#
