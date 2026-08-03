@@ -66,6 +66,21 @@ impl ChunkSize {
     /// Returns [`ExtentError::ZeroChunkSize`] when `size` is zero.
     /// Returns [`ExtentError::ChunkVolumeOverflow`] when the cube of `size`
     /// exceeds what a run length can express.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::grid::{ChunkSize, DESIGN_CHUNK_SIZE};
+    ///
+    /// let size = ChunkSize::new(DESIGN_CHUNK_SIZE)?;
+    /// assert_eq!(size.get(), 32);
+    ///
+    /// // Zero has no volume, and an edge whose cube outruns a `u32` run
+    /// // length has no canonical single-run form.
+    /// assert!(ChunkSize::new(0).is_err());
+    /// assert!(ChunkSize::new(1_626).is_err());
+    /// # Ok::<(), thysalion_world::grid::ExtentError>(())
+    /// ```
     pub const fn new(size: u32) -> Result<Self, ExtentError> {
         if size == 0 {
             return Err(ExtentError::ZeroChunkSize);
@@ -92,10 +107,27 @@ impl ChunkSize {
     }
 
     /// The edge length, in voxels.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::grid::ChunkSize;
+    ///
+    /// assert_eq!(ChunkSize::DESIGN.get(), 32);
+    /// ```
     #[must_use]
     pub const fn get(self) -> u32 { self.0 }
 
     /// The number of voxels in one chunk.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::grid::ChunkSize;
+    ///
+    /// // 32 x 32 x 32.
+    /// assert_eq!(ChunkSize::DESIGN.volume(), 32_768);
+    /// ```
     #[must_use]
     pub const fn volume(self) -> u64 {
         // Cannot overflow: `ChunkSize::new` refuses any edge whose cube does

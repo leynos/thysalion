@@ -64,6 +64,35 @@ pub enum RunDecodeError {
 /// cover the chunk exactly. The length check runs *before* any allocation
 /// proportional to the declared lengths, so a stream claiming a vast volume is
 /// refused rather than exhausting memory.
+/// # Examples
+///
+/// ```
+/// use thysalion_world::{
+///     grid::{VoxelIndex, runs::expand},
+///     scene::document::VoxelRunDocument,
+/// };
+///
+/// let runs = [
+///     VoxelRunDocument {
+///         length: 2,
+///         index: 0,
+///     },
+///     VoxelRunDocument {
+///         length: 1,
+///         index: 1,
+///     },
+/// ];
+/// let voxels = expand(&runs, 3)?;
+/// assert_eq!(
+///     voxels,
+///     vec![VoxelIndex::AIR, VoxelIndex::AIR, VoxelIndex::new(1)]
+/// );
+///
+/// // The declared volume is the contract: a stream that does not fill the
+/// // chunk exactly is refused rather than padded with air.
+/// assert!(expand(&runs, 4).is_err());
+/// # Ok::<(), thysalion_world::grid::runs::RunDecodeError>(())
+/// ```
 pub fn expand(runs: &[VoxelRunDocument], volume: u64) -> Result<Vec<VoxelIndex>, RunDecodeError> {
     check_canonical(runs)?;
     let total = total_length(runs);
@@ -119,6 +148,19 @@ fn check_canonical(runs: &[VoxelRunDocument]) -> Result<(), RunDecodeError> {
 ///
 /// Maximal runs, no zero-length run, no adjacent duplicates — the form
 /// [`expand`] accepts, and the form the content hash is taken over.
+///
+/// # Examples
+///
+/// ```
+/// use thysalion_world::grid::{VoxelIndex, runs::collapse};
+///
+/// let voxels = [VoxelIndex::AIR, VoxelIndex::AIR, VoxelIndex::new(1)];
+/// let runs = collapse(&voxels);
+/// // Adjacent equal voxels merge; the two air voxels become one run of two.
+/// assert_eq!(runs.len(), 2);
+/// assert_eq!(runs[0].length, 2);
+/// assert_eq!(runs[1].index, 1);
+/// ```
 #[must_use]
 pub fn collapse(voxels: &[VoxelIndex]) -> Vec<VoxelRunDocument> {
     let mut runs: Vec<VoxelRunDocument> = Vec::new();
@@ -138,6 +180,18 @@ pub fn collapse(voxels: &[VoxelIndex]) -> Vec<VoxelRunDocument> {
 ///
 /// A dense chunk that happens to hold one value must encode as a uniform
 /// payload, or two documents describing the same world would hash differently.
+///
+/// # Examples
+///
+/// ```
+/// use thysalion_world::grid::{VoxelIndex, runs::uniform_index};
+///
+/// let stone = VoxelIndex::new(1);
+/// assert_eq!(uniform_index(&[stone, stone]), Some(stone));
+/// assert_eq!(uniform_index(&[stone, VoxelIndex::AIR]), None);
+/// // An empty slice names no value, so there is nothing to be uniform.
+/// assert_eq!(uniform_index(&[]), None);
+/// ```
 #[must_use]
 pub fn uniform_index(voxels: &[VoxelIndex]) -> Option<VoxelIndex> {
     let first = *voxels.first()?;
