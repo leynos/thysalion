@@ -101,8 +101,11 @@ error scene.voxels.unknown-palette-index at voxels[0]
 Four things to read, in order.
 
 - **The source root.** Running from the wrong working directory produces
-  "knowledge resource absent", which is the same diagnostic a genuinely broken
-  scene produces. Check this line first.
+  `scene.knowledge.resource-unreadable`, not `resource-absent`:
+  `rules::resources::classify` maps an unavailable root to the unreadable class
+  precisely so a wrong directory is distinguishable from a scene naming a file
+  that is genuinely missing. Check this line first either way — the root is what
+  tells the two apart.
 - **The code.** Stable and machine-readable; the thing to search for and the
   thing tests assert on. Renaming one is a contract change; adding one is not.
 - **The document location** (`voxels[0]`). Which section, and which entry

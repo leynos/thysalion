@@ -3051,7 +3051,11 @@ found that the first pass had not, and that had survived into the revised plan:
   suppressions. `writeln!` on a `Stdout` handle resolves it without a
   suppression. The coverage half is resolved by amending this plan's own
   promise: one ignore entry for `crates/world/examples`, with the logic kept in
-  `check/` where tests reach it.
+  `check/` where tests reach it. That entry was never added, and on measurement
+  it is not needed: `cargo llvm-cov` does not report example targets at all, so
+  `examples/scene-check.rs` contributes nothing to the ratio whether or not the
+  pattern names it. The Makefile's boundary is therefore unchanged, which is
+  what `repository-layout.md` describes. Recorded 2026-08-03 during review.
 - **Two writers, one format, one tested.** The staleness test compared Python
   output against Python output. Rust's serializer re-emits defaults the
   generator would omit, so the two produce different bytes for the same scene
