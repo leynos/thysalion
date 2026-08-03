@@ -50,13 +50,15 @@ pub fn check(document: &SceneDocument, bounds: &Bounds) -> Result<Geometry, Vec<
         ));
     }
 
-    let Ok(chunk_size) = ChunkSize::new(document.chunk_size) else {
-        problems.push(SceneDiagnostic::structural(
-            DiagnosticCode::ZeroDimension,
-            at,
-            "chunk size is zero",
-        ));
-        return Err(problems);
+    let chunk_size = match ChunkSize::new(document.chunk_size) {
+        Ok(chunk_size) => chunk_size,
+        Err(error) => {
+            // Rendered through the shared mapping rather than assumed to be
+            // the zero case: an edge whose cube overflows fails here too, and
+            // reporting that as "chunk size is zero" would be a lie.
+            problems.push(extent_diagnostic(&error, at));
+            return Err(problems);
+        }
     };
 
     let extent = match Extent::new(
@@ -117,7 +119,9 @@ fn check_version(document: &SceneDocument) -> Result<(), SceneDiagnostic> {
 fn extent_diagnostic(error: &ExtentError, at: DocumentLocation) -> SceneDiagnostic {
     let code = match error {
         ExtentError::ZeroAxis { .. } | ExtentError::ZeroChunkSize => DiagnosticCode::ZeroDimension,
-        ExtentError::VolumeOverflow => DiagnosticCode::DimensionsOverflow,
+        ExtentError::VolumeOverflow | ExtentError::ChunkVolumeOverflow { .. } => {
+            DiagnosticCode::DimensionsOverflow
+        }
         ExtentError::Unaligned { .. } => DiagnosticCode::DimensionsUnaligned,
     };
     SceneDiagnostic::structural(code, at, error.to_string())

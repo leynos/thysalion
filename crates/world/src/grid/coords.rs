@@ -54,8 +54,18 @@ impl VoxelPos {
     /// [`ChunkSize::volume`].
     #[must_use]
     pub const fn local_index(self, chunk_size: ChunkSize) -> u64 {
+        // Saturating, because this is documented to accept a position outwith
+        // the chunk and to report that by returning an index the caller's
+        // bounds check rejects. An arbitrary `u32` position against a large
+        // chunk size overflows the products; saturating keeps the result
+        // outwith every chunk, which is exactly what the contract promises,
+        // where wrapping could land back inside one.
         let size = chunk_size.get() as u64;
-        (self.z as u64) * size * size + (self.y as u64) * size + (self.x as u64)
+        let plane = size.saturating_mul(size);
+        (self.z as u64)
+            .saturating_mul(plane)
+            .saturating_add((self.y as u64).saturating_mul(size))
+            .saturating_add(self.x as u64)
     }
 
     /// The chunk-local position at `index` in a chunk's Z-major stream.
@@ -102,11 +112,15 @@ impl ChunkCoord {
     /// The scene position of this chunk's origin corner.
     #[must_use]
     pub const fn origin(self, chunk_size: ChunkSize) -> VoxelPos {
+        // Saturating for the same reason `VoxelPos::local_index` is: a chunk
+        // coordinate is a public `u32` triple, and a coordinate past the grid
+        // must yield a position past the grid rather than panic in debug and
+        // wrap into a valid-looking one in release.
         let size = chunk_size.get();
         VoxelPos {
-            x: self.x * size,
-            y: self.y * size,
-            z: self.z * size,
+            x: self.x.saturating_mul(size),
+            y: self.y.saturating_mul(size),
+            z: self.z.saturating_mul(size),
         }
     }
 }

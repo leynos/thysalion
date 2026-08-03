@@ -422,3 +422,32 @@ fn many_over_long_chunks_are_summarized_rather_than_listed_or_dropped() {
         "the unlisted remainder must be counted, got {rendered:?}"
     );
 }
+
+#[test]
+fn a_second_document_appended_to_the_first_is_refused() {
+    // A document is one value, not the first value of a stream. Accepting a
+    // prefix means a file holding two scenes — or one scene and the tail of an
+    // interrupted write — loads as whichever came first, silently, and the
+    // content hash then describes bytes nobody can reproduce from the file.
+    let document = minimal_document();
+    let Ok(json) = encode_document(&document, Encoding::Json) else {
+        panic!("the minimal document must encode as JSON");
+    };
+    let Ok(msgpack) = encode_document(&document, Encoding::MessagePack) else {
+        panic!("the minimal document must encode as MessagePack");
+    };
+
+    for (encoding, one) in [(Encoding::Json, json), (Encoding::MessagePack, msgpack)] {
+        let mut bytes = one.clone();
+        bytes.extend_from_slice(&one);
+        let loader = SceneLoader::new(Arc::new(MemorySceneSource::new()));
+        let outcome = loader.load_bytes(&bytes, encoding).map(|_| ());
+        let Err(SceneLoadError::Malformed { message, .. }) = outcome else {
+            panic!("{encoding}: a doubled document must be refused as malformed");
+        };
+        assert!(
+            message.contains("trailing input"),
+            "{encoding}: got {message}"
+        );
+    }
+}

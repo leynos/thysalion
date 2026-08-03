@@ -237,3 +237,50 @@ fn a_zero_chunk_size_is_refused_before_the_payload_is_sized_from_it() {
     assert!(carries(&diagnostics, DiagnosticCode::ChunkSizeNotDesign));
     assert!(carries(&diagnostics, DiagnosticCode::ZeroDimension));
 }
+
+#[test]
+fn a_chunk_edge_whose_cube_overflows_is_refused() {
+    // `ChunkSize::volume` is `const` and infallible, so it has nowhere to
+    // report an overflow: the edge has to be refused at construction or the
+    // cube panics in debug builds and wraps in release ones. Every real size is
+    // far below this — design §7.1 fixes 32.
+    assert!(ChunkSize::new(32).is_ok());
+    assert!(
+        ChunkSize::new(2_642_245).is_ok(),
+        "the largest cube that fits"
+    );
+    assert!(
+        ChunkSize::new(2_642_246).is_err(),
+        "the first that does not"
+    );
+    assert!(ChunkSize::new(u32::MAX).is_err());
+    assert!(ChunkSize::new(0).is_err());
+}
+
+#[test]
+fn coordinate_arithmetic_saturates_rather_than_wrapping() {
+    let Ok(chunk_size) = ChunkSize::new(32) else {
+        panic!("32 must construct");
+    };
+    // Both are public and take arbitrary `u32`s. Wrapping would put a position
+    // far outwith the grid back inside it, which is worse than a large answer:
+    // the caller's bounds check would pass.
+    let far = ChunkCoord::new(u32::MAX, u32::MAX, u32::MAX);
+    assert_eq!(
+        far.origin(chunk_size),
+        VoxelPos {
+            x: u32::MAX,
+            y: u32::MAX,
+            z: u32::MAX,
+        }
+    );
+    let outwith = VoxelPos {
+        x: u32::MAX,
+        y: u32::MAX,
+        z: u32::MAX,
+    };
+    assert!(
+        outwith.local_index(chunk_size) >= chunk_size.volume(),
+        "a position outwith the chunk must yield an index the bounds check rejects"
+    );
+}

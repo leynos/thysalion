@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use crate::{
     codec::{CodecError, Encoding, encode_document},
-    scene::Scene,
+    scene::{Scene, document::SceneDocument},
 };
 
 /// How many bytes one voxel index occupies in a decoded chunk.
@@ -60,7 +60,11 @@ impl SceneStats {
         let json = encode_document(&document, Encoding::Json)?;
         let msgpack = encode_document(&document, Encoding::MessagePack)?;
 
-        let payload = ChunkTally::of(scene);
+        // Tallied from the document already built above rather than from a
+        // second `to_chunks()` pass: the run encoding is the expensive part of
+        // measuring a scene, and doing it twice to count what the first pass
+        // produced is pure duplication.
+        let payload = ChunkTally::of(&document);
         Ok(Self {
             palette_entries: scene.palette().len(),
             spawns: scene.entities().len(),
@@ -128,7 +132,7 @@ impl ChunkTally {
     /// internal storage, so the numbers describe what a reader will find in the
     /// file. A densely stored chunk holding one distinct index is *reported* as
     /// uniform, because that is how it encodes.
-    fn of(scene: &Scene) -> Self {
+    fn of(document: &SceneDocument) -> Self {
         use crate::scene::document::ChunkPayloadDocument;
 
         let mut tally = Self {
@@ -136,8 +140,8 @@ impl ChunkTally {
             dense: 0,
             runs: 0,
         };
-        for entry in scene.voxels().to_chunks() {
-            match entry.payload {
+        for entry in &document.voxels {
+            match &entry.payload {
                 ChunkPayloadDocument::Uniform(_) => tally.uniform = tally.uniform.saturating_add(1),
                 ChunkPayloadDocument::Runs(runs) => {
                     tally.dense = tally.dense.saturating_add(1);

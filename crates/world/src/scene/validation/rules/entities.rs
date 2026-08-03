@@ -104,15 +104,22 @@ impl Resolver<'_> {
     /// mistyped one is about to reference it.
     fn check_prototype_concepts(&self, problems: &mut Vec<SceneDiagnostic>) {
         let whole = DocumentLocation::section(DocumentSection::Entities);
-        for prototype in self.prototypes.values() {
+        for (name, prototype) in self.prototypes {
             let Some(raw) = prototype.concept.as_ref() else {
                 continue;
             };
             if let Err(problem) = ConceptIri::parse(raw, self.namespaces) {
+                // Named, because the diagnostic is located at the whole
+                // entities section: several prototypes sharing one mistyped
+                // prefix would otherwise produce diagnostics an author cannot
+                // tell apart, and no way to find which declaration to edit.
                 problems.push(SceneDiagnostic::structural(
                     DiagnosticCode::ConceptIriInvalid,
                     whole,
-                    describe_concept_problem(raw, &problem),
+                    format!(
+                        "prototype {name:?}: {}",
+                        describe_concept_problem(raw, &problem)
+                    ),
                 ));
             }
         }

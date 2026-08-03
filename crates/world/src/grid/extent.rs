@@ -28,6 +28,12 @@ pub enum ExtentError {
     /// The chunk size was zero.
     #[error("chunk size is zero")]
     ZeroChunkSize,
+    /// The chunk edge is so long that its cube does not fit a `u64`.
+    #[error("chunk size {size} has a volume that overflows")]
+    ChunkVolumeOverflow {
+        /// The offending edge length, in voxels.
+        size: u32,
+    },
     /// An axis is not a whole number of chunks.
     #[error("extent axis {axis} ({length}) is not a multiple of chunk size {chunk_size}")]
     Unaligned {
@@ -58,10 +64,25 @@ impl ChunkSize {
     /// # Errors
     ///
     /// Returns [`ExtentError::ZeroChunkSize`] when `size` is zero.
+    /// Returns [`ExtentError::ChunkVolumeOverflow`] when the cube of `size`
+    /// will not fit a `u64`.
     pub const fn new(size: u32) -> Result<Self, ExtentError> {
         if size == 0 {
             return Err(ExtentError::ZeroChunkSize);
         }
+        // Checked here, once, rather than at every use. `volume` is called on
+        // each chunk lookup and is `const`, so it has nowhere to report a
+        // failure: an unchecked edge would panic in debug builds and wrap in
+        // release ones. Refusing the edge makes `volume` total by
+        // construction. Every legitimate size is far below the limit — design
+        // §7.1 fixes 32 — so nothing real is excluded.
+        let edge = size as u64;
+        let Some(square) = edge.checked_mul(edge) else {
+            return Err(ExtentError::ChunkVolumeOverflow { size });
+        };
+        let Some(_cube) = square.checked_mul(edge) else {
+            return Err(ExtentError::ChunkVolumeOverflow { size });
+        };
         Ok(Self(size))
     }
 
@@ -72,6 +93,8 @@ impl ChunkSize {
     /// The number of voxels in one chunk.
     #[must_use]
     pub const fn volume(self) -> u64 {
+        // Cannot overflow: `ChunkSize::new` refuses any edge whose cube does
+        // not fit, and `DESIGN` is 32.
         let side = self.0 as u64;
         side * side * side
     }

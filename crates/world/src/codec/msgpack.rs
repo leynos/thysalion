@@ -25,15 +25,33 @@ pub(super) fn encode(document: &SceneDocument) -> Result<Vec<u8>, CodecError> {
 
 /// Deserializes `T`, attaching a structural path to any failure.
 fn located<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, CodecError> {
-    let mut deserializer = rmp_serde::Deserializer::new(bytes);
-    serde_path_to_error::deserialize(&mut deserializer).map_err(|error| {
+    // A `Cursor` rather than the slice directly: `position` — the only way to
+    // tell a complete document from a prefix of one — is implemented for the
+    // cursor-backed reader alone.
+    let mut deserializer = rmp_serde::Deserializer::new(std::io::Cursor::new(bytes));
+    let value = serde_path_to_error::deserialize(&mut deserializer).map_err(|error| {
         let pointer = error.path().to_string();
         CodecError::Malformed {
             encoding: Encoding::MessagePack,
             pointer,
             message: SmolStr::new(error.into_inner().to_string()),
         }
-    })
+    })?;
+    // A document is one value, not a prefix of a stream. MessagePack has no
+    // closing delimiter, so an appended second document is indistinguishable
+    // from a longer first one unless the consumed length is checked.
+    let consumed = deserializer.position();
+    if consumed != bytes.len() as u64 {
+        return Err(CodecError::Malformed {
+            encoding: Encoding::MessagePack,
+            pointer: String::from("/"),
+            message: SmolStr::new(format!(
+                "trailing input after the document: {} byte(s) unread",
+                bytes.len() as u64 - consumed
+            )),
+        });
+    }
+    Ok(value)
 }
 
 pub(super) fn probe_version(bytes: &[u8]) -> Result<DocumentVersion, CodecError> {
