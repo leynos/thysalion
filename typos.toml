@@ -33,7 +33,8 @@ extend-ignore-re = [
     "(?s)```.*?```",
     "Center \\| Microsoft Learn",
     "\\brust-analyzer\\b",
-    "`[^`\\n]+`",
+    "`color`",
+    "`serde_json::ser::Formatter`",
     "game engine for modeling",
 ]
 

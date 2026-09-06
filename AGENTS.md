@@ -317,6 +317,12 @@ project:
   pinned `typos` spelling gate with en-GB-oxendict policy.
 - The tracked `typos.toml` is generated. Add narrow repository exceptions to
   `typos.local.toml`, then run `uv run scripts/generate_typos_config.py`.
+- Inline code spans are checked. An identifier or a deliberately US spelling
+  inside backticks is not exempt, so record it under `[patterns]` in
+  `typos.local.toml` and include the backticks in the pattern. Scoping the
+  pattern to the backticked form keeps the same word flagged in prose;
+  `scripts/tests/test_typos_config.py` proves both halves of that. Never widen
+  the exception back to all inline code.
 - Run `make fmt` after any documentation changes to format all Markdown
   files and fix table markup.
 - Validate Mermaid diagrams in Markdown files by running `make nixie`.

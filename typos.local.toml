@@ -11,9 +11,17 @@ accepted = ["Flavored", "mold", "LOD"]
 [words.corrections]
 
 [patterns]
+# The shared base no longer excludes inline code spans, so an identifier or a
+# quoted US spelling inside backticks reaches the checker and must be recorded
+# here, scoped to the backticked form so the same word in prose is still caught.
 ignore = [
   'Center \| Microsoft Learn',
   'game engine for modeling',
+  # The documentation style guide's own example of a US spelling kept inside
+  # an API name.
+  '`color`',
+  # A path to a serde_json trait, quoted in the scene-format execplan.
+  '`serde_json::ser::Formatter`',
 ]
 
 [files]
