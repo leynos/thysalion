@@ -60,7 +60,14 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_recorded_backticked_terms_are_accepted(tmp_path: Path) -> None:
-    """Both recorded terms pass in the backticked form the documentation uses."""
+    """Both recorded terms pass in the backticked form the documentation uses.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Pytest-provided directory the Markdown fragment is written into, so the
+        checker runs against a real file rather than standard input.
+    """
     result = _run_typos(
         "Keep US spelling when used in an API, for example, `color`.\n"
         "Serialization requires a custom `serde_json::ser::Formatter` here.\n",
@@ -75,6 +82,12 @@ def test_the_same_words_are_still_caught_in_prose(tmp_path: Path) -> None:
 
     This is what separates a scoped exception from a blanket one: the recorded
     patterns exist for the quoted identifier, not for the word.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Pytest-provided directory the Markdown fragment is written into, so the
+        checker runs against a real file rather than standard input.
     """
     result = _run_typos("The color of the ser is wrong.\n", tmp_path)
 

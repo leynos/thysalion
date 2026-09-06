@@ -48,6 +48,12 @@ jobs:
         uses: astral-sh/setup-uv@c6081965dd0577ae48820cb8c288e12509571f0c
       - name: Check spelling
         run: make spelling
+      # The spelling gate's own regression suite. `make spelling` only checks
+      # the maintained prose, so a pattern widened back to a blanket exception
+      # passes it whenever no maintained document happens to contain the
+      # affected word. This target is what notices.
+      - name: Test the spelling helpers
+        run: make scripts-test
       - name: Install test runner
         env:
           RUSTFLAGS: ""
