@@ -62,18 +62,30 @@ use support::minimal_document;
 /// The knowledge resource is deliberately absent: every input here fails long
 /// before the knowledge rules run, and supplying one would only obscure which
 /// phase did the refusing.
-fn load(document: &SceneDocument) -> Result<(), SceneLoadError> {
-    load_with(document, Bounds::DEFAULT)
+fn load_within_default_bound(what: &str, document: &SceneDocument) -> Result<(), SceneLoadError> {
+    load_within_bound(what, document, Bounds::DEFAULT)
 }
 
-/// Loads `document` against the given resource bounds.
+/// Loads `document` against the given resource bounds, timing only the load.
+///
+/// Serializing the document happens *outside* [`within_bound`] on purpose. The
+/// bound exists to catch a loader that materializes a declared quantity instead
+/// of refusing it; writing a 65,537-entry palette to JSON is this test's own
+/// scaffolding, and under coverage instrumentation it alone costs seconds. With
+/// the encode inside the bound, the assertion measured serde rather than the
+/// loader, and the five-second bound a correct loader clears in microseconds
+/// overran on the encode.
 ///
 /// An encoding failure is reported as a load failure rather than a panic: this
 /// function returns a `Result`, and the workspace forbids asserting inside one.
 /// No test here distinguishes the two, because every one of them asserts only
 /// that the load *failed*, and a document these tests cannot even encode has
 /// failed at least as hard.
-fn load_with(document: &SceneDocument, bounds: Bounds) -> Result<(), SceneLoadError> {
+fn load_within_bound(
+    what: &str,
+    document: &SceneDocument,
+    bounds: Bounds,
+) -> Result<(), SceneLoadError> {
     let bytes =
         encode_document(document, Encoding::Json).map_err(|error| SceneLoadError::Malformed {
             path: "<hostile>".into(),
@@ -82,7 +94,9 @@ fn load_with(document: &SceneDocument, bounds: Bounds) -> Result<(), SceneLoadEr
             message: error.to_string().into(),
         })?;
     let loader = SceneLoader::new(Arc::new(MemorySceneSource::new())).with_bounds(bounds);
-    loader.load_bytes(&bytes, Encoding::Json).map(|_| ())
+    within_bound(what, || {
+        loader.load_bytes(&bytes, Encoding::Json).map(|_| ())
+    })
 }
 
 /// The codes a failed load reported.
@@ -108,7 +122,7 @@ fn a_palette_larger_than_a_sixteen_bit_index_is_refused() {
     // nothing could ever refer to.
     document.palette = vec![entry; 65_537];
 
-    let outcome = within_bound("a 65,537-entry palette", || load(&document));
+    let outcome = load_within_default_bound("a 65,537-entry palette", &document);
     assert!(
         codes(&outcome).contains(&DiagnosticCode::PaletteTooLarge.as_str()),
         "got {:?}",
@@ -138,9 +152,7 @@ fn a_chunk_count_past_the_bound_is_refused_before_decoding() {
 
     let mut bounds = Bounds::DEFAULT;
     bounds.max_chunks = 8;
-    let outcome = within_bound("twelve chunks against a bound of eight", || {
-        load_with(&document, bounds)
-    });
+    let outcome = load_within_bound("twelve chunks against a bound of eight", &document, bounds);
     assert!(
         codes(&outcome).contains(&DiagnosticCode::TooManyChunks.as_str()),
         "got {:?}",
@@ -169,9 +181,7 @@ fn a_run_stream_claiming_more_than_the_chunk_volume_is_refused() {
         ]),
     }];
 
-    let outcome = within_bound("a run stream claiming 8.6 billion voxels", || {
-        load(&document)
-    });
+    let outcome = load_within_default_bound("a run stream claiming 8.6 billion voxels", &document);
     assert!(
         codes(&outcome).contains(&DiagnosticCode::RunLengthMismatch.as_str()),
         "got {:?}",
@@ -197,7 +207,7 @@ fn a_run_count_past_the_per_chunk_bound_is_refused() {
         ),
     }];
 
-    let outcome = within_bound("65,537 runs in one chunk", || load(&document));
+    let outcome = load_within_default_bound("65,537 runs in one chunk", &document);
     assert!(
         codes(&outcome).contains(&DiagnosticCode::TooManyRuns.as_str()),
         "got {:?}",
@@ -230,7 +240,7 @@ fn a_prototype_chain_past_the_depth_bound_terminates() {
         spawn.prototype = Some("link-0".into());
     }
 
-    let outcome = within_bound("a 10,000-deep prototype chain", || load(&document));
+    let outcome = load_within_default_bound("a 10,000-deep prototype chain", &document);
     assert!(
         codes(&outcome).contains(&DiagnosticCode::PrototypeTooDeep.as_str()),
         "got {:?}",
@@ -254,7 +264,7 @@ fn a_self_referential_prototype_terminates() {
         spawn.prototype = Some("torch".into());
     }
 
-    let outcome = within_bound("a self-extending prototype", || load(&document));
+    let outcome = load_within_default_bound("a self-extending prototype", &document);
     assert!(
         codes(&outcome).contains(&DiagnosticCode::PrototypeCycle.as_str()),
         "got {:?}",
@@ -289,9 +299,7 @@ fn an_over_long_chunk_list_is_refused_without_describing_its_contents() {
         })
         .collect();
 
-    let outcome = within_bound("64 chunks against a bound of 4", || {
-        load_with(&document, bounds)
-    });
+    let outcome = load_within_bound("64 chunks against a bound of 4", &document, bounds);
     // Exactly one: the list is too long, and that is the whole finding.
     assert_eq!(
         codes(&outcome),
@@ -327,7 +335,7 @@ fn many_over_long_chunks_are_summarized_rather_than_listed_or_dropped() {
         })
         .collect();
 
-    let outcome = within_bound("40 over-long chunks", || load_with(&document, bounds));
+    let outcome = load_within_bound("40 over-long chunks", &document, bounds);
     let reported = codes(&outcome)
         .iter()
         .filter(|code| **code == DiagnosticCode::TooManyRuns.as_str())
