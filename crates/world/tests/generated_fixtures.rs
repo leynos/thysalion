@@ -20,17 +20,13 @@ use std::sync::Arc;
 
 use camino::Utf8PathBuf;
 use serde::Deserialize;
+use thysalion_test_support::scenes::{FIXTURE_NAMES as FIXTURES, SCENES, scene_dir as scenes};
 use thysalion_world::{
     codec::{Encoding, decode_document, encode_document},
     loader::{LoadedScene, SceneLoader},
     scene::{Scene, validation::Strictness},
     source::DirSceneSource,
 };
-
-#[path = "support/scenes.rs"]
-mod scenes_support;
-
-use scenes_support::{FIXTURE_NAMES as FIXTURES, SCENES, scene_dir as scenes};
 
 /// Loads a fixture through the real loader and the real filesystem adapter.
 ///
