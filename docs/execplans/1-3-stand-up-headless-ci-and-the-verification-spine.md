@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision log`, and `Outcomes & retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 ## Purpose / big picture
 
@@ -265,17 +265,20 @@ not quality criteria.
 
 ## Progress
 
-- [ ] Stage A: spike the crate skeleton and the dev-dependency loop; confirm
-  tooling accepts it.
-- [ ] Stage B: red tests — workflow-shape assertions, the combined headless
-  scenario, and the replay round-trip.
-- [ ] Stage C1: create `thysalion-test-support`; promote both adapters;
+- [x] Stage A: spike the crate skeleton and the dev-dependency loop; confirm
+  tooling accepts it. `make check-fmt`, `make lint`, and `make test` (214
+  tests) all green with the loop in place; `cargo tree -p thysalion-world -e
+  normal,dev` reports zero `bevy` matches on the default-feature path.
+- [x] Stage B: red tests — workflow-shape assertions, the combined headless
+  scenario, and the replay round-trip. Landed in the same working tree as
+  their production changes, per the no-red-commits constraint.
+- [x] Stage C1: create `thysalion-test-support`; promote both adapters;
   re-point both suites; delete the duplicates.
-- [ ] Stage C2: the combined fixture-in-harness behavioural scenario goes
+- [x] Stage C2: the combined fixture-in-harness behavioural scenario goes
   green.
-- [ ] Stage C3: CI triggers, concurrency, fork guard; workflow-shape tests
+- [x] Stage C3: CI triggers, concurrency, fork guard; workflow-shape tests
   green; `act-validation.yml` joins the pinning test.
-- [ ] Stage C4: replay envelope, recorder/replayer, golden bytes, CI test;
+- [x] Stage C4: replay envelope, recorder/replayer, golden bytes, CI test;
   ADR 007.
 - [ ] Stage D: documentation, roadmap checkboxes, refactor pass,
   retrospective.
@@ -306,6 +309,31 @@ not quality criteria.
   Evidence: grep of `.github/workflows/`. Impact: noted for the PR
   description; adding it to CI is a one-line follow-up outwith this step's
   scope.
+- Observation (Stage C1): `LoaderSession::load_fixture` reached for
+  `crate::scenes::scene_dir()` and `crate::scenes::SCENES` — a module in the
+  *consuming* test binary (`crates/world/tests/support/scenes.rs`), declared
+  through a `#[path]` attribute. A promoted adapter cannot depend on a module
+  in the suite that consumes it, so the fixture-location helpers were promoted
+  alongside the adapters as `thysalion_test_support::scenes`. Evidence: the
+  `crate::scenes` references in the moved file. Impact: one more module moved
+  than the plan anticipated, and `crates/world/tests/generated_fixtures.rs` —
+  the other consumer of that `#[path]` module — was re-pointed too. It is
+  mechanical import churn of the kind the Tolerances section already excludes
+  from the scope count.
+- Observation (Stage C1): promoting `LoaderSession` from a test module into a
+  library crate put three accessors (`document`, `loaded`, `diagnostics`)
+  under `clippy::must_use_candidate`, which does not fire on test-binary
+  items. Adding `#[must_use]` then put the two step functions that discard
+  their results under `clippy::let_underscore_must_use`. Evidence: `make lint`
+  output. Impact: those steps bind `let _loaded` / `let _diagnostics` rather
+  than a wildcard, with a comment saying why. A lint interaction worth
+  knowing about before the next promotion.
+- Observation (Stage C4): `#[derive(Serialize, Deserialize)]` accepts an
+  uninhabited enum, so `pub enum InputRecord {}` compiles, derives, and
+  encodes without a workaround. Evidence: the crate builds and
+  `tests/replay_round_trip.rs` passes. Impact: the plan's central
+  format-staging device is viable exactly as written; no placeholder variant
+  was needed.
 - Observation (pre-work verification of the Stage A question): the pinned
   `generate-coverage` action's ratchet stores and restores its baseline
   through the GitHub Actions cache (`ratchet-baseline-…` restore keys) and
@@ -375,6 +403,50 @@ not quality criteria.
   consumers. ADR 007 records both deferrals with their re-opening
   criteria. Date/Author: 2026-08-04, plan author; revised after the
   design-review panel, same day.
+
+- Decision (Stage C1): the fixture-location helpers
+  (`SCENES`, `FIXTURE_NAMES`, `repository_root`, `scene_dir`) are promoted
+  into `thysalion_test_support::scenes` alongside the adapters, and
+  `crates/world/tests/support/scenes.rs` is deleted. Rationale:
+  `LoaderSession` reaches for them, so leaving them behind would leave the
+  promoted adapter depending on a module in the crate that consumes it — the
+  inversion the promotion exists to remove. `repository_root` walks two
+  parents of `CARGO_MANIFEST_DIR`, which is the repository root from
+  `crates/test-support` exactly as it was from `crates/world`. Date/Author:
+  2026-09-14, implementor.
+- Decision (Stage C4): `RecordedSession` exposes its header through a
+  `header()` accessor rather than the public field the plan's interface
+  sketch named. Rationale: the byte-identity promise is over a session that
+  came from the recorder or the decoder, and a public field is a route to
+  mutating a decoded session and then re-encoding it to different bytes. The
+  accessor costs one line and closes that route. Date/Author: 2026-09-14,
+  implementor.
+- Decision (Stage C4): `SceneRef.name` is a `SmolStr` rather than the `String`
+  the plan sketched, while `content_hash_hex` stays a `String`. Rationale: the
+  field mirrors `SceneDocument.name`, which is a `SmolStr`, and ADR 006's type
+  discipline admits both; a 64-character BLAKE3 digest is well past
+  `SmolStr`'s inline capacity, so the same choice there would buy nothing.
+  Date/Author: 2026-09-14, implementor.
+- Decision (Stage C4): a session's ticks must strictly increase, and the rule
+  is checked when encoding *and* when decoding. Rationale: the encode-side
+  check catches a recorder bug before it writes an uninterpretable corpus
+  entry; the decode-side check is about untrusted bytes, and a replay corpus
+  is precisely where a build meets bytes an older build wrote. The rule also
+  gives the envelope one real invariant to test while the payload is
+  uninhabited. ADR 007 records it. Date/Author: 2026-09-14, implementor.
+- Decision (Stage C4): the replay format ships one encoding, MessagePack,
+  where ADR 006's scene format ships two. Rationale: JSON earns its place for
+  scenes because a human authors and diffs them; a recording is written by a
+  machine, read by a machine, and never hand-edited, so a second encoding
+  would buy a review surface nobody reviews and a second writer to drift
+  against. ADR 007 records the reasoning and names a dumping tool as the
+  answer if human-readable recordings are ever wanted. Date/Author:
+  2026-09-14, implementor.
+- Decision (Stage C3): `ci.yml`'s push trigger is `branches: ['**']` rather
+  than a bare `push:`. Rationale: a bare `push:` covers tags as well as
+  branches, which would run the full gate on every release tag alongside
+  `release.yml` for no added information. Date/Author: 2026-09-14,
+  implementor.
 
 ## Outcomes & retrospective
 
