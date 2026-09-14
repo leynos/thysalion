@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision log`, and `Outcomes & retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 ## Purpose / big picture
 
@@ -60,7 +60,7 @@ Concretely, after this change:
 4. Recording an empty replay session and replaying it is byte-identical,
    asserted by a test that runs in CI, over a storage format whose version
    field, probe, and golden bytes follow the pattern ADR 006 established for
-   scene documents. A new ADR 007 records the format decisions (task 1.3.2).
+   scene documents. A new ADR 008 records the format decisions (task 1.3.2).
 
 The stability promise of this step is *one adapter set, one verification
 spine*: every later phase's property tests, replay assertions, and
@@ -124,7 +124,7 @@ escalation, not workarounds.
 - The byte-identity promise of task 1.3.2 is *same-build round-trip*
   determinism: record, replay, re-record within one binary yields identical
   bytes. It is not cross-version wire byte-determinism, which ADR 006
-  explicitly declines to promise for scenes; ADR 007 must state the same
+  explicitly declines to promise for scenes; ADR 008 must state the same
   distinction for replay records.
 - Workflow contract tests follow the developers' guide's Dependabot policy:
   assert the *shape* of workflow callers (pinned 40-hex SHAs, expected
@@ -145,7 +145,7 @@ escalation, not workarounds.
   [documentation style guide](../documentation-style-guide.md):
   en-GB-oxendict spelling, sentence-case headings, 80-column prose wrap, and
   a language identifier on every fenced block. The new ADR follows the ADR
-  template and numbering (`adr-007-…`).
+  template and numbering (`adr-008-…`).
 
 ## Tolerances (exception triggers)
 
@@ -236,7 +236,7 @@ not quality criteria.
   *uninhabited*: `TickRecord.inputs` can only ever be empty until roadmap
   4.1.2 adds the first real variants with a minor version bump, so nothing
   meaningless ever reaches the wire and no placeholder variant becomes
-  permanent compatibility baggage. ADR 007 states this staging explicitly,
+  permanent compatibility baggage. ADR 008 states this staging explicitly,
   and the tolerance on ambiguity guards the boundary.
 - Risk: byte-identity fails intermittently because something nondeterministic
   reaches the wire — a `HashMap` iteration order, a timestamp, a platform
@@ -252,7 +252,7 @@ not quality criteria.
   stated over *input records at the circuit boundary*, not key codes.
   Severity: medium. Likelihood: low now that it is named. Mitigation: the
   format records domain-level input records (design §6.2's input-phase
-  writes: commands, intents, waypoints), never window events; ADR 007
+  writes: commands, intents, waypoints), never window events; ADR 008
   records the rejection and its grounds.
 - Risk: `act-validation.yml` invokes `make test WITH_ACT=1`, but no Makefile
   target consumes `WITH_ACT` — the variable is a silent no-op, so the Act
@@ -265,18 +265,21 @@ not quality criteria.
 
 ## Progress
 
-- [ ] Stage A: spike the crate skeleton and the dev-dependency loop; confirm
-  tooling accepts it.
-- [ ] Stage B: red tests — workflow-shape assertions, the combined headless
-  scenario, and the replay round-trip.
-- [ ] Stage C1: create `thysalion-test-support`; promote both adapters;
+- [x] Stage A: spike the crate skeleton and the dev-dependency loop; confirm
+  tooling accepts it. `make check-fmt`, `make lint`, and `make test` (214
+  tests) all green with the loop in place; `cargo tree -p thysalion-world -e
+  normal,dev` reports zero `bevy` matches on the default-feature path.
+- [x] Stage B: red tests — workflow-shape assertions, the combined headless
+  scenario, and the replay round-trip. Landed in the same working tree as
+  their production changes, per the no-red-commits constraint.
+- [x] Stage C1: create `thysalion-test-support`; promote both adapters;
   re-point both suites; delete the duplicates.
-- [ ] Stage C2: the combined fixture-in-harness behavioural scenario goes
+- [x] Stage C2: the combined fixture-in-harness behavioural scenario goes
   green.
-- [ ] Stage C3: CI triggers, concurrency, fork guard; workflow-shape tests
+- [x] Stage C3: CI triggers, concurrency, fork guard; workflow-shape tests
   green; `act-validation.yml` joins the pinning test.
-- [ ] Stage C4: replay envelope, recorder/replayer, golden bytes, CI test;
-  ADR 007.
+- [x] Stage C4: replay envelope, recorder/replayer, golden bytes, CI test;
+  ADR 008.
 - [ ] Stage D: documentation, roadmap checkboxes, refactor pass,
   retrospective.
 
@@ -306,6 +309,31 @@ not quality criteria.
   Evidence: grep of `.github/workflows/`. Impact: noted for the PR
   description; adding it to CI is a one-line follow-up outwith this step's
   scope.
+- Observation (Stage C1): `LoaderSession::load_fixture` reached for
+  `crate::scenes::scene_dir()` and `crate::scenes::SCENES` — a module in the
+  *consuming* test binary (`crates/world/tests/support/scenes.rs`), declared
+  through a `#[path]` attribute. A promoted adapter cannot depend on a module
+  in the suite that consumes it, so the fixture-location helpers were promoted
+  alongside the adapters as `thysalion_test_support::scenes`. Evidence: the
+  `crate::scenes` references in the moved file. Impact: one more module moved
+  than the plan anticipated, and `crates/world/tests/generated_fixtures.rs` —
+  the other consumer of that `#[path]` module — was re-pointed too. It is
+  mechanical import churn of the kind the Tolerances section already excludes
+  from the scope count.
+- Observation (Stage C1): promoting `LoaderSession` from a test module into a
+  library crate put three accessors (`document`, `loaded`, `diagnostics`)
+  under `clippy::must_use_candidate`, which does not fire on test-binary
+  items. Adding `#[must_use]` then put the two step functions that discard
+  their results under `clippy::let_underscore_must_use`. Evidence: `make lint`
+  output. Impact: those steps bind `let _loaded` / `let _diagnostics` rather
+  than a wildcard, with a comment saying why. A lint interaction worth
+  knowing about before the next promotion.
+- Observation (Stage C4): `#[derive(Serialize, Deserialize)]` accepts an
+  uninhabited enum, so `pub enum InputRecord {}` compiles, derives, and
+  encodes without a workaround. Evidence: the crate builds and
+  `tests/replay_round_trip.rs` passes. Impact: the plan's central
+  format-staging device is viable exactly as written; no placeholder variant
+  was needed.
 - Observation (pre-work verification of the Stage A question): the pinned
   `generate-coverage` action's ratchet stores and restores its baseline
   through the GitHub Actions cache (`ratchet-baseline-…` restore keys) and
@@ -358,7 +386,7 @@ not quality criteria.
   `thysalion-sim` is empty until phase 4, so parking format types there
   would put wire code in a plane crate for no consumer; ADR 006's pattern
   is battle-tested locally and the style guide's ADR template gives it a
-  home as ADR 007. Roadmap 4.1.2 may re-home the *driver* when the circuit
+  home as ADR 008. Roadmap 4.1.2 may re-home the *driver* when the circuit
   boundary exists; the format types stay put. Date/Author: 2026-08-04, plan
   author.
 - Decision: the record payload enum starts *uninhabited* (`enum
@@ -372,9 +400,53 @@ not quality criteria.
   roadmap 4.1.2 defines the first real variants with a minor bump.
   MessagePack via the existing discipline costs no new dependency, and
   the Arrow question re-opens when the corpus acquires analytical
-  consumers. ADR 007 records both deferrals with their re-opening
+  consumers. ADR 008 records both deferrals with their re-opening
   criteria. Date/Author: 2026-08-04, plan author; revised after the
   design-review panel, same day.
+
+- Decision (Stage C1): the fixture-location helpers
+  (`SCENES`, `FIXTURE_NAMES`, `repository_root`, `scene_dir`) are promoted
+  into `thysalion_test_support::scenes` alongside the adapters, and
+  `crates/world/tests/support/scenes.rs` is deleted. Rationale:
+  `LoaderSession` reaches for them, so leaving them behind would leave the
+  promoted adapter depending on a module in the crate that consumes it — the
+  inversion the promotion exists to remove. `repository_root` walks two
+  parents of `CARGO_MANIFEST_DIR`, which is the repository root from
+  `crates/test-support` exactly as it was from `crates/world`. Date/Author:
+  2026-09-14, implementor.
+- Decision (Stage C4): `RecordedSession` exposes its header through a
+  `header()` accessor rather than the public field the plan's interface
+  sketch named. Rationale: the byte-identity promise is over a session that
+  came from the recorder or the decoder, and a public field is a route to
+  mutating a decoded session and then re-encoding it to different bytes. The
+  accessor costs one line and closes that route. Date/Author: 2026-09-14,
+  implementor.
+- Decision (Stage C4): `SceneRef.name` is a `SmolStr` rather than the `String`
+  the plan sketched, while `content_hash_hex` stays a `String`. Rationale: the
+  field mirrors `SceneDocument.name`, which is a `SmolStr`, and ADR 006's type
+  discipline admits both; a 64-character BLAKE3 digest is well past
+  `SmolStr`'s inline capacity, so the same choice there would buy nothing.
+  Date/Author: 2026-09-14, implementor.
+- Decision (Stage C4): a session's ticks must strictly increase, and the rule
+  is checked when encoding *and* when decoding. Rationale: the encode-side
+  check catches a recorder bug before it writes an uninterpretable corpus
+  entry; the decode-side check is about untrusted bytes, and a replay corpus
+  is precisely where a build meets bytes an older build wrote. The rule also
+  gives the envelope one real invariant to test while the payload is
+  uninhabited. ADR 008 records it. Date/Author: 2026-09-14, implementor.
+- Decision (Stage C4): the replay format ships one encoding, MessagePack,
+  where ADR 006's scene format ships two. Rationale: JSON earns its place for
+  scenes because a human authors and diffs them; a recording is written by a
+  machine, read by a machine, and never hand-edited, so a second encoding
+  would buy a review surface nobody reviews and a second writer to drift
+  against. ADR 008 records the reasoning and names a dumping tool as the
+  answer if human-readable recordings are ever wanted. Date/Author:
+  2026-09-14, implementor.
+- Decision (Stage C3): `ci.yml`'s push trigger is `branches: ['**']` rather
+  than a bare `push:`. Rationale: a bare `push:` covers tags as well as
+  branches, which would run the full gate on every release tag alongside
+  `release.yml` for no added information. Date/Author: 2026-09-14,
+  implementor.
 
 ## Outcomes & retrospective
 
@@ -515,12 +587,12 @@ deliberately stays PR-scoped; the decision log says why). `make all`;
 commit; after push, confirm the Actions run appears for the branch push
 itself, not only for the PR event.
 
-### Stage C4 — the replay envelope and ADR 007
+### Stage C4 — the replay envelope and ADR 008
 
 In `crates/test-support/src/replay/`, define the wire types
 (`format.rs`), the version probe (`probe.rs`), and the
 recorder/replayer pair (`session.rs`) per `Interfaces and dependencies`
-below. Write `docs/adr-007-replay-record-format.md` covering: the envelope
+below. Write `docs/adr-008-replay-record-format.md` covering: the envelope
 shape; the `{major, minor}` rule and probe copied from ADR 006; the
 same-build byte-identity promise and its explicit non-promise of
 cross-version byte-determinism; the placeholder payload staging toward
@@ -535,7 +607,7 @@ Update [developers-guide.md](../developers-guide.md) (the headless-testing
 section gains the test-support crate, making the adapters' doc-comment
 claim true; the CI section gains the push trigger and concurrency policy),
 [repository-layout.md](../repository-layout.md) (the new crate),
-[contents.md](../contents.md) (ADR 007), and tick roadmap 1.3.1 and 1.3.2
+[contents.md](../contents.md) (ADR 008), and tick roadmap 1.3.1 and 1.3.2
 with any delivered-shape notes, following the precedent of the 1.2
 entries. Post-commit review pass per AGENTS.md; separate refactor commits
 if the heuristics fire. Complete `Outcomes & retrospective`.
@@ -584,7 +656,7 @@ Acceptance, phrased as behaviour:
    under `crates/test-support/src/`.
 3. Running the replay round-trip test twice in a row passes both times,
    and `git status` stays clean — the golden bytes do not churn.
-4. `docs/adr-007-replay-record-format.md` exists, is linked from
+4. `docs/adr-008-replay-record-format.md` exists, is linked from
    `contents.md`, and `make markdownlint` passes.
 
 ## Idempotence and recovery
@@ -620,7 +692,7 @@ In `crates/test-support/src/replay/format.rs` — wire types under ADR 006
 discipline, all integers, `deny_unknown_fields`:
 
 ```rust
-/// Wire version of the replay session format; ADR 007 owns the rules.
+/// Wire version of the replay session format; ADR 008 owns the rules.
 /// A reader accepts `major == SUPPORTED_MAJOR && minor <= SUPPORTED_MINOR`,
 /// probed permissively before full decode, exactly as ADR 006 does for
 /// scene documents.
