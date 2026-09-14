@@ -4,10 +4,9 @@
 //! `thysalion-world` has no Bevy dependency at this phase and ADR 005 stages
 //! one in later, so hosting these scenarios in an app would put the whole
 //! render feature set into the state plane's graph to satisfy a test harness.
-//! The adapter is deliberately the same *shape* as the Bevy one in
-//! `crates/harness/tests/headless/support.rs`, so roadmap step 1.3.1 can
-//! promote both into one shared test-support crate — the promotion point the
-//! developers' guide already names.
+//! This module is therefore on the crate's *default-feature* path: consumers
+//! that want an app opt into the `bevy` feature and
+//! `BevyHarness` instead, which is deliberately the same shape.
 
 use std::sync::Arc;
 
@@ -100,6 +99,7 @@ impl LoaderSession {
     ///
     /// Panics when no `Given` step ran, which is a malformed scenario rather
     /// than a runtime condition.
+    #[must_use]
     pub fn document(&self) -> &SceneDocument {
         // `expect` rather than a `let ... else` would be shorter, but the
         // workspace allows it only inside `#[test]` functions, and a
@@ -145,6 +145,7 @@ impl LoaderSession {
     /// # Panics
     ///
     /// Panics when the last load failed or no load ran.
+    #[must_use]
     pub fn loaded(&self) -> &LoadedScene {
         match self.outcome.as_ref() {
             Some(Ok(loaded)) => loaded,
@@ -158,6 +159,7 @@ impl LoaderSession {
     /// # Panics
     ///
     /// Panics when the last load succeeded or no load ran.
+    #[must_use]
     pub fn diagnostics(&self) -> &[thysalion_world::scene::validation::SceneDiagnostic] {
         match self.outcome.as_ref() {
             Some(Err(SceneLoadError::Invalid { diagnostics, .. })) => diagnostics,
