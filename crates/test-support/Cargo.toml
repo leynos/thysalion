@@ -1,0 +1,41 @@
+[package]
+name = "thysalion-test-support"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Thysalion test scaffolding: shared rstest-bdd harness adapters and the replay envelope"
+# Test tooling in ADR 005's sense: it exists for this workspace's suites, and
+# the release build is scoped `-p thysalion`, so it never ships.
+publish = false
+
+[features]
+# `bevy` is deliberately non-default. `thysalion-world` dev-depends on this
+# crate, and the state plane does not acquire `bevy` until roadmap 2.1.1; a
+# default-on feature here would stage that dependency in early through a test
+# convenience (ADR 005).
+default = []
+bevy = ["dep:bevy", "dep:thysalion-harness"]
+
+[dependencies]
+bevy = { workspace = true, optional = true }
+camino = { workspace = true }
+cap-std = { workspace = true }
+rmp-serde = { workspace = true }
+rstest-bdd-harness = { workspace = true }
+serde = { workspace = true }
+smol_str = { workspace = true }
+thiserror = { workspace = true }
+thysalion-harness = { workspace = true, optional = true }
+thysalion-world = { workspace = true }
+
+[dev-dependencies]
+# `with-serde` is required for `rmpv::Value` to implement `Deserialize`; the
+# wire-shape assertion decodes the encoder's output into it.
+rmpv = { workspace = true }
+rstest = { workspace = true }
+rstest-bdd = { workspace = true }
+rstest-bdd-macros = { workspace = true }
+
+[lints]
+workspace = true

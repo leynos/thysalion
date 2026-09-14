@@ -30,6 +30,9 @@ rstest = { workspace = true }
 rstest-bdd = { workspace = true }
 rstest-bdd-harness = { workspace = true }
 rstest-bdd-macros = { workspace = true }
+# Default features only: the `bevy` half of the test-support crate must never
+# enter the state plane's graph (ADR 005).
+thysalion-test-support = { workspace = true }
 
 [[test]]
 name = "loading"
