@@ -58,6 +58,9 @@ omits build output such as `target/`.
 └── rust-toolchain.toml
 ```
 
+_Figure 1: the repository tree. Each `crates/` member is one plane or one
+piece of tooling; the sections below say which is which._
+
 ## Workspace shape
 
 The repository is a non-virtual Cargo workspace. The root package `thysalion`

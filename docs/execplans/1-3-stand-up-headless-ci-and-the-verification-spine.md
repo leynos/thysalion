@@ -452,6 +452,48 @@ not quality criteria.
   `release.yml` for no added information. Date/Author: 2026-09-14,
   implementor.
 
+- Decision (review response): the recorder validates the header version
+  before encoding, using the same range test the decoder applies rather than
+  an equality test. Rationale: a recorder that writes a version its own
+  decoder refuses produces a corpus entry nothing can read, which is the worst
+  outcome available to a format whose recordings are meant to outlive the
+  build that made them. A range test rather than equality because recording at
+  an older minor is a legitimate compatibility choice, while recording at a
+  version this build could not read back is not. Both encode paths share the
+  check, so the recorder and the re-encoder cannot drift. Date/Author:
+  2026-09-15, implementor, after the CodeRabbit review.
+- Decision (review response): the decoder-side tick-ordering and version
+  refusals are tested against bytes built from `rmpv` values rather than from
+  the recorder. Rationale: the recorder now refuses exactly the sessions those
+  tests need, so a test reaching for it could only assert the encode-side
+  check twice — which is how the original test came to claim "both
+  boundaries" while checking one. Hand-built bytes are also closer to the
+  thing under test: a recording some other build produced. A drift guard
+  (`the_foreign_session_helper_agrees_with_the_recorder`) pins the hand-built
+  wire shape to the recorder's output so the helper cannot silently stop
+  imitating the real format. Date/Author: 2026-09-15, implementor.
+- Decision (review response): validated domain newtypes over the envelope's
+  fields are declined for now, with a re-opening trigger recorded in ADR 007.
+  Rationale: ADR 006 introduces a domain form only where there is a private
+  field to protect and an invariant to enforce, and states that a second form
+  for a type without one is "two names for one set of values". The envelope's
+  only real rule is the ordering of ticks across records, which no per-field
+  newtype expresses and which is checked at both boundaries instead. The hex
+  digest is the strongest candidate and still has no consumer until roadmap
+  4.1.2. Date/Author: 2026-09-15, implementor.
+- Decision (review response): the crate's panic-on-failure behaviour outwith
+  `replay` is kept and documented as a contract at the crate level, rather
+  than converted to `Result`. Rationale: every caller is a test, and each
+  condition is a broken checkout or a malformed scenario rather than a state a
+  test could handle; `rstest-bdd` step functions return `()`, so a `Result`
+  would be unwrapped one line further from the cause, and the lint table
+  denies `unwrap` and `expect` outwith `#[test]` functions anyway. `replay` is
+  the documented exception because a recording is data, frequently written by
+  another build, so a decode failure is an expected outcome. Converting the
+  promoted code's error handling would also exceed the promotion's remit,
+  which the Tolerances section scopes to moving test code rather than
+  reshaping it. Date/Author: 2026-09-15, implementor.
+
 ## Outcomes & retrospective
 
 To be completed as stages land.
@@ -730,7 +772,11 @@ pub struct FormatVersion { pub major: u16, pub minor: u16 }
 
 /// Names the scene a session ran against, by fixture name and the
 /// canonical content hash `thysalion_world` already computes.
-pub struct SceneRef { pub name: String, pub content_hash_hex: String }
+///
+/// `name` is a `SmolStr`, mirroring `SceneDocument.name`; the hash is a
+/// `String` because 64 hex characters never fit inline. See the decision
+/// log.
+pub struct SceneRef { pub name: SmolStr, pub content_hash_hex: String }
 
 /// Everything a replayer needs before the first tick.
 pub struct SessionHeader {
@@ -753,7 +799,7 @@ In `crates/test-support/src/replay/session.rs`:
 ```rust
 pub struct SessionRecorder { /* header + accumulated ticks */ }
 impl SessionRecorder {
-    pub fn new(header: SessionHeader) -> Self;
+    pub const fn new(header: SessionHeader) -> Self;
     pub fn record_tick(&mut self, record: TickRecord);
     pub fn finish(self) -> Result<Vec<u8>, ReplayEncodeError>;
 }
@@ -763,11 +809,25 @@ impl SessionReplayer {
     pub fn open(bytes: &[u8]) -> Result<RecordedSession, ReplayDecodeError>;
 }
 
-pub struct RecordedSession { pub header: SessionHeader, /* ticks */ }
+/// The header is behind an accessor rather than a public field: the
+/// byte-identity promise is over a session that came from the recorder or
+/// the decoder, and a public field is a route to mutating a decoded
+/// session and re-encoding it to different bytes. See the decision log.
+pub struct RecordedSession { /* header + ticks, both private */ }
 impl RecordedSession {
+    pub const fn header(&self) -> &SessionHeader;
     pub fn ticks(&self) -> impl Iterator<Item = &TickRecord>;
     pub fn re_encode(&self) -> Result<Vec<u8>, ReplayEncodeError>;
 }
+```
+
+Both encode paths enforce the format's two rules — a version this build can
+read back, and strictly increasing ticks — so the recorder and the
+re-encoder cannot drift about what they accept:
+
+```rust
+pub enum ReplayEncodeError { Encode { .. }, NonMonotonicTick { .. }, UnsupportedVersion { .. } }
+pub enum ReplayDecodeError { Malformed { .. }, UnsupportedVersion { .. }, NonMonotonicTick { .. } }
 ```
 
 The byte-identity test is `SessionRecorder::finish` output equals
