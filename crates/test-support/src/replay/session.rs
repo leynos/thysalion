@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 use super::{
-    format::{SUPPORTED_VERSION, SessionHeader, TickRecord},
+    format::{FormatVersion, SUPPORTED_VERSION, SessionHeader, TickRecord},
     probe::SessionProbe,
 };
 
@@ -56,6 +56,18 @@ pub enum ReplayEncodeError {
         previous: u64,
         /// The offending tick.
         found: u64,
+    },
+    /// The header declares a version this build cannot read back.
+    ///
+    /// A recorder that writes a version its own decoder refuses produces a
+    /// corpus entry nothing can read — the worst outcome available to a format
+    /// whose whole purpose is that recordings outlive the build that made them.
+    #[error("cannot record a session declaring version {found}; this build writes {supported}")]
+    UnsupportedVersion {
+        /// The version the header declares.
+        found: FormatVersion,
+        /// The version this build writes and understands.
+        supported: FormatVersion,
     },
 }
 
@@ -105,7 +117,19 @@ fn first_non_increasing(ticks: &[TickRecord]) -> Option<(u64, u64)> {
 }
 
 /// Encodes a session document in the canonical MessagePack form.
+///
+/// Both of the format's rules are checked here rather than at the call sites,
+/// so the recorder and the re-encoder cannot drift about what they enforce.
+/// The version check is the same range test the decoder applies, not an
+/// equality test: recording at an older minor is a legitimate compatibility
+/// choice, while recording at a version this build could not read back is not.
 fn encode(document: &SessionDocument) -> Result<Vec<u8>, ReplayEncodeError> {
+    if !SUPPORTED_VERSION.accepts(document.header.version) {
+        return Err(ReplayEncodeError::UnsupportedVersion {
+            found: document.header.version,
+            supported: SUPPORTED_VERSION,
+        });
+    }
     if let Some((previous, found)) = first_non_increasing(&document.ticks) {
         return Err(ReplayEncodeError::NonMonotonicTick { previous, found });
     }
@@ -146,6 +170,66 @@ fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, ReplayDecod
 /// stays infallible so a recording loop reads as a loop; the ordering rule is
 /// checked once, at [`Self::finish`], where a violation can be reported
 /// without the caller having to handle a `Result` on every tick.
+///
+/// # Examples
+///
+/// Recording an empty session, replaying it, and re-encoding it to the same
+/// bytes — roadmap task 1.3.2's byte-identity criterion:
+///
+/// ```
+/// use thysalion_test_support::replay::{
+///     SUPPORTED_VERSION,
+///     SessionHeader,
+///     SessionRecorder,
+///     SessionReplayer,
+/// };
+///
+/// let header = SessionHeader {
+///     version: SUPPORTED_VERSION,
+///     tick_rate_hz: 60,
+///     scene: None,
+/// };
+/// let recorded = SessionRecorder::new(header).finish()?;
+///
+/// let session = SessionReplayer::open(&recorded)?;
+/// assert_eq!(session.ticks().count(), 0);
+/// assert_eq!(session.re_encode()?, recorded);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// Ticks that do not increase are refused rather than written:
+///
+/// ```
+/// use thysalion_test_support::replay::{
+///     ReplayEncodeError,
+///     SUPPORTED_VERSION,
+///     SessionHeader,
+///     SessionRecorder,
+///     TickRecord,
+/// };
+///
+/// let mut recorder = SessionRecorder::new(SessionHeader {
+///     version: SUPPORTED_VERSION,
+///     tick_rate_hz: 60,
+///     scene: None,
+/// });
+/// recorder.record_tick(TickRecord {
+///     tick: 7,
+///     inputs: Vec::new(),
+/// });
+/// recorder.record_tick(TickRecord {
+///     tick: 7,
+///     inputs: Vec::new(),
+/// });
+///
+/// assert!(matches!(
+///     recorder.finish(),
+///     Err(ReplayEncodeError::NonMonotonicTick {
+///         previous: 7,
+///         found: 7
+///     })
+/// ));
+/// ```
 #[derive(Debug, Clone)]
 pub struct SessionRecorder {
     document: SessionDocument,
@@ -170,9 +254,11 @@ impl SessionRecorder {
     ///
     /// # Errors
     ///
-    /// Returns [`ReplayEncodeError::NonMonotonicTick`] when the recorded ticks
-    /// do not strictly increase, and [`ReplayEncodeError::Encode`] when the
-    /// underlying encoder fails.
+    /// Returns [`ReplayEncodeError::UnsupportedVersion`] when the header
+    /// declares a version this build could not read back,
+    /// [`ReplayEncodeError::NonMonotonicTick`] when the recorded ticks do not
+    /// strictly increase, and [`ReplayEncodeError::Encode`] when the underlying
+    /// encoder fails.
     pub fn finish(self) -> Result<Vec<u8>, ReplayEncodeError> { encode(&self.document) }
 }
 
@@ -195,6 +281,20 @@ impl SessionReplayer {
     /// [`ReplayDecodeError::NonMonotonicTick`] when its ticks do not strictly
     /// increase, and [`ReplayDecodeError::Malformed`] when the bytes do not
     /// parse.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_test_support::replay::{ReplayDecodeError, SessionReplayer};
+    ///
+    /// // Bytes from an older format, or from no format at all.
+    /// assert!(matches!(
+    ///     SessionReplayer::open(b"not a recording"),
+    ///     Err(ReplayDecodeError::Malformed { .. })
+    /// ));
+    /// ```
+    ///
+    /// See [`SessionRecorder`] for the round trip this completes.
     pub fn open(bytes: &[u8]) -> Result<RecordedSession, ReplayDecodeError> {
         let probed = decode::<SessionProbe>(bytes)?.header.version;
         if !SUPPORTED_VERSION.accepts(probed) {
@@ -235,7 +335,7 @@ impl RecordedSession {
     /// # Errors
     ///
     /// Returns [`ReplayEncodeError::Encode`] when the underlying encoder
-    /// fails. The tick-ordering arm is unreachable for a session that came
-    /// from [`SessionReplayer::open`], which already checked it.
+    /// fails. The version and tick-ordering arms are unreachable for a session
+    /// that came from [`SessionReplayer::open`], which already checked both.
     pub fn re_encode(&self) -> Result<Vec<u8>, ReplayEncodeError> { encode(&self.document) }
 }
