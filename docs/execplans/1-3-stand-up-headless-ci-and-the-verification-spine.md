@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision log`, and `Outcomes & retrospective` must be kept up to date as work
 proceeds.
 
-Status: IN PROGRESS
+Status: DELIVERED
 
 ## Purpose / big picture
 
@@ -284,8 +284,10 @@ not quality criteria.
   green; `act-validation.yml` joins the pinning test.
 - [x] Stage C4: replay envelope, recorder/replayer, golden bytes, CI test;
   ADR 007.
-- [ ] Stage D: documentation, roadmap checkboxes, refactor pass,
-  retrospective.
+- [x] Stage D: documentation, roadmap checkboxes, refactor pass,
+  retrospective. The refactor pass found nothing to act on: the largest new
+  file is 241 lines against the 400-line limit, and no duplication, long
+  function, or excessive parameter list survived review.
 
 ## Surprises & discoveries
 
@@ -338,6 +340,37 @@ not quality criteria.
   `tests/replay_round_trip.rs` passes. Impact: the plan's central
   format-staging device is viable exactly as written; no placeholder variant
   was needed.
+- Observation (second review round): `thysalion-harness`'s
+  `windowed_tests::overlay_refresh_is_throttled_until_the_interval_elapses`
+  is load-sensitive and failed once during this work, on a machine running
+  another build concurrently. It asserts that two `app.update()` calls take
+  "far below the 0.2 s throttle", which stops being true when the host is
+  busy; the overlay then refreshes and the placeholder assertion fails.
+  Evidence: one failure under concurrent load, five subsequent passes in
+  isolation, and the test's own comment stating the assumption. The test is
+  untouched by this step (last modified at roadmap 1.1, commit 3f23feb).
+  Impact: out of scope to fix here, and recorded for the pull request
+  description — it is a latent flake in the continuous-integration suite this
+  step has just put on every push, so it will surface more often from now on.
+  The fix is to drive the throttle from an injected clock rather than
+  wall-clock time, which is a change to harness internals and a step of its
+  own.
+- Observation (second review round): the first workflow-shape assertions
+  matched substrings against the raw workflow text, so a comment mentioning a
+  trigger could satisfy them — and `ci.yml`'s comments discuss exactly the
+  triggers under test. Evidence: the review finding, confirmed by mutation —
+  narrowing `branches: ['**']` to `[main]` and deleting the push trigger
+  outright both now fail the suite, with the comments still present. Impact:
+  the assertions became indentation-aware key lookups with comments stripped,
+  without taking a YAML dependency.
+- Observation (second review round): `LoaderSession::load_fixture` left a
+  previously selected document in place when a load failed, so a scenario
+  loading two fixtures where the second fails would assert against the first
+  fixture's scene. Evidence: the review finding, confirmed by reverting the
+  fix and watching the new regression test fail. Impact: latent rather than
+  live — no current scenario loads a second fixture and then reads the
+  document — but fixed with a unit test, because the next scenario to do so
+  would have had a silently wrong assertion rather than a failure.
 - Observation (pre-work verification of the Stage A question): the pinned
   `generate-coverage` action's ratchet stores and restores its baseline
   through the GitHub Actions cache (`ratchet-baseline-…` restore keys) and
@@ -496,7 +529,56 @@ not quality criteria.
 
 ## Outcomes & retrospective
 
-To be completed as stages land.
+All stages landed. The step's stability promise — *one adapter set, one
+verification spine* — holds: `BevyHarness` and `LoaderHarness` exist once
+each, under `crates/test-support/src/`, and the replay envelope is the single
+record format later phases build on.
+
+What the plan got right:
+
+- The two-movement promotion (land the crate, re-point one suite, then the
+  other) was the correct mitigation, and the risk it guarded against never
+  materialized as a failure — the compile errors it would have produced
+  appeared one suite at a time, as intended.
+- Writing Stage A as a go/no-go spike paid for itself in the wrong direction,
+  pleasantly: every tool accepted the dev-dependency loop, so the escalation
+  path was never needed. The cost of asking was one `make coverage` run.
+- The uninhabited payload worked exactly as designed. `serde` derives for an
+  empty enum without complaint, so the format-staging device cost nothing and
+  no placeholder variant became permanent baggage.
+
+What the plan did not anticipate:
+
+- `LoaderSession` reached into its *consumer's* test tree for the
+  fixture-location helpers, so the promotion was one module wider than
+  written. Worth generalizing: before promoting test code, check what it
+  reaches for through `#[path]` declarations, which are invisible to an
+  import-graph reading.
+- Moving code from a test binary into a library changes which lints apply.
+  `clippy::must_use_candidate` fired on three accessors that had been quiet
+  for a phase, and the `#[must_use]` it demanded then put every discarding
+  call site under `clippy::let_underscore_must_use`. Whitaker separately
+  required a `//!` comment on the new `#[cfg(test)]` module. None was
+  difficult; all were unbudgeted.
+- The first workflow-shape assertions were substring matches, which could
+  have been satisfied by `ci.yml`'s own comments about the triggers under
+  test. Review caught it. The lesson is narrower than "parse the YAML": a
+  test that asserts a file's *shape* should be mutation-checked against that
+  file, because it is the only kind of test whose subject is not exercised by
+  running it.
+- A guard for a wire rule cannot be tested through the writer once the writer
+  enforces the same rule. Closing the recorder's version gap made the
+  decoder's refusals untestable through the recorder, which is how the
+  original "both boundaries" test came to check one. Hand-built bytes plus a
+  drift guard against the recorder's output is the shape that works.
+
+Carried forward, not fixed here:
+
+- `thysalion-harness`'s overlay-throttle test is wall-clock sensitive and
+  will flake more often now that the suite runs on every push. It wants an
+  injected clock.
+- `WITH_ACT=1` is a no-op, and `make nixie` runs in no workflow. Both are
+  one-line follow-ups recorded in `Surprises & discoveries`.
 
 ## Context and orientation
 
@@ -694,14 +776,22 @@ Red-Green-Refactor evidence, as observed:
   items but does fire once they are library items, and
   `clippy::let_underscore_must_use` on the two step functions that discard
   those accessors' results once `#[must_use]` was added.
-- Green: `make test` reports `223 tests run: 223 passed, 2 skipped`, against
-  214 before the change. The nine new tests are the combined headless
-  scenario (1), the replay suite (5, plus one `#[ignore]`d regeneration
-  helper), and the workflow-shape additions (3). No losses.
+- Green: `make test` reports `228 tests run: 228 passed, 2 skipped`, against
+  214 before the change. The fourteen new tests are the combined headless
+  scenario (1), the replay suite (8 active, plus one `#[ignore]`d
+  regeneration helper), the workflow-shape additions (4, beside the two that
+  already existed), and the loader regression test (1). No losses.
 - Gates: `make check-fmt`, `make lint` (rustdoc, Clippy, Whitaker),
   `make test`, `make spelling`, `make scripts-test`, `make scenes-check`,
-  `make markdownlint`, `make nixie`, and `make coverage` all green at both
-  commits.
+  `make markdownlint`, `make nixie`, and `make coverage` all green at every
+  commit on this branch.
+- Mutation-checked rather than merely green, because three of the new tests
+  are *guards* and a guard that cannot fail is worse than none: narrowing
+  `ci.yml`'s push trigger to `[main]` and deleting it outright each fail the
+  workflow-shape suite, and reverting the `LoaderSession` fix fails the new
+  regression test. The workflow mutations fail with the file's comments still
+  in place, which is what the substring assertions they replaced could not
+  promise.
 
 Acceptance, as verified:
 
