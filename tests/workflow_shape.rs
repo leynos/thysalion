@@ -68,9 +68,10 @@ fn workflows_pin_shared_actions_to_full_length_shas() {
 
 /// The CI workflow's text, or a panic naming what could not be read.
 ///
-/// One reader for the three tests below rather than three `expect`s: they all
-/// assert about the same file, and a shared accessor is one place for the
-/// failure message to say which file and why.
+/// One reader for the four tests below rather than four `expect`s — two reach
+/// it through [`ci_triggers`] and two call it directly. They all assert about
+/// the same file, and a shared accessor is one place for the failure message
+/// to say which file and why.
 fn ci_workflow() -> String {
     match read_workflow("ci.yml") {
         Ok(text) => text,
