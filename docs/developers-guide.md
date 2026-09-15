@@ -17,6 +17,35 @@ The main `.github/workflows/ci.yml` workflow deliberately does not run
 `make test WITH_ACT=1`; the separate Act workflow runs those slower
 container-backed checks in parallel.
 
+### Continuous integration triggers
+
+`ci.yml` runs on every push to every branch, and on pull requests. Both
+triggers are needed and neither is sufficient: without the push trigger the
+suite runs only once a pull request exists (roadmap 1.3.1 requires it on every
+push), and without the pull-request trigger fork contributions would go
+untested, because a fork's pushes raise no event in this repository.
+
+Keeping both would double every run on an open pull request, so two mechanisms
+narrow it back to one run per event that carries new information:
+
+- A workflow-level `concurrency` group keyed on workflow and ref, with
+  `cancel-in-progress: true`, so a superseded run is cancelled. A push and its
+  own pull-request event carry different refs (`refs/heads/…` against
+  `refs/pull/N/merge`), so a fork's pull-request run is never cancelled by a
+  maintainer's push.
+- An `if` guard on the job that skips `pull_request` events whose head
+  repository is this repository. Required status checks match on job name
+  regardless of the triggering event, so the push-triggered run on the same
+  head commit satisfies the check. A skipped same-repository pull-request run
+  is the design, not a fault to fix.
+
+`act-validation.yml` stays pull-request-scoped: it is a slower secondary check,
+and the roadmap criterion names the test suite rather than Act.
+
+`tests/workflow_shape.rs` asserts all of the above as *shape* — the triggers,
+the concurrency keys, and the guard's presence — never a literal SHA value; see
+"Workflow pins and Dependabot" below for why that distinction matters.
+
 ## Tooling
 
 Development builds use Cranelift for debug code generation. On Linux targets,
@@ -92,11 +121,37 @@ binaries on disk and rejects anything else before Cargo runs
 
 ### Headless testing and the coverage boundary
 
-Behavioural tests use `rstest-bdd` (0.6.0-beta3) with a Bevy harness adapter
-(`crates/harness/tests/headless/support.rs`) that builds a `MinimalPlugins` app
-with `HarnessCorePlugin` and hands it to steps via the reserved
-`rstest_bdd_harness_context` fixture. Feature files live in
-`crates/harness/tests/features/`. Unit-level mathematics uses plain `rstest`;
+Behavioural tests use `rstest-bdd` (0.6.0-beta3) with harness adapters shared
+from `thysalion-test-support` (`crates/test-support/`). Two adapters live
+there, deliberately the same shape:
+
+- `BevyHarness` builds a `MinimalPlugins` app with `HarnessCorePlugin` and
+  hands it to steps via the reserved `rstest_bdd_harness_context` fixture. It
+  sits behind the crate's non-default `bevy` feature, which is what keeps
+  `thysalion-world` — a dev-dependent of this crate — free of `bevy` until
+  ADR 005 stages that dependency in at roadmap 2.1.1.
+- `LoaderHarness` hands steps a `LoaderSession`: a plain struct wrapping a
+  scene source, a selected document, and the outcome of the last load. It is on
+  the default-feature path, so a suite that only loads scenes pays for no
+  engine.
+
+`crates/test-support/src/scenes.rs` is the single statement of where the
+committed fixture scenes live and the single place that takes ambient
+filesystem authority to reach them; every suite that reads a fixture goes
+through it.
+
+A helper belongs in `thysalion-test-support` when two or more test targets need
+it and it drives public crate surface. A helper one suite uses stays in that
+suite's `tests/` tree. Plane crates take the crate as a *dev*-dependency only:
+the dev-dependency loop with `thysalion-world` is the `serde`/`serde_test`
+shape and is legal to Cargo, but a normal-edge cycle is not.
+
+Feature files live beside their suites — `crates/harness/tests/features/`,
+`crates/world/tests/features/`, and
+`crates/test-support/tests/features/`, the last of which hosts the combined
+scenario that builds a headless app, loads a fixture scene into it, and asserts
+against the harness's registered diagnostics. Unit-level mathematics uses plain
+`rstest`;
 generated-input properties (zoom clamping, the rig's action-sequence model) use
 `proptest`; and compile-time contracts (for example, struct-literal
 construction of `#[non_exhaustive]` harness types being rejected) are pinned
@@ -113,6 +168,29 @@ execute in continuous integration; they carry `#[coverage(off)]` and the
 Makefile's coverage target mirrors the same boundary with an ignore pattern. Do
 not count new windowed code against the coverage ratchet — keep logic testable
 headless and leave only thin windowed shims excluded.
+
+### The replay envelope
+
+`thysalion_test_support::replay` carries the deterministic replay session
+format of design §14 (invariant I1): a versioned `SessionHeader` followed by
+tick-stamped `TickRecord`s. The payload type `InputRecord` is uninhabited until
+roadmap step 4.1.2 defines the circuit boundary, so recordings are currently
+headers alone — deliberately, so no speculative record vocabulary becomes
+permanent wire-compatibility burden. [ADR 007](adr-007-replay-record-format.md)
+owns the rules; the short version is that the format copies ADR 006's
+canonical-encoding discipline wholesale.
+
+Record, replay, and re-record must produce identical bytes within one build.
+That, plus the checked-in golden bytes under
+`crates/test-support/tests/fixtures/golden/`, is what
+`crates/test-support/tests/replay_round_trip.rs` asserts. Refresh the golden
+bytes only deliberately — a change there is a wire-format change and needs a
+`FormatVersion` bump and an ADR 007 version-history entry:
+
+```console
+$ cargo test -p thysalion-test-support --test replay_round_trip -- \
+    --ignored regenerate
+```
 
 Screenshots (`F12`, on key release) save to
 `screenshots/<slug>-<timestamp>-<sequence>.png` (git-ignored). Bevy screenshots
