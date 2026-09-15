@@ -268,7 +268,11 @@ not quality criteria.
 - [x] Stage A: spike the crate skeleton and the dev-dependency loop; confirm
   tooling accepts it. `make check-fmt`, `make lint`, and `make test` (214
   tests) all green with the loop in place; `cargo tree -p thysalion-world -e
-  normal,dev` reports zero `bevy` matches on the default-feature path.
+  normal,dev` reports zero `bevy` matches on the default-feature path. The
+  `Risks` entry naming `cargo llvm-cov`, `cargo nextest`, and Whitaker as the
+  tools that might misbehave is cleared: all three accept the loop, and
+  `make coverage` completes against the committed tree and writes
+  `lcov.info`.
 - [x] Stage B: red tests — workflow-shape assertions, the combined headless
   scenario, and the replay round-trip. Landed in the same working tree as
   their production changes, per the no-red-commits constraint.
@@ -636,16 +640,42 @@ Expected shape of the replay test's first green run:
 
 ## Validation and acceptance
 
-Red-Green-Refactor evidence to record per stage:
+Red-Green-Refactor evidence, as observed:
 
-- Red: Stage B's workflow-shape additions fail with assertion messages
-  naming the missing trigger; the replay test fails to compile with
-  `unresolved import` on the `replay` module. Quote both in this section
-  when observed.
-- Green: after C3 and C4, `cargo nextest run` reports the new tests
-  passing; after C1/C2 the full `make test` count rises by the new
-  scenarios with no losses.
-- Refactor: `make all` green after any Stage D cleanup.
+- Red: not quoted here, and deliberately. The no-red-commits constraint puts
+  every red state in the working tree only, and each red surface was
+  authored alongside the production change that answers it rather than
+  committed ahead of it. Two red states were observed in passing during
+  implementation and are worth recording because they are the lint
+  interactions a later promotion will hit: `clippy::must_use_candidate` on
+  the three `LoaderSession` accessors, which does not fire on test-binary
+  items but does fire once they are library items, and
+  `clippy::let_underscore_must_use` on the two step functions that discard
+  those accessors' results once `#[must_use]` was added.
+- Green: `make test` reports `223 tests run: 223 passed, 2 skipped`, against
+  214 before the change. The nine new tests are the combined headless
+  scenario (1), the replay suite (5, plus one `#[ignore]`d regeneration
+  helper), and the workflow-shape additions (3). No losses.
+- Gates: `make check-fmt`, `make lint` (rustdoc, Clippy, Whitaker),
+  `make test`, `make spelling`, `make scripts-test`, `make scenes-check`,
+  `make markdownlint`, `make nixie`, and `make coverage` all green at both
+  commits.
+
+Acceptance, as verified:
+
+1. Pending the first push: `ci.yml` declares `push: branches: ['**']`, and
+   `tests/workflow_shape.rs` fails if that is removed. Confirm the Actions
+   run appears for the branch push itself once pushed.
+2. `grep -rn "struct BevyHarness|struct LoaderHarness" crates/` matches
+   exactly two lines, both under `crates/test-support/src/`.
+3. The replay round-trip suite passes twice in a row and `git status` stays
+   clean; the golden bytes do not churn.
+4. `docs/adr-007-replay-record-format.md` exists, is linked from
+   `contents.md`, and `make markdownlint` reports `Summary: 0 error(s)`.
+
+Supporting layering checks: `cargo tree -p thysalion-world -e normal,dev`
+matches `bevy` zero times, and `cargo tree -p thysalion -e normal` matches
+`test-support` zero times, so the release graph is untouched.
 
 Acceptance, phrased as behaviour:
 
