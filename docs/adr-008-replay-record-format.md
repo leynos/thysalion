@@ -216,6 +216,33 @@ point the natural shape is an Arrow or Parquet *projection* built from the
 MessagePack recordings, not a replacement for them: the recordings would remain
 the byte-identical artefacts and the columnar form would be a derived index.
 
+### Validated newtypes over the envelope's fields
+
+Review raised the envelope's raw primitives — `content_hash_hex` as a
+`String`, the tick rate and tick number as bare integers — and proposed
+validated domain newtypes wrapping the existing wire serialization.
+
+Declined, on ADR 006's own reasoning rather than on cost. That record
+introduced the document/domain split precisely where a domain type has "a
+private field to protect and an invariant to enforce", and it is explicit that
+"not every type needs two forms" — a second form for a type with no invariant
+"would be two names for one set of values and a conversion function that can
+only be the identity". The envelope is that case today: its one real rule is
+the ordering of ticks *across* records, which no per-field newtype can express,
+and which is therefore checked at the encode and decode boundaries instead.
+
+The hex digest is the strongest candidate, and it is still premature. Nothing
+reads the field yet — the replay-time check that a fixture still matches its
+recorded hash arrives with roadmap 4.1.2 — so a validating constructor now
+would encode a guess about what that check needs. The plan's own tolerance on
+ambiguity applies: do not extend the format speculatively.
+
+**Re-opening trigger.** Revisit when roadmap 4.1.2 adds the replay-time scene
+check, which is the first consumer that must reject a malformed hash, or when
+the first `InputRecord` variants give the payload an invariant of its own. A
+domain form added then is additive and needs no version bump, because it
+changes Rust API rather than wire shape.
+
 ### `postcard` or another compact binary format
 
 Smaller bytes, and nothing else. MessagePack is already in this workspace's

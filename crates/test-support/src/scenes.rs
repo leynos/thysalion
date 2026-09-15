@@ -32,6 +32,16 @@ pub const FIXTURE_NAMES: &[&str] = &[
 /// fixture path relative to the repository root has to be built rather than
 /// assumed. Every member crate sits at `crates/<name>`, so two parents of this
 /// crate's manifest directory is the root for consumers of this crate too.
+///
+/// # Examples
+///
+/// ```
+/// use thysalion_test_support::scenes;
+///
+/// let root = scenes::repository_root();
+/// assert!(root.join("Cargo.toml").exists());
+/// assert!(root.join(scenes::SCENES).is_dir());
+/// ```
 #[must_use]
 pub fn repository_root() -> Utf8PathBuf {
     let crate_root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -55,7 +65,17 @@ pub fn repository_root() -> Utf8PathBuf {
 /// # Panics
 ///
 /// Panics when `assets/scenes` is missing, which is a broken checkout or a
-/// tree nobody has run `make scenes` in.
+/// tree nobody has run `make scenes` in. See the crate-level documentation for
+/// why that is a panic rather than a `Result`.
+///
+/// # Examples
+///
+/// ```
+/// use thysalion_test_support::scenes;
+///
+/// let fixtures = scenes::scene_dir();
+/// assert!(fixtures.read("bare-cell.scene.json").is_ok());
+/// ```
 #[must_use]
 pub fn scene_dir() -> Dir {
     let root = repository_root().join(SCENES);
