@@ -70,6 +70,12 @@ impl LoaderSession {
         )));
         let path = Utf8PathBuf::from(format!("{name}.scene.json"));
         let outcome = loader.load(&path);
+        // Cleared before the attempt, not left alone on failure. A scenario
+        // that loads two fixtures and sees the second fail would otherwise
+        // find the *first* one's document still selected, and every later step
+        // would silently assert against the wrong scene rather than reporting
+        // that a Given step selected nothing.
+        self.document = None;
         if let Ok(loaded) = outcome.as_ref() {
             self.document = Some(loaded.scene.to_document());
             self.adopt_resources(loaded, &replica);
@@ -182,5 +188,42 @@ impl HarnessAdapter for LoaderHarness {
 
     fn run<T>(&self, request: ScenarioRunRequest<'_, Self::Context, T>) -> HarnessResult<T> {
         Ok(request.run(LoaderSession::new()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Regression coverage for the session's own state transitions, as
+    //! distinct from the loading behaviour the behavioural suite in
+    //! `crates/world/tests/loading/` covers. What is tested here is what a
+    //! *scenario* would otherwise observe only indirectly: that a failed
+    //! fixture load leaves no stale selection behind for the next step to
+    //! assert against.
+
+    use super::LoaderSession;
+
+    #[test]
+    fn a_failed_fixture_load_clears_the_previously_selected_document() {
+        // The scenario this guards: two fixture loads in one session, the
+        // second failing. Without the clear, `document()` would hand back the
+        // first fixture's document and every later assertion would quietly
+        // test the wrong scene.
+        let mut session = LoaderSession::new();
+        session.load_fixture("bare-cell");
+        assert!(
+            session.document.is_some(),
+            "a shipped fixture must select a document"
+        );
+
+        session.load_fixture("no-such-fixture");
+        assert!(
+            session.document.is_none(),
+            "a failed load must leave no document selected"
+        );
+        assert_eq!(
+            session.fixtures.len(),
+            2,
+            "both attempts must be recorded, successful or not"
+        );
     }
 }
