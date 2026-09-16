@@ -146,7 +146,7 @@ const fn minimal_lighting() -> Lighting {
     }
 }
 
-/// The minimal hand-written scene, as specified by the 1.2 execution plan.
+/// The minimal handwritten scene, as specified by the 1.2 execution plan.
 ///
 /// Two chunks: one run-encoded chunk carrying four rows of stone on its
 /// `z = 0` layer, and one uniform chunk of stone. Sixteen non-air voxels in

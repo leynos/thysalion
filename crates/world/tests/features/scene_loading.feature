@@ -1,14 +1,14 @@
 Feature: Scene loading and validation
 
   Scenario: A well-formed scene loads
-    Given the minimal hand-written scene document
+    Given the minimal handwritten scene document
     When the scene is loaded
     Then loading succeeds
     And the scene reports 3 palette entries
     And the scene reports 32784 non-air voxels
 
   Scenario: The same scene survives a MessagePack round trip
-    Given the minimal hand-written scene document
+    Given the minimal handwritten scene document
     When the document is re-encoded as MessagePack and loaded
     Then loading succeeds
     And the loaded scene equals the scene loaded from JSON
@@ -41,7 +41,7 @@ Feature: Scene loading and validation
   Scenario: A failed load leaves the loader usable
     Given the scene document with an out-of-range palette index
     When the scene is loaded
-    And the minimal hand-written scene document is loaded afterwards
+    And the minimal handwritten scene document is loaded afterwards
     Then loading succeeds
 
   Scenario: A spawn inside a wall warns without failing

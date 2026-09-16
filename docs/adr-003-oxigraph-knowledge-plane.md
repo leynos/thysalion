@@ -41,7 +41,7 @@ and circuit-computed reactive facts; TriG for authoring and saves.
 
 ### Option B: ECS fact components
 
-Facts as components/resources; queries as hand-written system logic.
+Facts as components/resources; queries as handwritten system logic.
 
 ### Option C: Datalog fact base as primary store
 

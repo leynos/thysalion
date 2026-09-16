@@ -8,7 +8,7 @@
 //! Corrupt documents are derived here by mutating the minimal document rather
 //! than being read from disk. That guarantees the corruption is the *only*
 //! difference from a valid scene, which is exactly what each scenario claims
-//! to be testing. The hand-written corrupt fixtures under
+//! to be testing. The handwritten corrupt fixtures under
 //! `tests/fixtures/corrupt/` serve a different purpose: they pin the rendered
 //! diagnostic report, one file per corruption class.
 
@@ -117,7 +117,7 @@ fn with_three_faults() -> SceneDocument {
     document
 }
 
-#[given("the minimal hand-written scene document")]
+#[given("the minimal handwritten scene document")]
 fn given_minimal(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
     session.document = Some(minimal_document());
 }
@@ -170,7 +170,7 @@ fn when_loaded_as_msgpack(#[from(rstest_bdd_harness_context)] session: &mut Load
     session.load(Encoding::MessagePack);
 }
 
-#[when("the minimal hand-written scene document is loaded afterwards")]
+#[when("the minimal handwritten scene document is loaded afterwards")]
 fn when_minimal_loaded_after(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
     let document = minimal_document();
     session.load_other(&document);

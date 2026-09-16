@@ -6,7 +6,7 @@ schema = 1
 stems = []
 
 [words]
-accepted = ["Flavored", "mold", "LOD"]
+accepted = ["mold", "LOD"]
 
 [words.corrections]
 

@@ -30,10 +30,10 @@ The generated `Makefile` exposes these public targets:
 - `make audit` derives the Rust workspace root with `cargo metadata` and runs
   `cargo audit` once from that root.
 - `make markdownlint` checks Markdown files and enforces en-GB-oxendict
-  spelling through the pinned `typos` release.
-- `make spelling` refreshes the shared Oxford dictionary when its published
-  source is newer than the ignored local cache, generates `typos.toml`, and
-  checks Markdown prose.
+  spelling.
+- `make spelling` runs the shared `typos-config-builder` gate, which
+  regenerates `typos.toml` from the live shared dictionary and the
+  `typos.local.toml` overlay and then checks the prose.
 - `make nixie` validates Mermaid diagrams.
 
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the

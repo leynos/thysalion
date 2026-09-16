@@ -130,7 +130,7 @@ pub struct SceneLoader {
 }
 
 impl core::fmt::Debug for SceneLoader {
-    /// Hand-written because [`SceneSource`] is a trait object and cannot derive
+    /// Handwritten because [`SceneSource`] is a trait object and cannot derive
     /// `Debug` without making it a supertrait, which would constrain every
     /// adapter for the sake of a diagnostic line.
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

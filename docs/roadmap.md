@@ -59,7 +59,7 @@ scenes all later spikes and CI suites consume. See thysalion-design.md §7.
   - Palette entries with material class, per-face passability, slope,
     emission, simulation coefficients, and optional concept IRI.
   - See thysalion-design.md §7.2.
-  - Success: a hand-written JSON scene round-trips through the model and
+  - Success: a handwritten JSON scene round-trips through the model and
     the MessagePack encoding without loss.
 - [x] 1.2.2. Implement scene loading with load-time validation.
   - Reject unknown palette references, out-of-bounds spawns, and dangling
