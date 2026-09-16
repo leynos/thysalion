@@ -40,6 +40,14 @@ COVERAGE_CODEGEN_BACKEND ?= llvm
 # it rather than requiring a system lld just to run the gate locally.
 COVERAGE_LLD_DIR ?= $(shell $(RUSTC) --print sysroot)/lib/rustlib/$(shell $(RUSTC) -vV | sed -n 's/^host: //p')/bin/gcc-ld
 MDLINT ?= markdownlint-cli2
+# `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
+# Markdown files Git tracks and `--include-untracked` adds the untracked files
+# Git does not ignore, so a new document is formatted before it is staged.
+# Both modes need mdtablefix 0.6.0 or later; CI pins the version at the
+# install-mdtablefix step.
+MDTABLEFIX ?= mdtablefix
+MDTABLEFIX_SELECT = --git --include-untracked
+MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 NIXIE ?= nixie
 TYPOS_VERSION ?= 1.48.0
 TYPOS := uv tool run typos@$(TYPOS_VERSION)
@@ -109,10 +117,12 @@ demo: ## Run a capability demonstration binary (DEMO=empty by default)
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) +nightly fmt --all
-	mdformat-all
+	$(MDTABLEFIX) --in-place $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
+	@unset FORCE_COLOR; $(MDLINT) --fix "**/*.md"
 
 check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check
+	$(MDTABLEFIX) --check $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 
 markdownlint: ## Lint Markdown files
 	$(MDLINT) '**/*.md'
