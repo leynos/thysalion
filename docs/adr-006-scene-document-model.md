@@ -237,7 +237,7 @@ an unknown field.
 `deny_unknown_fields`. `#[serde(flatten)]` is forbidden, being incompatible
 with it at runtime. `#[serde(untagged)]` is forbidden: it buffers through
 serde's `Content`, collapses integer widths differently per format, and
-destroys error locality. No document type has a hand-written `Serialize` or
+destroys error locality. No document type has a handwritten `Serialize` or
 `Deserialize`. No document type is a tuple struct.
 
 ### The canonical byte form

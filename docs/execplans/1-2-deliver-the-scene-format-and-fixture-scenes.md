@@ -121,7 +121,7 @@ escalation, not workarounds.
   `#[serde(deny_unknown_fields)]`. `#[serde(flatten)]` is forbidden, being
   incompatible with it at runtime; `#[serde(untagged)]` is forbidden, because
   it buffers through serde's `Content`, collapses integer widths differently
-  per format, and destroys error locality. No document type has a hand-written
+  per format, and destroys error locality. No document type has a handwritten
   `Serialize` or `Deserialize` implementation. No tuple struct reaches the wire:
   `rmp_serde`'s `serialize_tuple_struct` writes a positional array regardless
   of the struct-map configuration, so a tuple struct is permanently unevolvable
@@ -558,7 +558,7 @@ travel with the C1 commit.
   identity and `Palette::get` is fallible. The dependency direction
   `scene -> grid` is unchanged.
 - Observation: task 1.2.1's success criterion is a property of the *document*
-  alone — "a hand-written JSON scene round-trips through the model and the
+  alone — "a handwritten JSON scene round-trips through the model and the
   MessagePack encoding without loss" — and needs no validated `Scene`.
   Evidence: roadmap §1.2.1 against the Stage C1 and C2 split. Impact: the stage
   boundary is sharper than the plan's module tree implies. Stage C1 delivers
@@ -714,7 +714,7 @@ travel with the C1 commit.
 
 - Observation: writing the worked example into the world-plane architecture
   document reproduced, exactly, the defect an empirical review caught in this
-  plan before implementation began — a hand-written scene document whose run
+  plan before implementation began — a handwritten scene document whose run
   lengths did not sum to the chunk volume. Evidence: `scene-check` reported
   `scene.voxels.run-length-mismatch`, 32 voxels short, on the first run against
   the documented JSON. Impact: prose examples of a format with arithmetic
@@ -755,34 +755,34 @@ travel with the C1 commit.
   names do not change. Date/Author: 2026-07-30, during Stage C2.
 
 - Decision: generated fixture documents are encoded as **compact** JSON — one
-  line, `serde_json::to_string` — not pretty-printed. Hand-written test
-  fixtures under `crates/world/tests/fixtures/` stay pretty, because no
-  generator writes them. Short `serde` renames are **not** adopted. Rationale:
-  Spike A2 measured the busiest plausible wilderness fixture at 2.33 MiB pretty
-  against a 1 MiB tolerance, and at 0.74 MiB compact. The escape this plan
-  prescribed — renaming `length` and `index` to `n` and `i` — reaches only 2.04
-  MiB and does not clear the bar, because the cost is `serde_json`'s pretty
-  printer putting every field of every one of 33,000 run objects on its own
-  line, not the length of the field names. The instruction being withdrawn was
-  justified as keeping "authored documents diffable", and that justification
-  does not survive contact with Stage C3: generated fixtures are *not* the
-  authoring surface. The layer rasters are, `make scenes-check` proves the JSON
-  matches them, and the provenance sidecar maps a diagnostic back to the
-  raster. A reviewer has no reason to read the generated JSON, and
-  pretty-printing it buys a diff nobody reads at 3.1 times the size, forever,
-  in every clone. A middle path was considered and rejected: pretty down to the
-  chunk-entry level with each payload compact on one line. It gives genuinely
-  better diffs, but it requires a custom `serde_json::ser::Formatter` *and* a
-  byte-identical reimplementation of it in the Python generator — two
-  hand-written formatters that must agree exactly, which is precisely the
-  two-writer drift hazard this plan already guards against elsewhere. Compact
-  output is one line of `json.dumps(..., separators=(",", ":"))` on the Python
-  side and one call on the Rust side, and the two agree by construction.
-  Consequences: Stage C1's `codec/json.rs` encodes compactly; the "byte
-  identical to `serde_json::to_string_pretty`" clause in Stage B's worked
-  example applies to the hand-written fixtures only; the fixture-size tolerance
-  stands unchanged at 1 MiB, and the wilderness fixture now sits at roughly
-  three quarters of it. Date/Author: 2026-07-30, after Spike A2.
+  line, `serde_json::to_string` — not pretty-printed. Handwritten test fixtures
+  under `crates/world/tests/fixtures/` stay pretty, because no generator writes
+  them. Short `serde` renames are **not** adopted. Rationale: Spike A2 measured
+  the busiest plausible wilderness fixture at 2.33 MiB pretty against a 1 MiB
+  tolerance, and at 0.74 MiB compact. The escape this plan prescribed — renaming
+  `length` and `index` to `n` and `i` — reaches only 2.04 MiB and does not
+  clear the bar, because the cost is `serde_json`'s pretty printer putting
+  every field of every one of 33,000 run objects on its own line, not the
+  length of the field names. The instruction being withdrawn was justified as
+  keeping "authored documents diffable", and that justification does not
+  survive contact with Stage C3: generated fixtures are *not* the authoring
+  surface. The layer rasters are, `make scenes-check` proves the JSON matches
+  them, and the provenance sidecar maps a diagnostic back to the raster. A
+  reviewer has no reason to read the generated JSON, and pretty-printing it
+  buys a diff nobody reads at 3.1 times the size, forever, in every clone. A
+  middle path was considered and rejected: pretty down to the chunk-entry level
+  with each payload compact on one line. It gives genuinely better diffs, but
+  it requires a custom `serde_json::ser::Formatter` *and* a byte-identical
+  reimplementation of it in the Python generator — two handwritten formatters
+  that must agree exactly, which is precisely the two-writer drift hazard this
+  plan already guards against elsewhere. Compact output is one line of
+  `json.dumps(..., separators=(",", ":"))` on the Python side and one call on
+  the Rust side, and the two agree by construction. Consequences: Stage C1's
+  `codec/json.rs` encodes compactly; the "byte identical to
+  `serde_json::to_string_pretty`" clause in Stage B's worked example applies to
+  the handwritten fixtures only; the fixture-size tolerance stands unchanged at
+  1 MiB, and the wilderness fixture now sits at roughly three quarters of it.
+  Date/Author: 2026-07-30, after Spike A2.
 - Decision: `to_vec_named` is recorded in ADR 006 as a **correctness**
   requirement rather than an evolvability preference. Rationale: Spike A1
   confirmed that `rmp_serde` decodes an array-encoded document silently into an
@@ -1591,14 +1591,14 @@ Create `crates/world/tests/features/scene_loading.feature`:
 Feature: Scene loading and validation
 
   Scenario: A well-formed scene loads
-    Given the minimal hand-written scene document
+    Given the minimal handwritten scene document
     When the scene is loaded
     Then loading succeeds
     And the scene reports 3 palette entries
     And the scene reports 32784 non-air voxels
 
   Scenario: The same scene survives a MessagePack round trip
-    Given the minimal hand-written scene document
+    Given the minimal handwritten scene document
     When the document is re-encoded as MessagePack and loaded
     Then loading succeeds
     And the loaded scene equals the scene loaded from JSON
@@ -1631,7 +1631,7 @@ Feature: Scene loading and validation
   Scenario: A failed load leaves the loader usable
     Given the scene document with an out-of-range palette index
     When the scene is loaded
-    And the minimal hand-written scene document is loaded afterwards
+    And the minimal handwritten scene document is loaded afterwards
     Then loading succeeds
 
   Scenario Outline: Every fixture scene loads clean
@@ -1718,7 +1718,7 @@ Alongside the behavioural suite, add the task 1.2.1 unit and property tests:
   `Scene` cannot be constructed by struct literal, so validation cannot be
   bypassed.
 
-Here is the minimal hand-written scene the first scenario loads, checked in at
+Here is the minimal handwritten scene the first scenario loads, checked in at
 `crates/world/tests/fixtures/minimal.scene.json`. It is the worked example a
 reader needs in order to understand every later section, so it is shown in the
 **fully explicit** form the fixtures are committed in: every defaulted field is
@@ -1849,9 +1849,9 @@ normalizing it, so a generator bug is visible rather than absorbed.
 **Nothing is elided.** Every defaulted field appears. Committed fixtures are
 byte-identical to what this crate's own encoder produces for the same document,
 which is what `make scenes-check` asserts. This worked example is shown
-pretty-printed because it is a hand-written test fixture and a teaching aid;
-the *generated* fixtures under `assets/scenes/` are compact, for the reason in
-the decision log. Two writers exist for this format — the Python generator and
+pretty-printed because it is a handwritten test fixture and a teaching aid; the
+*generated* fixtures under `assets/scenes/` are compact, for the reason in the
+decision log. Two writers exist for this format — the Python generator and
 Rust's serializer — and if the generator omits defaults that Rust re-emits, the
 two produce different bytes for the same scene from the first commit. That
 divergence is invisible to a canonical-bytes test, which only proves
@@ -2061,7 +2061,7 @@ continuous integration runs strict.
 Two fixture directories, with different assertions:
 
 - `tests/fixtures/corrupt/` holds *authoring mistakes* — one per class above,
-  hand-written, tiny, literal, one fault each. These are never generated:
+  handwritten, tiny, literal, one fault each. These are never generated:
   routing them through the fixture compiler would make the fault an artefact of
   the compiler rather than of the document.
 - `tests/fixtures/hostile/` holds *resource attacks* — a prototype chain past
@@ -2432,12 +2432,12 @@ make nixie             # documentation changes only
 Acceptance is behavioural, and maps one-to-one onto the roadmap's success
 criteria.
 
-Task 1.2.1 — "a hand-written JSON scene round-trips through the model and the
+Task 1.2.1 — "a handwritten JSON scene round-trips through the model and the
 MessagePack encoding without loss". Red: the round-trip property test fails
 because `SceneDocument` does not exist. Green: it passes for the checked-in
-hand-written minimal scene and for every generated document `proptest`
-produces. Observable: `cargo test -p thysalion-world round_trip` reports the
-property passing over its full case budget.
+handwritten minimal scene and for every generated document `proptest` produces.
+Observable: `cargo test -p thysalion-world round_trip` reports the property
+passing over its full case budget.
 
 Task 1.2.2 — "corrupt fixture variants each produce a distinct diagnostic and
 leave no scene state behind". Red: each corrupt-fixture scenario fails because

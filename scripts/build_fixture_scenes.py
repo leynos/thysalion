@@ -5,7 +5,7 @@
 # ///
 """Compile layered-text scene sources into scene documents.
 
-Fixture scenes are authored as text and compiled, never hand-written as JSON.
+Fixture scenes are authored as text and compiled, never handwritten as JSON.
 A chunk-keyed run-length payload is not a thing a person can edit: a
 single-voxel change moves every subsequent run, and a reviewer reading the diff
 sees numbers rather than a room. The authoring sources are what review looks

@@ -235,11 +235,13 @@ file is a pointer with `git lfs ls-files` before pushing.
 
 ## Spelling policy
 
-Markdown uses en-GB-oxendict spelling enforced by the pinned `typos` release.
-The tracked `typos.toml` is generated from the estate-wide shared dictionary
-and the narrow repository overlay in `typos.local.toml`. Run `make spelling` to
-refresh the ignored local shared-base cache when the published source is newer,
-regenerate the tracked configuration, and check maintained prose.
+Prose uses en-GB-oxendict spelling enforced by the shared
+`typos-config-builder` gate. Run `make spelling`. The gate regenerates the
+tracked `typos.toml` on every run from the live estate-wide shared dictionary
+and the narrow repository overlay in `typos.local.toml`, then checks the
+maintained prose. Because the dictionary is live, a word added to the shared
+dictionary needs no change here and `typos.toml` must never be drift checked in
+continuous integration.
 
 Inline code spans are checked. Fenced blocks are ignored, but a term inside
 single backticks is read like any other word, so an identifier, a file name or
@@ -250,9 +252,8 @@ corrected when they appear in prose. Never widen the pattern back to all inline
 code, and never add the bare word under `[words] accepted`, which disables the
 correction across the whole repository.
 
-`scripts/tests/test_typos_config.py` proves both halves against the committed
-configuration: the recorded terms pass inside backticks, and the same words in
-a sentence still fail. `make scripts-test` runs it, and CI runs that target.
+Hand-editing `typos.toml` is not supported; any edits are overwritten on the
+next run.
 
 ### Security audit ignores
 

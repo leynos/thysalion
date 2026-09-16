@@ -314,15 +314,16 @@ project:
 ## Markdown guidance
 
 - Validate Markdown files using `make markdownlint`. This target also runs the
-  pinned `typos` spelling gate with en-GB-oxendict policy.
-- The tracked `typos.toml` is generated. Add narrow repository exceptions to
-  `typos.local.toml`, then run `uv run scripts/generate_typos_config.py`.
+  en-GB-oxendict spelling gate.
+- Enforce spelling with `make spelling`. It regenerates `typos.toml` from the
+  live shared dictionary and the `typos.local.toml` overlay on every run, so
+  `typos.toml` is never drift checked in CI. Add narrow repository exceptions to
+  `typos.local.toml`; never edit generated entries by hand.
 - Inline code spans are checked. An identifier or a deliberately US spelling
   inside backticks is not exempt, so record it under `[patterns]` in
   `typos.local.toml` and include the backticks in the pattern. Scoping the
-  pattern to the backticked form keeps the same word flagged in prose;
-  `scripts/tests/test_typos_config.py` proves both halves of that. Never widen
-  the exception back to all inline code.
+  pattern to the backticked form keeps the same word flagged in prose. Never
+  widen the exception back to all inline code.
 - Run `make fmt` after any documentation changes to format all Markdown
   files and fix table markup.
 - Validate Mermaid diagrams in Markdown files by running `make nixie`.
