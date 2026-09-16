@@ -104,8 +104,8 @@ Four things to read, in order.
   `scene.knowledge.resource-unreadable`, not `resource-absent`:
   `rules::resources::classify` maps an unavailable root to the unreadable class
   precisely so a wrong directory is distinguishable from a scene naming a file
-  that is genuinely missing. Check this line first either way — the root is what
-  tells the two apart.
+  that is genuinely missing. Check this line first either way — the root is
+  what tells the two apart.
 - **The code.** Stable and machine-readable; the thing to search for and the
   thing tests assert on. Renaming one is a contract change; adding one is not.
 - **The document location** (`voxels[0]`). Which section, and which entry
@@ -170,8 +170,7 @@ reader is the generator itself.
 | `sim`      | object         | `fuel`, `ignition_point`, `moisture_capacity`, all Q8.8 fixed point. `ignition_point` of 65535 means "never ignites". |
 | `concept`  | string or null | An ontology concept as `prefix:local`. Checked for syntax and namespace only.                                         |
 
-*Table 4: one palette entry — everything the engine knows about a voxel
-kind.*
+*Table 4: one palette entry — everything the engine knows about a voxel kind.*
 
 Six named booleans rather than design §7.2's `[bool; 6]`. An array requires
 every reader to agree on the index-to-face mapping and offers no way to notice
@@ -276,10 +275,10 @@ What a future bump would mean:
 
 - **Minor** — a field added. The field carries `#[serde(default)]`, so a reader
   of a *newer* minor still loads an older document of the same major. The
-  reverse does not hold: every document type carries `deny_unknown_fields`, so a
-  reader that knows only 1.0 refuses a 1.1 document rather than ignoring the
-  field it does not recognize. Anticipated: phase 3's fog volume in the lighting
-  section, and phase 4's component vocabulary on spawns.
+  reverse does not hold: every document type carries `deny_unknown_fields`, so
+  a reader that knows only 1.0 refuses a 1.1 document rather than ignoring the
+  field it does not recognize. Anticipated: phase 3's fog volume in the
+  lighting section, and phase 4's component vocabulary on spawns.
 - **Major** — a field removed, retyped, or re-meant; an enum variant renamed; a
   closed vocabulary widened. A reader of an older major refuses the document
   rather than misreading it.
