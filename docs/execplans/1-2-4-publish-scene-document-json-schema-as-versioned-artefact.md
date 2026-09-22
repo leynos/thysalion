@@ -669,7 +669,7 @@ optional field. The coverage document also loads without diagnostics.
     generated nested objects (depth up to 3, up to 6 keys each).
   - Artefact: `crates/world/tests/schema_canonical.rs`. A text scanner reads
     keys per depth from the rendered string and does not re-parse into a map.
-  - Evidence: the scanner is shown to reject a hand-written string with
+  - Evidence: the scanner is shown to reject a handwritten string with
     descending keys, which is the negative control. `preserve_order` is not
     enabled anywhere in the workspace, so no red phase against the renderer
     itself is possible. The obligation guards against a *future* change of
