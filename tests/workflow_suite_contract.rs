@@ -76,6 +76,8 @@ fn suite_runs(found: &[(String, String)]) -> Vec<(&str, &str, &str)> {
 #[case::make_directory("make -C . test", true)]
 #[case::make_all("make all", true)]
 #[case::make_default_goal("make", true)]
+#[case::make_coverage("make coverage", true)]
+#[case::make_dev_test("make dev-test", true)]
 #[case::quoted_target("make \"test\"", true)]
 #[case::cargo("cargo test --all-features", true)]
 #[case::cargo_config("cargo --config tools/dev-fast/config.toml test", true)]
@@ -243,12 +245,15 @@ fn both_coverage_steps_pass_the_features() {
     let found = workflows().expect("failed to read the workflows");
     let expected = format!("features: {COVERAGE_FEATURES}");
     for workflow in COVERAGE_WORKFLOWS {
-        let text = found
+        let steps: Vec<_> = found
             .iter()
-            .find(|(name, _)| name == workflow)
-            .map_or("", |(_, text)| text.as_str());
+            .filter(|(name, _)| name == workflow)
+            .flat_map(|(_, text)| Workflow(text).jobs())
+            .flat_map(|job| job.steps())
+            .filter(|step| step.uses(COVERAGE_ACTION))
+            .collect();
         assert!(
-            text.lines().any(|line| line.trim() == expected),
+            !steps.is_empty() && steps.iter().all(|step| step.has_line(&expected)),
             "{workflow}'s coverage step must pass `{expected}`"
         );
     }

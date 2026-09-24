@@ -33,9 +33,10 @@ const MAKE_VALUE_OPTIONS: [&str; 8] = [
 /// Cargo subcommands that run the suite.
 const SUITE_SUBCOMMANDS: [&str; 3] = ["test", "nextest", "llvm-cov"];
 
-/// Make targets that run the suite. A bare `make` runs the default goal,
-/// which is `all`, so it counts as well.
-const SUITE_TARGETS: [&str; 2] = ["test", "all"];
+/// Make targets that run the suite: `test`, `all` (which runs it),
+/// `coverage` (under `cargo llvm-cov`) and the fast local variants. A bare
+/// `make` runs the default goal, which is `all`, so it counts as well.
+const SUITE_TARGETS: [&str; 5] = ["test", "all", "coverage", "dev-test", "test-fast"];
 
 /// Opens the crate manifest directory as a capability-scoped handle.
 pub(crate) fn manifest_dir() -> std::io::Result<Dir> {
@@ -148,6 +149,9 @@ impl Segment<'_> {
 /// Returns a line's indentation width.
 fn indent(line: &str) -> usize { line.len() - line.trim_start().len() }
 
+/// Returns `true` for a line that opens a YAML list item.
+fn is_item(line: &str) -> bool { line.trim_start().starts_with("- ") }
+
 /// Returns `true` for a line that carries no YAML content.
 fn is_blank_or_comment(line: &str) -> bool {
     let trimmed = line.trim();
@@ -178,8 +182,8 @@ impl<'a> Workflow<'a> {
             .lines()
             .skip_while(|line| line.trim_end() != "jobs:")
             .skip(1)
-            .take_while(|line| indent(line) > 0 || line.trim().is_empty())
             .filter(|line| !is_blank_or_comment(line))
+            .take_while(|line| indent(line) > 0)
             .collect();
         let level = section.first().map_or(0, |line| indent(line));
         let mut found: Vec<Job<'a>> = Vec::new();
@@ -215,16 +219,28 @@ impl<'a> Job<'a> {
     }
 
     /// Splits the job into steps, each a run of lines starting at a `- `
-    /// list item, so a step can be found by what it does, not its name.
+    /// item at the step list's own indentation, so a step can be found by
+    /// what it does, not its name, and a nested list inside a step does not
+    /// split it.
     pub(crate) fn steps(&self) -> Vec<Step<'a>> {
+        let items = self
+            .lines
+            .iter()
+            .skip_while(|line| line.trim() != "steps:")
+            .skip(1);
+        let level = items
+            .clone()
+            .find(|line| is_item(line))
+            .map(|line| indent(line));
         let mut found: Vec<Step<'a>> = Vec::new();
-        for line in &self.lines {
-            if line.trim_start().starts_with("- ") {
+        for line in items {
+            if is_item(line) && Some(indent(line)) == level {
                 found.push(Step(Vec::new()));
             }
-            if let Some(step) = found.last_mut() {
-                step.0.push(line);
-            }
+            found
+                .last_mut()
+                .into_iter()
+                .for_each(|step| step.0.push(line));
         }
         found
     }
@@ -246,6 +262,11 @@ impl Step<'_> {
             let trimmed = line.trim_start().trim_start_matches("- ");
             trimmed.starts_with("run:") && Command::from_line(trimmed).text() == command.text()
         })
+    }
+
+    /// Returns `true` if one of the step's lines, trimmed, is `expected`.
+    pub(crate) fn has_line(&self, expected: &str) -> bool {
+        self.0.iter().any(|line| line.trim() == expected)
     }
 
     /// Returns `true` if the step uses an action whose reference contains
