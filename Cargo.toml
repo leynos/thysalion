@@ -82,6 +82,8 @@ categories = ["game"]
 [dev-dependencies]
 cap-std = { workspace = true }
 camino = { workspace = true }
+rstest = { workspace = true }
+toml = "1.1.3"
 
 # The package.metadata.binstall pkg-url intentionally mixes Jinja2 values
 # rendered at project generation with single-brace cargo-binstall variables

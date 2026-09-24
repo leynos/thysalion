@@ -113,6 +113,17 @@ jobs:
           output-path: lcov.info
           format: lcov
           with-ratchet: 'true'
+          # `make test` runs with --all-features, and the demo-empty bin's
+          # tests build only with its feature (required-features), so
+          # coverage names it to select the same tests.
+          features: thysalion-demos/demo-empty
+      # The doctests are the only part of `make test` the coverage step does
+      # not run. The flags are the ones `make test` gives its doctest line.
+      # tests/workflow_suite_contract.rs holds the split.
+      - name: Run doctests
+        env:
+          RUSTFLAGS: -D warnings
+        run: cargo test --doc --workspace --all-features
       # Deferred CodeScene coverage gate (mode: check):
       # The changed-line gate is intentionally NOT wired here yet.
       # `cs-coverage check` fails on any CodeScene project whose configuration
