@@ -24,18 +24,24 @@ through `required-features`, so both coverage steps pass that feature and
 select the same 215 tests `make test` does. `tests/workflow_suite_contract.rs`
 holds the split, including that coverage enables every declared feature.
 
-`coverage-main.yml` measures coverage on pushes to `main` and on dispatch, and
-is the only CodeScene caller. A `Check CodeScene token availability` step (id
-`codescene_token`) runs exactly
+`coverage-main.yml` measures coverage on pushes to `main` and on dispatch from
+`main`, and is the only CodeScene caller; `ci.yml` measures pull requests for
+their own ratchet, at the same `generate-coverage` revision with
+`publish-artefact: 'false'`, and names no CodeScene token, host, or command.
+The publisher job runs in the `codescene` environment, which admits `main`
+alone and holds `CS_ACCESS_TOKEN` as an environment secret. A
+`Check CodeScene token availability` step (id `codescene_token`) runs exactly
 `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
 with no `if:` and no `env`. The upload runs only when that output is `true` and
-`github.ref` is `refs/heads/main`, and takes the token as its `access-token`
-input, so the workflow binds it in no `env` of its own: the upload is a
-composite action whose nested steps would inherit one. Until the repository has
-a `CS_ACCESS_TOKEN` secret the upload is skipped.
-`tests/codescene_publisher.rs` holds the shape over the committed workflow and
-requires the token to be named on exactly two lines, the check's command and
-the upload's input.
+`github.ref` is `refs/heads/main`, takes the token as its `access-token` input
+so the workflow binds it in no `env` of its own, and uploads with
+`mode: upload` and no checksum input. Publisher runs share the concurrency group
+`coverage-main-${{ github.ref }}` with `cancel-in-progress: false`: a running
+publisher is never cancelled, and a newer trigger replaces an older pending
+run, so the newest trigger's run is the one that publishes. A merge made by the
+Dependabot automerge workflow's `GITHUB_TOKEN` fires no push event, so it
+publishes nothing until a dispatch from `main` or the next push.
+`tests/codescene_publisher.rs` holds the shape over the committed workflows.
 
 ## Tooling
 
