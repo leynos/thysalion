@@ -24,6 +24,10 @@ documentation set.
 - [ADR 006: the scene document model](adr-006-scene-document-model.md)
   records the two-stage document/domain scene model, the canonical byte form,
   and the compatibility policy for scene documents.
+- [ADR 007: the replay record format](adr-007-replay-record-format.md)
+  records the versioned replay session envelope, its uninhabited payload, the
+  same-build byte-identity promise, and the deferrals of raw input capture and
+  columnar storage.
 - [World plane architecture](world-plane-architecture.md) documents the
   `thysalion-world` crate's module tree, the `SceneSource` port, reading a
   diagnostic report, the scene format reference, and the version-history table.

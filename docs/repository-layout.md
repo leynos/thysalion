@@ -31,6 +31,7 @@ omits build output such as `target/`.
 │   ├── knowledge/      # knowledge plane: thysalion-knowledge
 │   ├── presentation/   # presentation plane: thysalion-presentation
 │   ├── harness/        # demo scaffolding: thysalion-harness
+│   ├── test-support/   # shared test scaffolding: thysalion-test-support
 │   └── demos/          # demo binaries: thysalion-demos
 ├── docs/
 │   ├── contents.md
@@ -55,6 +56,9 @@ omits build output such as `target/`.
 ├── codecov.yml
 └── rust-toolchain.toml
 ```
+
+_Figure 1: the repository tree. Each `crates/` member is one plane or one
+piece of tooling; the sections below say which is which._
 
 ## Workspace shape
 
@@ -107,6 +111,12 @@ from the root `Cargo.toml`.
 - `crates/harness/` (`thysalion-harness`): Shared demo scaffolding — the
   two-plugin harness contract (`HarnessCorePlugin` headless,
   `DemoHarnessPlugin` windowed). Demo tooling, not a plane.
+- `crates/test-support/` (`thysalion-test-support`): Shared test
+  scaffolding — the `rstest-bdd` harness adapters (`LoaderHarness` and, behind
+  the non-default `bevy` feature, `BevyHarness`), the fixture-scene locations,
+  and the replay session envelope of ADR 007. Test tooling, not a plane: plane
+  crates take it as a dev-dependency only, and `publish = false` plus the
+  release build's `-p thysalion` scoping keep it out of the shipped graph.
 - `crates/demos/` (`thysalion-demos`): One binary per capability
   demonstration under `src/bin/`. Per-demo heavy dependencies are feature-gated
   with `required-features` on each `[[bin]]`.

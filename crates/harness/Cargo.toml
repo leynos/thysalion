@@ -18,6 +18,9 @@ rstest = { workspace = true }
 rstest-bdd = { workspace = true }
 rstest-bdd-harness = { workspace = true }
 rstest-bdd-macros = { workspace = true }
+# The `bevy` feature carries the promoted `BevyHarness` adapter; this crate is
+# where the app half of the test-support crate is actually exercised.
+thysalion-test-support = { workspace = true, features = ["bevy"] }
 trybuild = { workspace = true }
 
 [lints]

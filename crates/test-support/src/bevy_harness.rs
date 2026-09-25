@@ -4,15 +4,22 @@
 //! The adapter's context is a full `bevy::app::App` built with
 //! `MinimalPlugins` and `HarnessCorePlugin`, so step functions drive the
 //! real schedule with `app.update()` rather than poking systems directly.
-//! Roadmap step 1.3.1 (headless continuous-integration scaffolding) is
-//! the intended point to promote this adapter into a shared test-support
-//! crate.
+//!
+//! The module sits behind the crate's non-default `bevy` feature. That is
+//! what keeps `thysalion-world` — which dev-depends on this crate — free of
+//! `bevy` until ADR 005 stages the dependency in at roadmap 2.1.1; a
+//! default-on feature here would stage it in early through a test
+//! convenience.
 
 use bevy::{MinimalPlugins, app::App};
 use rstest_bdd_harness::{HarnessAdapter, HarnessResult, ScenarioRunRequest};
 use thysalion_harness::{HarnessConfig, HarnessCorePlugin};
 
 /// Runs each scenario against a fresh headless harness app.
+///
+/// A fresh app per scenario, not a shared one: Bevy resources are mutable
+/// global state, so a scenario that leaves the rig rotated would silently
+/// become the next scenario's precondition.
 #[derive(Default)]
 pub struct BevyHarness;
 

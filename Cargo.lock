@@ -4998,6 +4998,7 @@ dependencies = [
  "rstest-bdd-harness",
  "rstest-bdd-macros",
  "thysalion-presentation",
+ "thysalion-test-support",
  "trybuild",
 ]
 
@@ -5016,6 +5017,26 @@ dependencies = [
 [[package]]
 name = "thysalion-sim"
 version = "0.1.0"
+
+[[package]]
+name = "thysalion-test-support"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "camino",
+ "cap-std 4.0.2",
+ "rmp-serde",
+ "rmpv",
+ "rstest",
+ "rstest-bdd",
+ "rstest-bdd-harness",
+ "rstest-bdd-macros",
+ "serde",
+ "smol_str 0.3.6",
+ "thiserror 2.0.19",
+ "thysalion-harness",
+ "thysalion-world",
+]
 
 [[package]]
 name = "thysalion-world"
@@ -5038,6 +5059,7 @@ dependencies = [
  "serde_path_to_error",
  "smol_str 0.3.6",
  "thiserror 2.0.19",
+ "thysalion-test-support",
  "tracing",
 ]
 

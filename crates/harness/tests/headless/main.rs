@@ -1,12 +1,11 @@
 //! Headless behavioural specification for the harness core, driven by
-//! rstest-bdd 0.6.0-beta3 through the Bevy harness adapter in
-//! [`support`]. Scenarios live in `tests/features/harness.feature`.
+//! rstest-bdd 0.6.0-beta3 through the Bevy harness adapter
+//! `thysalion_test_support::BevyHarness`. Scenarios live in
+//! `tests/features/harness.feature`.
 //!
 //! Steps borrow the running `bevy::app::App` via the reserved
 //! `rstest_bdd_harness_context` fixture; the adapter builds a
 //! `MinimalPlugins` app with `HarnessCorePlugin` before steps run.
-
-mod support;
 
 use bevy::{
     app::App,
@@ -14,9 +13,9 @@ use bevy::{
     input::{ButtonInput, keyboard::KeyCode},
 };
 use rstest_bdd_macros::{given, scenario, then, when};
-use support::BevyHarness;
 use thysalion_harness::{HarnessAction, HarnessConfig, RigState};
 use thysalion_presentation::Quadrant;
+use thysalion_test_support::BevyHarness;
 
 fn send_action(app: &mut App, action: HarnessAction, count: usize) {
     for _ in 0..count {
