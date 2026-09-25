@@ -27,9 +27,9 @@ holds the split, including that coverage enables every declared feature.
 `coverage-main.yml` measures coverage on pushes to `main` and on dispatch from
 `main`, and is the only CodeScene caller; `ci.yml` measures pull requests for
 their own ratchet, at the same `generate-coverage` revision with
-`publish-artefact: 'false'`, and names no CodeScene token, host or command. The
-publisher job runs in the `codescene` environment, which admits `main` alone
-and holds `CS_ACCESS_TOKEN` as an environment secret. A
+`publish-artefact: 'false'`, and names no CodeScene token, host, or command.
+The publisher job runs in the `codescene` environment, which admits `main`
+alone and holds `CS_ACCESS_TOKEN` as an environment secret. A
 `Check CodeScene token availability` step (id `codescene_token`) runs exactly
 `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
 with no `if:` and no `env`. The upload runs only when that output is `true` and
