@@ -45,10 +45,14 @@ publishes nothing until a dispatch from `main` or the next push.
 
 ## Tooling
 
-Development builds use Cranelift for debug code generation. On Linux targets,
-`.cargo/config.toml` configures clang to link with `mold` so debug builds link
-quickly. Coverage generation uses `lld` because LLVM coverage tooling expects
-LLVM-compatible linker behaviour.
+Development builds use Cranelift for debug code generation. Every `rustflags`
+source in `.cargo/config.toml` enables the parallel `rustc` frontend with
+`-Zthreads=8`, and on Linux targets it also configures clang to link with
+`mold` so debug builds link quickly. Cargo applies one `rustflags` source and
+an assigned `RUSTFLAGS` replaces them all, so the Makefile restates both flags
+as `STANDARD_RUSTFLAGS` for the targets that assign `RUSTFLAGS`. Coverage
+generation uses `lld` because LLVM coverage tooling expects LLVM-compatible
+linker behaviour.
 
 Both of those defaults are wrong for coverage, and `make coverage` displaces
 each of them rather than expecting the developer to. `RUSTFLAGS` replaces the
