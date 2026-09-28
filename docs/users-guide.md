@@ -39,6 +39,11 @@ The generated `Makefile` exposes these public targets:
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
 
+Development builds, including `make build`, `make test`, `make lint`, and
+`make typecheck`, use the parallel `rustc` frontend (`-Zthreads=8`) and, on
+Linux, link with `mold`. `make release` and `make coverage` use their own flag
+sets and take neither.
+
 - `make demo` runs a capability demonstration binary (`DEMO=empty` by
   default, so `make demo DEMO=empty` and `make demo` are equivalent).
 - `make scenes` compiles the fixture scenes under `assets/scenes/src/` into
