@@ -97,16 +97,28 @@ fn make_rustflags(target: &str, host: &str) -> Read<Vec<Option<Vec<String>>>> {
     }
     // A recipe continued with a trailing backslash is one command.
     let stdout = String::from_utf8_lossy(&output.stdout).replace("\\\n", " ");
-    let commands: Vec<Option<Vec<String>>> = stdout
+    let mut commands: Vec<Option<Vec<String>>> = Vec::new();
+    for line in stdout
         .lines()
         .filter(|line| line.contains("cargo") || line.contains("whitaker"))
-        .map(|line| {
-            let (_, rest) = line.split_once("RUSTFLAGS=\"")?;
-            let (value, _) = rest.split_once('"')?;
-            let words: Vec<String> = value.split_whitespace().map(str::to_owned).collect();
-            Some(normalized(&words))
-        })
-        .collect();
+    {
+        let assigned = match line.split_once("RUSTFLAGS=\"") {
+            Some((_, rest)) => {
+                let (value, _) = rest
+                    .split_once('"')
+                    .ok_or_else(|| format!("unterminated RUSTFLAGS in `{line}`"))?;
+                let words: Vec<String> = value.split_whitespace().map(str::to_owned).collect();
+                Some(normalized(&words))
+            }
+            // Any other spelling still replaces the configuration's sources,
+            // so a form this reader cannot parse fails rather than passing.
+            None if line.contains("RUSTFLAGS=") => {
+                return Err(format!("unreadable RUSTFLAGS assignment in `{line}`").into());
+            }
+            None => None,
+        };
+        commands.push(assigned);
+    }
     if commands.is_empty() {
         return Err(format!("`make -n {target}` runs no cargo command").into());
     }
