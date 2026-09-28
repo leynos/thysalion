@@ -26,13 +26,22 @@ fn read(path: &str) -> Read<String> {
     Ok(root.read_to_string(path)?)
 }
 
-/// Returns whether any command in the workflow text selects the stable
-/// toolchain with a `+stable` override.
-fn builds_on_stable(workflow: &str) -> bool {
-    workflow
+/// Returns whether the workflow's release build runs on stable: it has at
+/// least one `cross ... build` command, and every one selects `+stable`.
+///
+/// The check reads the release build commands alone, the lines
+/// `tests/workflow_shape.rs` also reads, so a `+stable` elsewhere in the
+/// workflow cannot keep it green.
+fn release_builds_on_stable(workflow: &str) -> bool {
+    let builds: Vec<&str> = workflow
         .lines()
         .filter(|line| !line.trim_start().starts_with('#'))
-        .any(|line| line.split_whitespace().any(|word| word == "+stable"))
+        .filter(|line| line.contains("cross ") && line.contains("build"))
+        .collect();
+    !builds.is_empty()
+        && builds
+            .iter()
+            .all(|line| line.split_whitespace().any(|word| word == "+stable"))
 }
 
 /// Collects the dotted path of every `codegen-backend` key under `value`.
@@ -57,8 +66,9 @@ fn backend_keys(value: &toml::Value, path: &str, found: &mut Vec<String>) {
 fn configuration_names_no_codegen_backend_while_releases_build_on_stable() {
     let workflow = read(".github/workflows/release.yml").expect("read release.yml");
     assert!(
-        builds_on_stable(&workflow),
-        "release.yml no longer builds on +stable; revisit the Cranelift exception and this test"
+        release_builds_on_stable(&workflow),
+        "release.yml's cross build no longer runs on +stable; revisit the Cranelift exception and \
+         this test"
     );
     let text = read(".cargo/config.toml").expect("read .cargo/config.toml");
     let config: toml::Value = toml::from_str(&text).expect("parse .cargo/config.toml");
