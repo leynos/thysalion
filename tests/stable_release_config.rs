@@ -7,10 +7,16 @@
 //! none. That is why the repository carries a Cranelift exception to the build
 //! standard; see "Cranelift exception" in `docs/developers-guide.md`.
 //!
-//! File access goes through a `cap_std` directory handle rooted at the crate
-//! manifest directory.
+//! Two tests hold this. The first reads the configuration and the workflow, so
+//! the failure names the key and the reason. The second hands the repository's
+//! configuration to a real `cargo +stable check` in a throwaway crate, so a
+//! refusal the first test does not anticipate still fails the suite.
+//!
+//! File access goes through `cap_std` directory handles: one rooted at the
+//! crate manifest directory, one at the fixture crate under
+//! `CARGO_TARGET_TMPDIR`.
 
-use std::error::Error;
+use std::{error::Error, process::Command};
 
 use cap_std::{ambient_authority, fs::Dir};
 
@@ -77,5 +83,60 @@ fn configuration_names_no_codegen_backend_while_releases_build_on_stable() {
     assert!(
         found.is_empty(),
         "stable Cargo refuses `{UNSTABLE_KEY}` keys, but .cargo/config.toml names {found:?}"
+    );
+}
+
+/// The manifest of the throwaway crate the stable smoke test checks.
+///
+/// The empty `[workspace]` table detaches it from any enclosing workspace, so
+/// Cargo reads the copied configuration and nothing else from the tree.
+const FIXTURE_MANIFEST: &str = "[package]\nname = \"stable_fixture\"\nversion = \
+                                \"0.0.0\"\nedition = \"2021\"\n\n[workspace]\n";
+
+/// Writes the fixture crate, carrying a copy of the repository's Cargo
+/// configuration, and returns the directory it was written under.
+fn write_fixture() -> Read<std::path::PathBuf> {
+    let config = read(".cargo/config.toml")?;
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("stable-config-fixture");
+    // A clean directory keeps a stale `Cargo.lock` or target from an earlier run out.
+    Dir::open_ambient_dir(env!("CARGO_TARGET_TMPDIR"), ambient_authority())?
+        .remove_dir_all("stable-config-fixture")
+        .or_else(|error| match error.kind() {
+            std::io::ErrorKind::NotFound => Ok(()),
+            _ => Err(error),
+        })?;
+    Dir::create_ambient_dir_all(path.join("src"), ambient_authority())?;
+    Dir::create_ambient_dir_all(path.join(".cargo"), ambient_authority())?;
+    let root = Dir::open_ambient_dir(&path, ambient_authority())?;
+    root.write("Cargo.toml", FIXTURE_MANIFEST)?;
+    root.write("src/lib.rs", "")?;
+    root.write(".cargo/config.toml", config)?;
+    Ok(path)
+}
+
+#[test]
+fn stable_cargo_accepts_the_repository_configuration() {
+    let fixture = write_fixture().expect("write the fixture crate");
+    // `check` resolves profiles, which is where stable Cargo refuses an
+    // unstable key; it needs no network for a crate without dependencies. The
+    // release step assigns an empty `RUSTFLAGS`, which displaces the
+    // configuration's `-Zthreads` flag that stable `rustc` would refuse; the
+    // test assigns the same value. The other wrappers and target directories
+    // are removed so the fixture builds under the copied configuration alone.
+    let output = Command::new("cargo")
+        .args(["+stable", "check", "--offline"])
+        .current_dir(&fixture)
+        .env("CARGO_TARGET_DIR", fixture.join("target"))
+        .env_remove("CARGO_BUILD_BUILD_DIR")
+        .env("RUSTFLAGS", "")
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env_remove("RUSTC_WRAPPER")
+        .env_remove("RUSTC_WORKSPACE_WRAPPER")
+        .output()
+        .expect("run `cargo +stable check`; is the stable toolchain installed?");
+    assert!(
+        output.status.success(),
+        "stable Cargo rejects .cargo/config.toml, so `cross +stable build` would fail:\n{}",
+        String::from_utf8_lossy(&output.stderr)
     );
 }
