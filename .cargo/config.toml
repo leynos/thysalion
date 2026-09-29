@@ -10,11 +10,10 @@
 # is therefore repeated in each source, and the Makefile restates them where it
 # assigns `RUSTFLAGS` for the gate targets.
 
-[unstable]
-codegen-backend = true
-
-[profile.dev]
-codegen-backend = "cranelift"
+# No `codegen-backend` key belongs here: release.yml builds with
+# `cross +stable`, and stable Cargo refuses a configuration that names one
+# ("feature `codegen-backend` is required"). Development builds therefore
+# stay on LLVM; `tests/stable_release_config.rs` holds this.
 
 [build]
 rustflags = ["-Zthreads=8"]

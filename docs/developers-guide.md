@@ -45,7 +45,7 @@ publishes nothing until a dispatch from `main` or the next push.
 
 ## Tooling
 
-Development builds use Cranelift for debug code generation. Every `rustflags`
+Development builds use LLVM; see *Cranelift exception* below. Every `rustflags`
 source in `.cargo/config.toml` enables the parallel `rustc` frontend with
 `-Zthreads=8`, and on Linux targets it also configures clang to link with
 `mold` so debug builds link quickly. Cargo applies one `rustflags` source and
@@ -56,13 +56,14 @@ takes the standard flags. `tests/build_standard_contract.rs` holds the
 configuration sources and those recipes to this. Coverage generation uses `lld`
 because LLVM coverage tooling expects LLVM-compatible linker behaviour.
 
-Both of those defaults are wrong for coverage, and `make coverage` displaces
-each of them rather than expecting the developer to. `RUSTFLAGS` replaces the
-config's target flags wholesale, which is what takes `mold` out of the picture;
-`mold` cannot be used here because it does not carry the instrumentation
-sections `llvm-cov` reads. Cranelift is displaced separately, through
+`mold` is wrong for coverage, and `make coverage` displaces it rather than
+expecting the developer to. `RUSTFLAGS` replaces the config's target flags
+wholesale, which is what takes `mold` out of the picture; `mold` cannot be used
+here because it does not carry the instrumentation sections `llvm-cov` reads.
+The recipe also pins the development profile to LLVM through
 `CARGO_PROFILE_DEV_CODEGEN_BACKEND`, because no rustflag can reach a profile
-setting and rustc refuses `-C instrument-coverage` under Cranelift outright.
+setting and rustc refuses `-C instrument-coverage` under Cranelift outright;
+the configuration no longer selects Cranelift, so the override is inert today.
 `CARGO_UNSTABLE_CODEGEN_BACKEND` accompanies it so that the throwaway project
 `trybuild` generates — which sits under `CARGO_TARGET_DIR` and so may never see
 this repository's `.cargo/config.toml` — accepts the same override.
@@ -74,6 +75,25 @@ toolchain already works.
 
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
+
+### Cranelift exception
+
+The build standard makes Cranelift the development-profile backend where the
+suite passes under it. Thysalion cannot carry that default: `release.yml`
+builds release binaries with `cross +stable`, Cargo reads `.cargo/config.toml`
+inside that build, and stable Cargo refuses any `codegen-backend` key there:
+
+```text
+error: config profile `dev` is not valid (defined in `.cargo/config.toml`)
+
+Caused by:
+  feature `codegen-backend` is required
+```
+
+So `.cargo/config.toml` names no backend and development builds use LLVM on the
+pinned `nightly-2026-05-28`. `tests/stable_release_config.rs` fails if a
+`codegen-backend` key returns while the release workflow builds on stable.
+Revisit the exception if releases move to the pinned nightly.
 
 ## Demo harness
 
