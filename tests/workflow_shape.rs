@@ -43,12 +43,7 @@ fn release_build_is_scoped_to_the_root_package() {
 
 #[test]
 fn workflows_pin_shared_actions_to_full_length_shas() {
-    for name in [
-        "ci.yml",
-        "release.yml",
-        "coverage-main.yml",
-        "act-validation.yml",
-    ] {
+    for name in ["ci.yml", "release.yml", "coverage-main.yml"] {
         let workflow = read_workflow(name).expect("read workflow file");
         for line in workflow.lines() {
             let Some((_, reference)) = line.split_once("leynos/shared-actions/") else {

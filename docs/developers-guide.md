@@ -18,11 +18,12 @@ step runs the same tests `make test` runs except the doctests, which
 `cargo test --doc --workspace --all-features`. The repository used to carry an
 `act-validation.yml` workflow that ran `make test WITH_ACT=1`, but nothing reads
 `WITH_ACT` and no test is gated on Act, so that workflow ran the whole suite a
-second time and was removed. `make test` passes `--all-features`, and the only
-declared feature, `thysalion-demos/demo-empty`, gates the `demo-empty` binary
-through `required-features`, so both coverage steps pass that feature and
-select the same 215 tests `make test` does. `tests/workflow_suite_contract.rs`
-holds the split, including that coverage enables every declared feature.
+second time and was removed. `make test` passes `--all-features`. The
+`thysalion-demos/demo-empty` feature gates the `demo-empty` binary through
+`required-features`, and `thysalion-test-support/bevy` enables the shared
+Bevy-backed harness, so both coverage steps pass these features and select the
+same tests as `make test`. `tests/workflow_suite_contract.rs` holds the split,
+including that coverage enables every declared feature.
 
 `coverage-main.yml` measures coverage on pushes to `main` and on dispatch from
 `main`, and is the only CodeScene caller; `ci.yml` measures pull requests for
@@ -64,9 +65,6 @@ narrow it back to one run per event that carries new information:
   regardless of the triggering event, so the push-triggered run on the same
   head commit satisfies the check. A skipped same-repository pull-request run
   is the design, not a fault to fix.
-
-`act-validation.yml` stays pull-request-scoped: it is a slower secondary check,
-and the roadmap criterion names the test suite rather than Act.
 
 `tests/workflow_shape.rs` asserts all of the above as *shape* — the triggers,
 the concurrency keys, and the guard's presence — never a literal SHA value; see
@@ -160,8 +158,8 @@ there, deliberately the same shape:
 - `BevyHarness` builds a `MinimalPlugins` app with `HarnessCorePlugin` and
   hands it to steps via the reserved `rstest_bdd_harness_context` fixture. It
   sits behind the crate's non-default `bevy` feature, which is what keeps
-  `thysalion-world` — a dev-dependent of this crate — free of `bevy` until
-  ADR 005 stages that dependency in at roadmap 2.1.1.
+  `thysalion-world` — a dev-dependent of this crate — free of `bevy` until ADR
+  005 stages that dependency in at roadmap 2.1.1.
 - `LoaderHarness` hands steps a `LoaderSession`: a plain struct wrapping a
   scene source, a selected document, and the outcome of the last load. It is on
   the default-feature path, so a suite that only loads scenes pays for no
@@ -179,15 +177,14 @@ the dev-dependency loop with `thysalion-world` is the `serde`/`serde_test`
 shape and is legal to Cargo, but a normal-edge cycle is not.
 
 Feature files live beside their suites — `crates/harness/tests/features/`,
-`crates/world/tests/features/`, and
-`crates/test-support/tests/features/`, the last of which hosts the combined
-scenario that builds a headless app, loads a fixture scene into it, and asserts
-against the harness's registered diagnostics. Unit-level mathematics uses plain
-`rstest`;
-generated-input properties (zoom clamping, the rig's action-sequence model) use
-`proptest`; and compile-time contracts (for example, struct-literal
-construction of `#[non_exhaustive]` harness types being rejected) are pinned
-with `trybuild` cases under `crates/harness/tests/ui/`.
+`crates/world/tests/features/`, and `crates/test-support/tests/features/`, the
+last of which hosts the combined scenario that builds a headless app, loads a
+fixture scene into it, and asserts against the harness's registered
+diagnostics. Unit-level mathematics uses plain `rstest`; generated-input
+properties (zoom clamping, the rig's action-sequence model) use `proptest`; and
+compile-time contracts (for example, struct-literal construction of
+`#[non_exhaustive]` harness types being rejected) are pinned with `trybuild`
+cases under `crates/harness/tests/ui/`.
 
 The windowed half is behaviourally tested too, without a window or graphics
 device: `crates/harness/src/windowed_tests.rs` runs `DemoHarnessPlugin` under

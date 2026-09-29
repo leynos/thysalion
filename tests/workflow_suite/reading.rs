@@ -204,15 +204,6 @@ impl<'a> Workflow<'a> {
 }
 
 impl<'a> Job<'a> {
-    /// Returns `true` if the job carries its own `if:` condition, read at
-    /// the job's own key indentation, whatever its width.
-    pub(crate) fn is_conditional(&self) -> bool {
-        let level = self.lines.iter().map(|line| indent(line)).min();
-        self.lines
-            .iter()
-            .any(|line| Some(indent(line)) == level && line.trim_start().starts_with("if:"))
-    }
-
     /// Returns the job's lines as commands.
     pub(crate) fn commands(&self) -> impl Iterator<Item = Command<'a>> + '_ {
         self.lines.iter().map(|line| Command::from_line(line))

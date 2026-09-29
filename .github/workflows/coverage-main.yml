@@ -74,10 +74,10 @@ jobs:
           output-path: lcov.info
           format: lcov
           with-ratchet: 'true'
-          # `make test` runs with --all-features, and the demo-empty bin's
-          # tests build only with its feature (required-features), so
-          # coverage names it to select the same tests.
-          features: thysalion-demos/demo-empty
+          # `make test` runs with --all-features. The demo-empty bin's tests
+          # need its required feature, and test-support's Bevy harness is
+          # non-default, so coverage names both to select the same tests.
+          features: thysalion-demos/demo-empty,thysalion-test-support/bevy
       # Publishes whether the token exists, and nothing else. The token is in
       # no `env` on this workflow: the upload is a composite action whose
       # nested steps inherit the calling step's `env`. GitHub evaluates the

@@ -28,7 +28,7 @@
 //!
 //! - MessagePack is written with `rmp_serde::to_vec_named`, never `to_vec`.
 //! - Every wire type carries `#[serde(deny_unknown_fields)]`; none uses `flatten`, `untagged`, a
-//!   tuple struct, or a hand-written `serde` implementation.
+//!   tuple struct, or a handwritten `serde` implementation.
 //! - Every quantity is an integer, and every map would be a `BTreeMap`.
 //! - The version is a `{major, minor}` pair read by a permissive probe before the full document,
 //!   exactly as ADR 006 does for scene documents.

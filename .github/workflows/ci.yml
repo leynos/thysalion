@@ -135,10 +135,10 @@ jobs:
           # The publisher in coverage-main.yml owns the coverage artefact and
           # the ratchet baseline; this lane only compares against it.
           publish-artefact: 'false'
-          # `make test` runs with --all-features, and the demo-empty bin's
-          # tests build only with its feature (required-features), so
-          # coverage names it to select the same tests.
-          features: thysalion-demos/demo-empty
+          # `make test` runs with --all-features. The demo-empty bin's tests
+          # need its required feature, and test-support's Bevy harness is
+          # non-default, so coverage names both to select the same tests.
+          features: thysalion-demos/demo-empty,thysalion-test-support/bevy
       # The doctests are the only part of `make test` the coverage step does
       # not run. The step denies warnings as `make test`'s doctest line does;
       # the build standard's frontend and linker flags are a local build-speed
