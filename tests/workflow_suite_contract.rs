@@ -13,7 +13,9 @@
 //! - no workflow line runs the suite, in any spelling of `make test`, `make all`, a bare `make`,
 //!   `cargo test`, `cargo nextest` or `cargo llvm-cov`, whatever the options or separators around
 //!   it, except the one doctest step;
-//! - that doctest step is in `build-test`, and neither the job nor the step carries an `if:`;
+//! - that doctest step is in `build-test` and carries no `if:`; the job skips same-repository
+//!   pull-request events because the head push already ran, while pushes and fork pull requests
+//!   still run it;
 //! - `build-test` runs the coverage action in one unguarded step, and no workflow turns on its
 //!   doctests;
 //! - the coverage steps in `ci.yml` and `coverage-main.yml` pass every declared feature, so `make
@@ -122,13 +124,9 @@ fn only_the_doctest_step_runs_the_suite_outside_coverage() {
 }
 
 #[test]
-fn build_test_runs_the_doctests_unconditionally() {
+fn build_test_keeps_the_doctest_step_unconditional() {
     let found = workflows().expect("failed to read the workflows");
     let job = suite_job(&found).expect("ci.yml must define build-test");
-    assert!(
-        !job.is_conditional(),
-        "{SUITE_JOB} must run on every pull request"
-    );
     let doctest = Command::from_line(DOCTEST_COMMAND);
     let steps: Vec<_> = job
         .steps()
@@ -198,7 +196,7 @@ fn manifest_features_are_read(#[case] text: &str, #[case] expected: &[&str]) {
 }
 
 /// The features the coverage steps pass, which must be every declared one.
-const COVERAGE_FEATURES: &str = "thysalion-demos/demo-empty";
+const COVERAGE_FEATURES: &str = "thysalion-demos/demo-empty,thysalion-test-support/bevy";
 
 /// The workflows whose coverage step must pass the features.
 const COVERAGE_WORKFLOWS: [&str; 2] = ["ci.yml", "coverage-main.yml"];
@@ -228,10 +226,7 @@ fn workspace_features() -> std::io::Result<Vec<String>> {
 
 #[test]
 fn coverage_enables_every_declared_feature() {
-    let mut passed: Vec<String> = COVERAGE_FEATURES
-        .split_whitespace()
-        .map(str::to_owned)
-        .collect();
+    let mut passed: Vec<String> = COVERAGE_FEATURES.split(',').map(str::to_owned).collect();
     passed.sort();
     assert_eq!(
         workspace_features().expect("failed to read the workspace manifests"),

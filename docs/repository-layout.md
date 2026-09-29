@@ -57,8 +57,8 @@ omits build output such as `target/`.
 └── rust-toolchain.toml
 ```
 
-_Figure 1: the repository tree. Each `crates/` member is one plane or one
-piece of tooling; the sections below say which is which._
+_Figure 1: the repository tree. Each `crates/` member is one plane or one piece
+of tooling; the sections below say which is which._
 
 ## Workspace shape
 
