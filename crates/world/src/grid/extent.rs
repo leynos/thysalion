@@ -143,8 +143,11 @@ impl ChunkSize {
 /// construction rather than checked at each use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Extent {
+    /// Chunk-aligned width along the x axis, in voxels.
     x: u32,
+    /// Chunk-aligned height along the y axis, in voxels.
     y: u32,
+    /// Chunk-aligned depth along the z axis, in voxels.
     z: u32,
 }
 

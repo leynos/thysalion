@@ -6,7 +6,7 @@ schema = 1
 stems = []
 
 [words]
-accepted = ["mold", "LOD"]
+accepted = ["LOD"]
 
 [words.corrections]
 
@@ -20,6 +20,8 @@ ignore = [
   # The documentation style guide's own example of a US spelling kept inside
   # an API name.
   '`color`',
+  # The Linux linker keeps its upstream spelling when named as a tool.
+  '`mold`',
   # A path to a serde_json trait, quoted in the scene-format execplan.
   '`serde_json::ser::Formatter`',
 ]

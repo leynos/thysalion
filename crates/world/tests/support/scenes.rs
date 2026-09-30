@@ -48,15 +48,10 @@ pub fn repository_root() -> camino::Utf8PathBuf {
 /// point of `cap_std` is that a reader can see the whole filesystem surface a
 /// module touches by reading one function (AGENTS.md).
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics when `assets/scenes` is missing, which is a broken checkout or a
-/// tree nobody has run `make scenes` in.
-#[must_use]
-pub fn scene_dir() -> cap_std::fs_utf8::Dir {
+/// Returns an I/O error if the checkout has no compiled scene directory.
+pub fn scene_dir() -> std::io::Result<cap_std::fs_utf8::Dir> {
     let root = repository_root().join(SCENES);
-    match cap_std::fs_utf8::Dir::open_ambient_dir(&root, cap_std::ambient_authority()) {
-        Ok(directory) => directory,
-        Err(error) => panic!("the fixture scenes must exist at {root}: {error}"),
-    }
+    cap_std::fs_utf8::Dir::open_ambient_dir(&root, cap_std::ambient_authority())
 }

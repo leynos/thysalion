@@ -1,30 +1,15 @@
-//! Contract test that each pull request runs the test suite once.
-//!
-//! `make test` runs the suite with `--all-targets --all-features` and then
-//! the doctests. The coverage step in `ci.yml`'s `build-test` job runs the
-//! same tests, but not the doctests, which `build-test` runs in a step of its
-//! own. The repository used to carry an `act-validation.yml` workflow running
-//! `make test WITH_ACT=1`; nothing reads `WITH_ACT` and no test is gated on
-//! Act, so it ran the whole suite a second time and was removed.
-//!
-//! These tests read the workflows textually and the manifest as TOML, and
-//! hold the split:
-//!
-//! - no workflow line runs the suite, in any spelling of `make test`, `make all`, a bare `make`,
-//!   `cargo test`, `cargo nextest` or `cargo llvm-cov`, whatever the options or separators around
-//!   it, except the one doctest step;
-//! - that doctest step is in `build-test`, and neither the job nor the step carries an `if:`;
-//! - `build-test` runs the coverage action in one unguarded step, and no workflow turns on its
-//!   doctests;
-//! - the coverage steps in `ci.yml` and `coverage-main.yml` pass every declared feature, so `make
-//!   test`'s `--all-features` and the coverage run select the same tests.
-//!
-//! The readers live in `workflow_suite/reading.rs`.
+//! Contract that pull requests run the suite once through coverage, with
+//! doctests in a separate unconditional step. The workflow reader also checks
+//! build-tool provisioning before every Linux suite route.
 
 use rstest::rstest;
 
+#[path = "workflow_suite/install_tools.rs"]
+mod install_tools;
 #[path = "workflow_suite/reading.rs"]
 mod reading;
+#[path = "workflow_suite/whitaker.rs"]
+mod whitaker;
 
 use reading::{Command, Job, Manifest, Workflow, manifest_dir, workflows};
 
@@ -194,7 +179,11 @@ fn coverage_leaves_the_doctests_off() {
 #[case::required("[dependencies]\nserde = { version = \"1\" }\n", &[])]
 fn manifest_features_are_read(#[case] text: &str, #[case] expected: &[&str]) {
     let parsed = Manifest::parse(text).expect("the fixture must parse");
-    assert_eq!(parsed.features(), expected);
+    assert_eq!(
+        parsed.features(),
+        expected,
+        "manifest feature parsing changed"
+    );
 }
 
 /// The features the coverage steps pass, which must be every declared one.
@@ -257,4 +246,98 @@ fn both_coverage_steps_pass_the_features() {
             "{workflow}'s coverage step must pass `{expected}`"
         );
     }
+}
+
+#[test]
+fn a_new_linux_suite_job_without_installation_is_not_hidden() {
+    let source = format!(
+        "{minimal_routing}  new-linux-test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: \
+         cargo nextest run\n",
+        minimal_routing = install_tools::MINIMAL_INSTALL_ROUTING,
+    );
+    let report = install_tools::inspect_routing(&source).expect("new job route must be inspected");
+    assert_eq!(
+        report.missing_installers,
+        vec!["fixture.yml:new-linux-test:step-0".to_owned()],
+        "a new Linux suite job must report its missing installer"
+    );
+}
+
+#[test]
+fn empty_or_unresolvable_workflow_inventory_fails_closed() {
+    assert!(
+        install_tools::inspect(&[]).is_err(),
+        "empty workflow inventory must fail"
+    );
+    assert!(
+        install_tools::inspect_routing("name: empty\njobs: {}\n").is_err(),
+        "workflow with no jobs must fail"
+    );
+    let missing_runner = "name: unknown\njobs:\n  test:\n    steps:\n      - run: cargo test\n";
+    assert!(
+        install_tools::inspect_routing(missing_runner).is_err(),
+        "suite job without a runner must fail"
+    );
+    let no_suite = "jobs:\n  check:\n    steps:\n      - run: echo ready\n";
+    assert!(
+        install_tools::inspect_routing(no_suite).is_err(),
+        "workflow inventory without a suite route must fail"
+    );
+}
+
+/// Reads the recipe lines beneath one Make target declaration.
+fn make_recipe<'a>(makefile: &'a str, target: &str) -> Vec<&'a str> {
+    let prefix = format!("{target}:");
+    makefile
+        .lines()
+        .skip_while(|line| !line.starts_with(&prefix))
+        .skip(1)
+        .take_while(|line| line.starts_with('\t'))
+        .collect()
+}
+
+#[test]
+fn indirect_make_suite_targets_reach_test_and_coverage_commands() {
+    let makefile = manifest_dir()
+        .expect("failed to open the repository")
+        .read_to_string("Makefile")
+        .expect("failed to read Makefile");
+    assert!(
+        makefile
+            .lines()
+            .any(|line| { line.starts_with("test:") && line.contains("check-build-tools") }),
+        "test must depend on the build-tool preflight"
+    );
+    assert!(
+        makefile
+            .lines()
+            .any(|line| { line.starts_with("coverage:") && line.contains("check-build-tools") }),
+        "coverage must depend on the build-tool preflight"
+    );
+    assert!(
+        make_recipe(&makefile, "all")
+            .join("\n")
+            .contains("$(MAKE) test"),
+        "all must reach the test target"
+    );
+    assert!(
+        make_recipe(&makefile, "test")
+            .join("\n")
+            .contains("$(CARGO) $(TEST_CMD)"),
+        "test must invoke the injectable Cargo command"
+    );
+    assert!(
+        make_recipe(&makefile, "coverage")
+            .join("\n")
+            .contains("$(CARGO) llvm-cov"),
+        "coverage must invoke cargo llvm-cov"
+    );
+    assert!(
+        Command::from_line("make all").runs_suite(),
+        "all must reach the suite"
+    );
+    assert!(
+        Command::from_line("make coverage").runs_suite(),
+        "coverage must reach the suite"
+    );
 }

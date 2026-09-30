@@ -17,7 +17,9 @@ use crate::scene::concept::ConceptIri;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct SceneKnowledge {
+    /// Validated identifier for the scene's named graph.
     graph: ConceptIri,
+    /// Validated resource paths, preserving document order.
     sources: Vec<Utf8PathBuf>,
 }
 

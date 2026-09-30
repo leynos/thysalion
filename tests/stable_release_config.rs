@@ -25,6 +25,19 @@ type Read<T> = Result<T, Box<dyn Error>>;
 
 /// The configuration key stable Cargo refuses.
 const UNSTABLE_KEY: &str = "codegen-backend";
+/// Backend-related Cargo settings cleared by the release workflow.
+const BACKEND_ENVIRONMENT_VARIABLES: [&str; 10] = [
+    "CARGO_ENCODED_RUSTFLAGS",
+    "CARGO_UNSTABLE_CODEGEN_BACKEND",
+    "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
+    "CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND",
+    "CARGO_PROFILE_TEST_CODEGEN_BACKEND",
+    "CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND",
+    "CARGO_PROFILE_RELEASE_CODEGEN_BACKEND",
+    "CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND",
+    "CARGO_PROFILE_BENCH_CODEGEN_BACKEND",
+    "CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND",
+];
 
 /// Reads a file relative to the crate manifest directory.
 fn read(path: &str) -> Read<String> {
@@ -119,19 +132,24 @@ fn stable_cargo_accepts_the_repository_configuration() {
     let fixture = write_fixture().expect("write the fixture crate");
     // `check` resolves profiles, which is where stable Cargo refuses an
     // unstable key; it needs no network for a crate without dependencies. The
-    // release step assigns an empty `RUSTFLAGS`, which displaces the
-    // configuration's `-Zthreads` flag that stable `rustc` would refuse; the
-    // test assigns the same value. The other wrappers and target directories
-    // are removed so the fixture builds under the copied configuration alone.
-    let output = Command::new("cargo")
+    // The release step assigns empty `RUSTFLAGS` and clears the inherited
+    // backend selectors before invoking stable Cargo. Mirror that boundary so
+    // coverage's LLVM overrides cannot leak into this nested process. The
+    // other wrappers and target directories are removed so the fixture builds
+    // under the copied configuration alone.
+    let mut command = Command::new("cargo");
+    command
         .args(["+stable", "check", "--offline"])
         .current_dir(&fixture)
         .env("CARGO_TARGET_DIR", fixture.join("target"))
         .env_remove("CARGO_BUILD_BUILD_DIR")
         .env("RUSTFLAGS", "")
-        .env_remove("CARGO_ENCODED_RUSTFLAGS")
         .env_remove("RUSTC_WRAPPER")
-        .env_remove("RUSTC_WORKSPACE_WRAPPER")
+        .env_remove("RUSTC_WORKSPACE_WRAPPER");
+    for variable in BACKEND_ENVIRONMENT_VARIABLES {
+        command.env_remove(variable);
+    }
+    let output = command
         .output()
         .expect("run `cargo +stable check`; is the stable toolchain installed?");
     assert!(

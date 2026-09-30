@@ -134,8 +134,7 @@ management. Contributors should follow these best practices when working on the
 project:
 
 - Run `make check-fmt`, `make lint`, and `make test` before committing. These
-  targets wrap the following commands, so contributors understand the exact
-  behaviour and policy enforced:
+  targets apply the repository's formatting, lint, and test policies:
   - `make check-fmt` executes:
 
     ```sh
@@ -143,23 +142,27 @@ project:
     ```
 
     validating formatting across the entire workspace without modifying files.
-  - `make lint` executes:
-
-    ```sh
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
-    ```
-
-    linting every target with all features enabled and denying all Clippy
-    warnings.
-  - `make test` executes:
-
-    ```sh
-    cargo test --workspace
-    ```
-
-    running the full workspace test suite. Use `make fmt`
-    (`cargo fmt --workspace`) to apply formatting fixes reported by the
-    formatter check.
+  - `make lint` runs rustdoc, Clippy, and the installer-managed Whitaker suite.
+    Clippy checks all workspace targets and features with warnings denied.
+  - `make test` runs the full workspace suite, preferring `cargo nextest` when
+    it is installed, and then runs doctests. Use `make fmt` to apply formatting
+    fixes reported by the check.
+- On Linux, run `make install-build-tools` before development builds. It
+  installs the pinned `mold` binary and required components for the pinned
+  nightly toolchain; `make check-build-tools` is the preflight used by build,
+  test, lint, coverage, typecheck, and demo targets. Install `clang` separately.
+- Bare Cargo development commands discover `.cargo/config.toml`. It leaves
+  Cargo's LLVM backend in effect, enables `-Zthreads=8`, and uses `mold` on
+  Linux. Make recipes that set `RUSTFLAGS` restate those flags and the warnings
+  policy; they also clear inherited backend overrides. Release and coverage
+  routes explicitly clear or replace development settings. The release workflow
+  invokes stable Cargo from outside the repository with an absolute manifest
+  path, but Cross loads the checkout configuration inside its container; that
+  config therefore omits `codegen-backend` keys.
+- The authoritative lint tables are in the root `Cargo.toml`; the root package
+  and every workspace member inherit them. See the `Lint baseline` section of
+  the developers' guide for thresholds, environment restrictions and toolchain
+  components.
 - Clippy warnings MUST be disallowed.
 - Fix any warnings emitted during tests in the code itself rather than
   silencing them.
@@ -203,8 +206,8 @@ project:
 - Place function attributes **after** doc comments.
 - Do not use `return` in single-line functions.
 - Use predicate functions for conditional criteria with more than two branches.
-- Lints must not be silenced except as a **last resort**.
-- Lint rule suppressions must be tightly scoped and include a clear reason.
+- Fix lint findings at source. Never add `#[allow]`; use `#[expect]` only for
+  macro-expansion artefacts or genuine floating-point arithmetic, with a reason.
 - Use `concat!()` to combine long string literals rather than escaping newlines
   with a backslash.
 - Prefer single line versions of functions where appropriate. i.e.,
@@ -313,90 +316,4 @@ project:
 
 ## Markdown guidance
 
-- Validate Markdown files using `make markdownlint`. This target also runs the
-  en-GB-oxendict spelling gate.
-- Inline code spans are checked. An identifier or a deliberately US spelling
-  inside backticks is not exempt, so record it under `[patterns]` in
-  `typos.local.toml` and include the backticks in the pattern. Scoping the
-  pattern to the backticked form keeps the same word flagged in prose. Never
-  widen the exception back to all inline code.
-- Run `make fmt` after any documentation changes to format all Markdown
-  files and fix table markup.
-- Validate Mermaid diagrams in Markdown files by running `make nixie`.
-- Markdown paragraphs and bullet points must be wrapped at 80 columns.
-- Code blocks must be wrapped at 120 columns.
-- Tables and headings must not be wrapped.
-- Use dashes (`-`) for list bullets.
-- Use GitHub-flavoured Markdown footnotes (`[^1]`) for references and
-  footnotes.
-
-<!-- typos-config-builder:agents-md:start -->
-
-## Spelling
-
-- `make spelling` runs the pinned `typos-config-builder gate`, which
-  regenerates `typos.toml` from the shared en-GB-oxendict dictionary and
-  `typos.local.toml`, then checks spelling and the shared phrase corrections.
-- `typos.toml` is generated: never edit it by hand. Put narrow
-  repository-specific exceptions in `typos.local.toml`, as exact or full-line
-  patterns rather than bare accepted words.
-- When `make spelling` changes `typos.toml`, commit the regenerated file. If
-  the change is unrelated to your work, commit it in a separate base pull
-  request and stack your branch on it, so each review diff stays focused.
-
-<!-- typos-config-builder:agents-md:end -->
-
-## Project documentation
-
-Record design decisions in the design document. Where a decision is
-substantive, record it in an ADR document following the documentation style
-guide, then reference that ADR from the design document.
-
-Update `docs/users-guide.md` for any change to application behaviour or user
-interface that a user should know about. Document internally facing interfaces
-or practices in the relevant component architecture document. Document
-internally facing conventions or practices in `docs/developers-guide.md`.
-
-## Additional tooling
-
-The following tooling is available in this environment:
-
-- `mbake` — A Makefile validator. Run using `mbake validate Makefile`.
-- `strace` — Traces system calls and signals made by a process; useful for
-  debugging runtime behaviour and syscalls.
-- `gdb` — The GNU Debugger, for inspecting and controlling programs as they
-  execute (or post-mortem via core dumps).
-- `ripgrep` — Fast, recursive text search tool (`grep` alternative) that
-  respects `.gitignore` files.
-- `ltrace` — Traces calls to dynamic library functions made by a process.
-- `valgrind` — Suite for detecting memory leaks, profiling, and debugging
-  low-level memory errors.
-- `bpftrace` — High-level tracing tool for eBPF, using a custom scripting
-  language for kernel and application tracing.
-- `lsof` — Lists open files and the processes using them.
-- `htop` — Interactive process viewer (visual upgrade to `top`).
-- `iotop` — Displays and monitors I/O usage by processes.
-- `ncdu` — NCurses-based disk usage viewer for finding large files/folders.
-- `tree` — Displays directory structure as a tree.
-- `bat` — `cat` clone with syntax highlighting, Git integration, and paging.
-- `delta` — Syntax-highlighted pager for Git and diff output.
-- `tcpdump` — Captures and analyses network traffic at the packet level.
-- `nmap` — Network scanner for host discovery, port scanning, and service
-  identification.
-- `lldb` — LLVM debugger, alternative to `gdb`.
-- `eza` — Modern `ls` replacement with more features and better defaults.
-- `fzf` — Interactive fuzzy finder for selecting files, commands, etc.
-- `hyperfine` — Command-line benchmarking tool with statistical output.
-- `shellcheck` — Linter for shell scripts, identifying errors and bad practices.
-- `fd` — Fast, user-friendly `find` alternative with sensible defaults.
-- `checkmake` — Linter for `Makefile`s, ensuring they follow best practices and
-  conventions.
-- `srgn` — [Structural grep](https://github.com/alexpovel/srgn), searches code
-  and enables editing by syntax tree patterns.
-- `difft` **(Difftastic)** — Semantic diff tool that compares code structure
-  rather than just text differences.
-
-## Key takeaway
-
-These practices help maintain a high-quality codebase and facilitate
-collaboration.
+- Validate Markdown files using `make markdownlint`.

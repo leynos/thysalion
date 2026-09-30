@@ -67,7 +67,8 @@ fn send_twenty_zoom_ins(#[from(rstest_bdd_harness_context)] app: &mut App) {
 fn rig_in_north_west(#[from(rstest_bdd_harness_context)] app: &mut App) {
     assert_eq!(
         app.world().resource::<RigState>().quadrant(),
-        Quadrant::NorthWest
+        Quadrant::NorthWest,
+        "the camera rig should have reached the north-west quadrant"
     );
 }
 
@@ -75,7 +76,8 @@ fn rig_in_north_west(#[from(rstest_bdd_harness_context)] app: &mut App) {
 fn rig_in_south_east(#[from(rstest_bdd_harness_context)] app: &mut App) {
     assert_eq!(
         app.world().resource::<RigState>().quadrant(),
-        Quadrant::SouthEast
+        Quadrant::SouthEast,
+        "the camera rig should have reached the south-east quadrant"
     );
 }
 

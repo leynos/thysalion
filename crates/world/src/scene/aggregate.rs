@@ -74,11 +74,17 @@ impl core::fmt::Display for SceneContentHash {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Scene {
+    /// Validated scene name from the document header.
     name: SmolStr,
+    /// Resolved voxel kinds in document order.
     palette: Palette,
+    /// Validated sparse voxel contents.
     voxels: VoxelGrid,
+    /// Resolved spawn points in document order.
     entities: Entities,
+    /// Lighting settings accepted by scene validation.
     lighting: Lighting,
+    /// Named graph and validated knowledge resources.
     knowledge: SceneKnowledge,
 }
 

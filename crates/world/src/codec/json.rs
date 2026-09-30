@@ -42,8 +42,16 @@ fn located<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, CodecError> {
     Ok(value)
 }
 
+/// Reads the version before decoding the full JSON scene.
+///
+/// For example, a syntactically valid document with an invalid later section
+/// can still be classified by version before full decoding reports the fault.
 pub(super) fn probe_version(bytes: &[u8]) -> Result<DocumentVersion, CodecError> {
     located::<VersionProbe>(bytes).map(|probe| probe.version)
 }
 
+/// Decodes one complete JSON scene, including the end-of-input check.
+///
+/// For example, bytes containing a scene followed by another JSON value fail
+/// instead of silently accepting the first scene.
 pub(super) fn decode(bytes: &[u8]) -> Result<SceneDocument, CodecError> { located(bytes) }

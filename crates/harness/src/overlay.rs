@@ -98,26 +98,23 @@ fn format_readout(fps: Option<f64>, frame_time: Option<f64>, tick_time: Option<f
 }
 
 /// Rewrites the overlay text at the throttled cadence.
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy system parameters are taken by value"
-)]
 pub(crate) fn refresh_overlay(
     time: Res<Time>,
     mut timer: ResMut<OverlayTimer>,
     diagnostics: Res<DiagnosticsStore>,
-    mut overlays: Query<&mut Text, With<OverlayText>>,
+    overlays: Query<&mut Text, With<OverlayText>>,
 ) {
-    if !timer.0.tick(time.delta()).just_finished() {
+    if !timer.0.tick(time.into_inner().delta()).just_finished() {
         return;
     }
+    let diagnostics_ref = diagnostics.into_inner();
     let smoothed = |path| {
-        diagnostics
+        diagnostics_ref
             .get(path)
             .and_then(bevy::diagnostic::Diagnostic::smoothed)
     };
     let readout = format_readout(smoothed(&FPS), smoothed(&FRAME_TIME), smoothed(&TICK_TIME));
-    for mut text in &mut overlays {
+    for mut text in overlays.iter_inner() {
         text.0.clone_from(&readout);
     }
 }
@@ -135,25 +132,36 @@ mod tests {
     #[rstest]
     fn populated_diagnostics_render_all_three_values() {
         let readout = format_readout(Some(60.0), Some(16.6666), Some(2.5));
-        assert_eq!(readout, "60 fps  16.67 ms/frame  2.50 ms/tick");
+        assert_eq!(
+            readout, "60 fps  16.67 ms/frame  2.50 ms/tick",
+            "populated diagnostics should all appear in the formatted readout"
+        );
     }
 
     #[rstest]
     fn missing_tick_measurement_renders_not_available() {
         let readout = format_readout(Some(14.0), Some(70.9111), None);
-        assert_eq!(readout, "14 fps  70.91 ms/frame  tick: n/a");
+        assert_eq!(
+            readout, "14 fps  70.91 ms/frame  tick: n/a",
+            "a missing tick measurement should use the unavailable placeholder"
+        );
     }
 
     #[rstest]
     fn missing_frame_diagnostics_render_the_collecting_placeholder() {
-        assert_eq!(format_readout(None, None, None), "collecting…  tick: n/a");
+        assert_eq!(
+            format_readout(None, None, None),
+            "collecting…  tick: n/a",
+            "missing frame and tick measurements should use their collecting placeholders"
+        );
     }
 
     #[rstest]
     fn partial_frame_diagnostics_still_render_collecting() {
         assert_eq!(
             format_readout(Some(60.0), None, Some(1.0)),
-            "collecting…  1.00 ms/tick"
+            "collecting…  1.00 ms/tick",
+            "available tick timing should remain visible while frame data is collecting"
         );
     }
 }

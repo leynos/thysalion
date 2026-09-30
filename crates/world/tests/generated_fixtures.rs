@@ -34,12 +34,8 @@ use scenes_support::{FIXTURE_NAMES as FIXTURES, SCENES, scene_dir as scenes};
 
 /// Loads a fixture through the real loader and the real filesystem adapter.
 ///
-/// # Panics
-///
-/// Panics with the diagnostic report when the fixture does not load, because a
-/// committed fixture that fails validation is the single most useful failure
-/// this suite can produce and `assert!(result.is_ok())` is not it.
-fn load(name: &str) -> Scene { loaded(name).1.scene }
+/// Returns the diagnostic report if the committed fixture does not load.
+fn load(name: &str) -> Result<Scene, String> { Ok(loaded(name)?.1.scene) }
 
 /// Loads a committed fixture, keeping the warnings and the path the strict
 /// check needs alongside the scene.
@@ -47,35 +43,31 @@ fn load(name: &str) -> Scene { loaded(name).1.scene }
 /// One constructor for both callers: rebuilding the loader inline in each is
 /// two chances for them to disagree about which source the fixtures come from.
 ///
-/// # Panics
-///
-/// Panics with the diagnostic report when the fixture does not load.
-fn loaded(name: &str) -> (Utf8PathBuf, LoadedScene) {
-    let loader = SceneLoader::new(Arc::new(DirSceneSource::new(scenes(), SCENES)));
+/// Returns the I/O or validation failure with the fixture name and diagnostics.
+fn loaded(name: &str) -> Result<(Utf8PathBuf, LoadedScene), String> {
+    let directory = scenes().map_err(|error| format!("open {SCENES}: {error}"))?;
+    let loader = SceneLoader::new(Arc::new(DirSceneSource::new(directory, SCENES)));
     let path = Utf8PathBuf::from(format!("{name}.scene.json"));
-    match loader.load(&path) {
-        Ok(found) => (path, found),
-        Err(error) => panic!("{name} must load: {error}\n{:#?}", error.diagnostics()),
-    }
+    let found = loader
+        .load(&path)
+        .map_err(|error| format!("{name} must load: {error}\n{:#?}", error.diagnostics()))?;
+    Ok((path, found))
 }
 
 /// Reads a fixture's bytes.
 ///
-/// # Panics
-///
-/// Panics when the file is missing, which is a broken checkout or a fixture
-/// nobody ran `make scenes` for.
-fn bytes(name: &str) -> Vec<u8> {
-    match scenes().read(format!("{name}.scene.json")) {
-        Ok(found) => found,
-        Err(error) => panic!("{name}.scene.json must exist; run `make scenes`: {error}"),
-    }
+/// Returns the read error with guidance for regenerating absent artefacts.
+fn bytes(name: &str) -> Result<Vec<u8>, String> {
+    scenes()
+        .map_err(|error| format!("open {SCENES}: {error}"))?
+        .read(format!("{name}.scene.json"))
+        .map_err(|error| format!("{name}.scene.json must exist; run `make scenes`: {error}"))
 }
 
 #[test]
 fn every_fixture_loads_clean() {
     for name in FIXTURES {
-        let scene = load(name);
+        let scene = load(name).expect("the committed scene must load");
         assert!(
             scene.non_air_count() > 0,
             "{name}: a fixture with no content proves nothing"
@@ -90,7 +82,7 @@ fn every_fixture_is_strict_clean() {
     // phase renders, lights, simulates, and tests against; a warning in one is
     // a warning every phase inherits.
     for name in FIXTURES {
-        let (path, checked) = loaded(name);
+        let (path, checked) = loaded(name).expect("the committed scene must load");
         let report = thysalion_world::scene::validation::Report::new(&path, SCENES)
             .with_warnings(&checked.warnings);
         assert!(
@@ -108,7 +100,7 @@ fn rust_re_encodes_the_python_output_byte_identically() {
     // and comparing proves the two agree on every *value*, not merely on the
     // shape. A difference here is one implementation having drifted.
     for name in FIXTURES {
-        let original = bytes(name);
+        let original = bytes(name).expect("the committed scene bytes must be readable");
         let Ok(document) = decode_document(&original, Encoding::Json) else {
             panic!("{name}: the Python generator's output must decode");
         };
@@ -129,7 +121,7 @@ fn a_fixture_hashes_the_same_whichever_encoding_it_came_from() {
     // encoding actually read, so a save taken in a development build does not
     // refuse itself in a shipped one.
     for name in FIXTURES {
-        let scene = load(name);
+        let scene = load(name).expect("the committed scene must load");
         let Ok(document) = encode_document(&scene.to_document(), Encoding::MessagePack) else {
             panic!("{name}: a validated scene must encode");
         };
@@ -185,19 +177,16 @@ struct SourceShape {
 
 /// Reads a fixture's provenance sidecar, failing loudly on a shape change.
 ///
-/// # Panics
-///
-/// Panics when the sidecar is missing or no longer matches its published
-/// shape, both of which are `make scenes` not having been run.
-fn provenance(name: &str) -> ProvenanceShape {
-    let raw = match scenes().read(format!("{name}.provenance.json")) {
-        Ok(found) => found,
-        Err(error) => panic!("{name}.provenance.json must exist; run `make scenes`: {error}"),
-    };
-    match serde_json::from_slice(&raw) {
-        Ok(parsed) => parsed,
-        Err(error) => panic!("{name}: the provenance sidecar must match its shape: {error}"),
-    }
+/// Returns a read or shape error when the generated sidecar is stale.
+fn provenance(name: &str) -> Result<ProvenanceShape, String> {
+    let raw = scenes()
+        .map_err(|error| format!("open {SCENES}: {error}"))?
+        .read(format!("{name}.provenance.json"))
+        .map_err(|error| {
+            format!("{name}.provenance.json must exist; run `make scenes`: {error}")
+        })?;
+    serde_json::from_slice(&raw)
+        .map_err(|error| format!("{name}: the provenance sidecar must match its shape: {error}"))
 }
 
 #[test]
@@ -206,11 +195,17 @@ fn every_populated_chunk_has_provenance() {
     // chunk (3, 1, 0) at local (7, 2, 4) is precise and useless on its own;
     // joined against this it names a layer file and a line somebody wrote.
     for name in FIXTURES {
-        let sidecar = provenance(name);
-        assert_eq!(sidecar.scene, *name);
+        let sidecar = provenance(name).expect("the provenance sidecar must be readable");
+        assert_eq!(
+            sidecar.scene, *name,
+            "the provenance sidecar must identify the fixture it describes"
+        );
         assert_eq!(
             sidecar.chunks.len(),
-            load(name).voxels().populated_chunks(),
+            load(name)
+                .expect("the committed scene must load")
+                .voxels()
+                .populated_chunks(),
             "{name}: every populated chunk must have provenance"
         );
     }
@@ -219,7 +214,8 @@ fn every_populated_chunk_has_provenance() {
 #[test]
 fn every_provenance_entry_names_a_layer_raster_and_a_line() {
     for name in FIXTURES {
-        for chunk in &provenance(name).chunks {
+        let sidecar = provenance(name).expect("the provenance sidecar must be readable");
+        for chunk in &sidecar.chunks {
             let at = &chunk.at;
             assert!(
                 !chunk.sources.is_empty(),

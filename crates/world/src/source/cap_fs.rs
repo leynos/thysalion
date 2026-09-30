@@ -15,7 +15,9 @@ use super::{MAX_RESOURCE_BYTES, SceneSource, SceneSourceError, check_resource_pa
 /// A source backed by a capability-scoped directory.
 #[derive(Debug)]
 pub struct DirSceneSource {
+    /// Directory capability that confines all resource reads.
     root: Dir,
+    /// Human-readable root name included in source diagnostics.
     label: SmolStr,
 }
 

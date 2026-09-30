@@ -134,7 +134,9 @@ impl Quadrant {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoomBounds {
+    /// Smallest permitted zoom factor; larger viewports use smaller factors.
     min: f32,
+    /// Largest permitted zoom factor; smaller viewports use larger factors.
     max: f32,
 }
 
@@ -170,7 +172,9 @@ impl ZoomBounds {
     /// Baseline orthographic viewport height at zoom `1.0`, in world units.
     pub const BASE_VIEWPORT_HEIGHT: f32 = 12.0;
 
+    /// Lower limit selected by the default zoom range.
     const DEFAULT_MIN: f32 = 0.5;
+    /// Upper limit selected by the default zoom range.
     const DEFAULT_MAX: f32 = 4.0;
 
     /// Creates a zoom range, rejecting non-finite, non-positive, or

@@ -9,7 +9,6 @@
 use bevy::{
     ecs::message::{Message, MessageWriter},
     input::{ButtonInput, keyboard::KeyCode, mouse::AccumulatedMouseScroll},
-    prelude::Res,
 };
 
 /// Buffered per-frame harness action stream (a Bevy message, not an
@@ -84,14 +83,11 @@ pub fn action_for_key(key: KeyCode) -> Option<HarnessAction> {
 ///
 /// Headless-safe: `HarnessCorePlugin` initializes the input resources it
 /// reads, so `MinimalPlugins` apps can inject synthetic presses.
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy system parameters are taken by value"
-)]
+/// Bevy registration closures borrow their extracted system parameters here.
 pub(crate) fn read_input(
-    keys: Res<ButtonInput<KeyCode>>,
-    scroll: Res<AccumulatedMouseScroll>,
-    mut writer: MessageWriter<HarnessAction>,
+    keys: &ButtonInput<KeyCode>,
+    scroll: &AccumulatedMouseScroll,
+    writer: &mut MessageWriter<HarnessAction>,
 ) {
     for key in keys.get_just_pressed() {
         if let Some(action) = action_for_key(*key) {
@@ -122,6 +118,7 @@ mod tests {
         app::{App, Update},
         ecs::message::Messages,
         math::Vec2,
+        prelude::Res,
     };
     use rstest::rstest;
 
@@ -134,7 +131,14 @@ mod tests {
         app.add_message::<HarnessAction>()
             .init_resource::<ButtonInput<KeyCode>>()
             .init_resource::<AccumulatedMouseScroll>()
-            .add_systems(Update, read_input);
+            .add_systems(
+                Update,
+                |keys: Res<ButtonInput<KeyCode>>,
+                 scroll: Res<AccumulatedMouseScroll>,
+                 mut writer: MessageWriter<HarnessAction>| {
+                    read_input(&keys, &scroll, &mut writer);
+                },
+            );
         app
     }
 
@@ -163,12 +167,20 @@ mod tests {
         #[case] key: KeyCode,
         #[case] expected: Option<HarnessAction>,
     ) {
-        assert_eq!(action_for_key(key), expected);
+        assert_eq!(
+            action_for_key(key),
+            expected,
+            "each bound key should map to its declared action"
+        );
     }
 
     #[rstest]
     fn the_screenshot_key_is_not_a_press_binding() {
-        assert_eq!(action_for_key(SCREENSHOT_KEY), None);
+        assert_eq!(
+            action_for_key(SCREENSHOT_KEY),
+            None,
+            "the screenshot key must not emit a press action"
+        );
     }
 
     #[rstest]
