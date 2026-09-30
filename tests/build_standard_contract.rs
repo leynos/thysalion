@@ -241,3 +241,36 @@ fn coverage_and_release_take_neither_flag() {
         }
     }
 }
+
+/// Returns the `RUSTFLAGS` a named workflow step assigns.
+fn step_rustflags(workflow: &str, name: &str) -> Option<String> {
+    let after = workflow.split_once(&format!("- name: {name}\n"))?.1;
+    let step = after.split("\n      - ").next().unwrap_or(after);
+    step.lines()
+        .find_map(|line| line.trim().strip_prefix("RUSTFLAGS:"))
+        .map(|value| value.trim().to_owned())
+}
+
+/// CI runs the doctests directly, outside `make`, so the step's own assignment
+/// is the only thing that keeps the standard's flags on that build: the toolchain
+/// action's `RUSTFLAGS` would otherwise replace every configuration source.
+#[test]
+fn the_ci_doctest_step_restates_both_flags() {
+    let root = Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())
+        .expect("open the manifest directory");
+    let workflow = root
+        .read_to_string(".github/workflows/ci.yml")
+        .expect("read ci.yml");
+    let value =
+        step_rustflags(&workflow, "Run doctests").expect("the doctest step assigns RUSTFLAGS");
+    let words: Vec<String> = value.split_whitespace().map(str::to_owned).collect();
+    let flags = normalized(&words);
+    assert!(
+        names(&flags, THREADS_FLAG),
+        "the doctest step drops {THREADS_FLAG}: {flags:?}"
+    );
+    assert!(
+        names(&flags, MOLD_FLAG),
+        "the doctest step drops {MOLD_FLAG}: {flags:?}"
+    );
+}
