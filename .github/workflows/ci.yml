@@ -42,7 +42,7 @@ jobs:
         with:
           globs: '**/*.md'
       - name: Setup uv
-        uses: astral-sh/setup-uv@c6081965dd0577ae48820cb8c288e12509571f0c
+        uses: astral-sh/setup-uv@bcf05803b55ef01a5ec6368521ee1b42f97bc438
       - name: Check spelling
         run: make spelling
       # The pytest suite for the Python helper scripts under `scripts/`,
