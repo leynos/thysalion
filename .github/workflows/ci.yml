@@ -14,10 +14,6 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
-      # 0.2.7 ships the lint suite built for the repository's pinned
-      # toolchain (nightly-2026-05-28); older suites cannot compile Bevy 0.19
-      # (rustc >= 1.95 required). 0.2.7 also removed the --cranelift flag.
-      WHITAKER_INSTALLER_VERSION: '0.2.7'
     steps:
       - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
         with:
@@ -65,30 +61,8 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.x'
-      - name: Cache Whitaker installation
-        id: cache-whitaker
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
-        with:
-          path: |
-            ~/.cargo/bin/whitaker-installer
-            ~/.local/bin/whitaker
-            ~/.dylint_drivers
-            ~/.local/share/whitaker
-          key: whitaker-v3-${{ runner.os }}-${{ env.WHITAKER_INSTALLER_VERSION }}
       - name: Install Whitaker
-        env:
-          RUSTFLAGS: ""
-          WHITAKER_CACHE_HIT: ${{ steps.cache-whitaker.outputs.cache-hit }}
-        run: |
-          set -euo pipefail
-          echo "Whitaker cache hit: ${WHITAKER_CACHE_HIT}"
-          if [ "${WHITAKER_CACHE_HIT}" != "true" ]; then
-            echo "Installing whitaker-installer ${WHITAKER_INSTALLER_VERSION}"
-            cargo binstall --no-confirm --locked \
-              whitaker-installer@"${WHITAKER_INSTALLER_VERSION}"
-          fi
-          whitaker-installer
-          echo "Whitaker binary: $(command -v whitaker || true)"
+        uses: leynos/shared-actions/.github/actions/install-whitaker@6dea5677a84fec60ca51b07202570e3af12ffdb4
       - name: Audit dependencies
         run: make audit
       - name: Lint
