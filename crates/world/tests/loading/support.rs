@@ -57,14 +57,15 @@ impl LoaderSession {
     /// the *committed artefacts* load, which an in-memory copy of them could
     /// not: it would prove the constructor agrees with itself.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics when `assets/scenes` is missing, which is a broken checkout.
-    pub fn load_fixture(&mut self, name: &str) {
-        let directory = crate::scenes::scene_dir();
-        let Ok(replica) = directory.try_clone() else {
-            panic!("the fixture directory must be cloneable");
-        };
+    /// Returns an error if the fixture directory is absent or unreadable.
+    pub fn load_fixture(&mut self, name: &str) -> Result<(), String> {
+        let directory = crate::scenes::scene_dir()
+            .map_err(|error| format!("open the fixture scenes: {error}"))?;
+        let replica = directory
+            .try_clone()
+            .map_err(|error| format!("clone the fixture directory: {error}"))?;
         let loader = SceneLoader::new(Arc::new(DirSceneSource::new(
             directory,
             crate::scenes::SCENES,
@@ -73,9 +74,10 @@ impl LoaderSession {
         let outcome = loader.load(&path);
         if let Ok(loaded) = outcome.as_ref() {
             self.document = Some(loaded.scene.to_document());
-            self.adopt_resources(loaded, &replica);
+            self.adopt_resources(loaded, &replica)?;
         }
         self.fixtures.push((name.to_owned(), outcome));
+        Ok(())
     }
 
     /// Copies a loaded fixture's knowledge resources into the in-memory source.
@@ -85,40 +87,44 @@ impl LoaderSession {
     /// re-encoded document fails the resource check and the scenario reports a
     /// missing TriG file when what it was testing was the encoding. Copying
     /// them keeps the round-trip scenario about the round trip.
-    fn adopt_resources(&mut self, loaded: &LoadedScene, directory: &Dir) {
+    fn adopt_resources(&mut self, loaded: &LoadedScene, directory: &Dir) -> Result<(), String> {
         for source in loaded.scene.knowledge().sources() {
-            let Ok(bytes) = directory.read(source) else {
-                panic!("a loaded fixture's resources must still be readable: {source}");
-            };
+            let bytes = directory
+                .read(source)
+                .map_err(|error| format!("read fixture resource {source}: {error}"))?;
             self.source.insert(source, bytes);
         }
+        Ok(())
     }
 
     /// The document a `Given` step selected.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics when no `Given` step ran, which is a malformed scenario rather
-    /// than a runtime condition.
-    pub fn document(&self) -> &SceneDocument {
-        // `expect` rather than a `let ... else` would be shorter, but the
-        // workspace allows it only inside `#[test]` functions, and a
-        // step-definition helper is neither.
-        let Some(document) = self.document.as_ref() else {
-            panic!("a Given step must select a document");
-        };
-        document
+    /// Returns an error when no `Given` step selected a document.
+    pub fn document(&self) -> Result<&SceneDocument, &'static str> {
+        self.document
+            .as_ref()
+            .ok_or("a Given step must select a document")
     }
 
     /// Encodes the selected document and loads it.
-    pub fn load(&mut self, encoding: Encoding) {
-        let document = self.document().clone();
-        self.load_other_as(&document, encoding);
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no document was selected or encoding fails.
+    pub fn load(&mut self, encoding: Encoding) -> Result<(), String> {
+        let document = self.document().map_err(str::to_owned)?.clone();
+        self.load_other_as(&document, encoding)
     }
 
     /// Loads a document other than the selected one, leaving the selection.
-    pub fn load_other(&mut self, document: &SceneDocument) {
-        self.load_other_as(document, Encoding::Json);
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the document cannot be encoded.
+    pub fn load_other(&mut self, document: &SceneDocument) -> Result<(), String> {
+        self.load_other_as(document, Encoding::Json)
     }
 
     /// Encodes `document` and loads it through a fresh loader.
@@ -127,17 +133,17 @@ impl LoaderSession {
     /// state, so reusing one would prove nothing that this does not, and
     /// constructing one per load is what a caller actually does.
     ///
-    /// # Panics
-    ///
-    /// Panics when the document will not encode, which is a broken fixture
-    /// rather than a runtime condition.
-    fn load_other_as(&mut self, document: &SceneDocument, encoding: Encoding) {
-        let bytes = match encode_document(document, encoding) {
-            Ok(bytes) => bytes,
-            Err(error) => panic!("the fixture document must encode: {error}"),
-        };
+    /// Returns an encoding error if the selected fixture is malformed.
+    fn load_other_as(
+        &mut self,
+        document: &SceneDocument,
+        encoding: Encoding,
+    ) -> Result<(), String> {
+        let bytes = encode_document(document, encoding)
+            .map_err(|error| format!("encode the fixture document: {error}"))?;
         let loader = SceneLoader::new(Arc::new(self.source.clone()));
         self.outcome = Some(loader.load_bytes(&bytes, encoding));
+        Ok(())
     }
 
     /// The loaded scene, or a panic naming what actually happened.
@@ -145,6 +151,7 @@ impl LoaderSession {
     /// # Panics
     ///
     /// Panics when the last load failed or no load ran.
+    #[track_caller]
     pub fn loaded(&self) -> &LoadedScene {
         match self.outcome.as_ref() {
             Some(Ok(loaded)) => loaded,
@@ -158,6 +165,7 @@ impl LoaderSession {
     /// # Panics
     ///
     /// Panics when the last load succeeded or no load ran.
+    #[track_caller]
     pub fn diagnostics(&self) -> &[thysalion_world::scene::validation::SceneDiagnostic] {
         match self.outcome.as_ref() {
             Some(Err(SceneLoadError::Invalid { diagnostics, .. })) => diagnostics,

@@ -8,11 +8,9 @@ name: Coverage (main)
 # are readable by every pull-request run, so the baseline written here is the
 # one a pull request's ratchet compares against.
 #
-# workflow_dispatch is mandatory, not a convenience: merges performed by
-# the automerge workflow's GITHUB_TOKEN do not fire push-event workflows,
-# so automerged changes to main only receive coverage when this workflow
-# is dispatched from main. The token is an environment secret of the
-# main-only `codescene` environment, which the job declares.
+# An existing manual dispatch can measure and upload main coverage, but the
+# coverage action advances the ratchet baseline only on a push to main. The
+# token belongs to the main-only `codescene` environment declared by this job.
 
 'on':
   push:
@@ -25,7 +23,7 @@ name: Coverage (main)
 # ratchet baseline only on a push, so a dispatch uploads coverage but leaves
 # the baseline where the last completed push left it.
 concurrency:
-  group: coverage-main-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -47,29 +45,43 @@ jobs:
         uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:
           expect-cache: any
-      - name: Install mold linker
+      - name: Install coverage linker prerequisites
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
-          # mold accelerates dev builds; coverage uses lld for llvm-tools compatibility.
+          # Coverage uses lld for llvm-tools compatibility.
           sudo apt-get update \
-            && sudo apt-get install --yes --no-install-recommends clang lld mold
+            && sudo apt-get install --yes --no-install-recommends clang lld
       - name: Install test runner
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RUSTFLAGS: ""
         run: cargo binstall --no-confirm --locked cargo-nextest
+      - name: Check build tools
+        run: make install-build-tools
       - name: Log coverage linker configuration
         run: |
           echo "Coverage linker: clang"
           echo "Coverage RUSTFLAGS: -C link-arg=-fuse-ld=lld"
           echo "Coverage CFLAGS: -fuse-ld=lld"
           echo "Coverage LDFLAGS: -fuse-ld=lld"
+      # The coverage action does not clear encoded rustflags, which take
+      # precedence over RUSTFLAGS and could reactivate development settings.
+      - name: Check coverage flag isolation
+        run: |
+          if [ "${CARGO_ENCODED_RUSTFLAGS+x}" = x ]; then
+            echo 'CARGO_ENCODED_RUSTFLAGS must be unset for coverage' >&2
+            exit 1
+          fi
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
+        uses: leynos/shared-actions/.github/actions/generate-coverage@d4d248bbbecdcf7b4f5bc79ffd4d6caee370bd79
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
+          CARGO_UNSTABLE_CODEGEN_BACKEND: 'true'
+          CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm
+          CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND: llvm
+          CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND: llvm
           RUSTFLAGS: -C link-arg=-fuse-ld=lld
           CFLAGS: -fuse-ld=lld
           LDFLAGS: -fuse-ld=lld
@@ -87,15 +99,15 @@ jobs:
       # expression before it sends the command to the runner, so this shell
       # receives only `true` or `false`; the upload alone receives the token,
       # as its input.
-      - name: Check CodeScene token availability
-        id: codescene_token
+      - name: Check CodeScene token
+        id: codescene-token
         run: echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
       # The ref guard is not redundant with the push branch filter: a
       # dispatch runs from whichever branch started it, and the upload action
       # does not check the ref itself.
       - name: Upload coverage data to CodeScene
-        if: steps.codescene_token.outputs.available == 'true' && github.ref == 'refs/heads/main'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
+        if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@d4d248bbbecdcf7b4f5bc79ffd4d6caee370bd79
         # No checksum input: the uploader pins cs-coverage through its own
         # manifest and rejects a non-empty `installer-checksum`.
         with:

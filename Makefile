@@ -1,14 +1,21 @@
-.PHONY: help all clean test build release coverage lint fmt check-fmt markdownlint spelling nixie audit rust-audit demo scenes scenes-check scripts-test
+.PHONY: help all clean test build release coverage lint lint-clippy lint-whitaker \
+	typecheck fmt check-fmt markdownlint spelling nixie audit rust-audit demo \
+	scenes scenes-check scripts-test install-build-tools check-build-tools \
+	install-markdownlint
 
 SHELL := bash
+.NOTPARALLEL: lint
 
 
 TARGET ?= thysalion
 
-USER_WHITAKER := $(HOME)/.local/bin/whitaker
-USER_BIN_PATH := $(HOME)/.cargo/bin:$(HOME)/.local/bin:$(HOME)/.bun/bin
 CARGO ?= cargo
 RUSTC ?= rustc
+BUILD_TOOLS_PREFIX ?= $(HOME)/.local
+MOLD_VERSION_FILE ?= tools/mold/VERSION
+MOLD_SHA256SUMS_FILE ?= tools/mold/SHA256SUMS
+export BUILD_TOOLS_PREFIX MOLD_VERSION_FILE MOLD_SHA256SUMS_FILE
+export PATH := $(BUILD_TOOLS_PREFIX)/bin:$(PATH)
 BUILD_JOBS ?=
 RUST_FLAGS ?=
 RUST_FLAGS := -D warnings $(RUST_FLAGS)
@@ -20,11 +27,26 @@ STANDARD_THREADS_FLAG ?= -Zthreads=8
 STANDARD_MOLD_FLAG ?= -Clink-arg=-fuse-ld=mold
 BUILD_HOST_OS := $(shell uname -s)
 STANDARD_RUSTFLAGS = $(STANDARD_THREADS_FLAG)$(if $(filter Linux,$(BUILD_HOST_OS)), $(STANDARD_MOLD_FLAG))
-# Release builds take neither flag: assigning `RUSTFLAGS`, even to an empty
-# inherited value, displaces every `rustflags` source in the configuration.
-RELEASE_RUSTFLAGS = RUSTFLAGS="$${RUSTFLAGS-}"
-RUSTDOC_FLAGS ?=
-RUSTDOC_FLAGS := -D warnings $(RUSTDOC_FLAGS)
+# Keep inherited backend selectors out of each built-in Cargo profile. Test
+# inherits dev and bench inherits release, but either may be overridden by an
+# exported profile setting; build scripts and proc macros use build-override.
+BACKEND_PROFILE_ENV_UNSETS = \
+	-u CARGO_PROFILE_DEV_CODEGEN_BACKEND \
+	-u CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND \
+	-u CARGO_PROFILE_TEST_CODEGEN_BACKEND \
+	-u CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND \
+	-u CARGO_PROFILE_RELEASE_CODEGEN_BACKEND \
+	-u CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND \
+	-u CARGO_PROFILE_BENCH_CODEGEN_BACKEND \
+	-u CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND
+# Keep development on Cargo's LLVM default even when callers export a
+# different backend through their shell environment.
+DEVELOPMENT_CARGO_ENV = env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) -u CARGO_UNSTABLE_CODEGEN_BACKEND
+# Release builds take neither development flag. Cross runs stable Cargo inside
+# the checkout, so the committed config must omit codegen-backend settings.
+# The host invocation uses an external directory and explicit manifest path.
+RELEASE_RUSTFLAGS = env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) -u CARGO_UNSTABLE_CODEGEN_BACKEND RUSTFLAGS=""
+RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
 # --workspace is load-bearing: with a root package present, Cargo would
 # otherwise default to the root package alone and silently skip members.
 CARGO_FLAGS ?= --workspace --all-targets --all-features
@@ -38,18 +60,17 @@ TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
 COVERAGE_LINKER_FLAGS ?= -fuse-ld=lld
 COVERAGE_RUST_FLAGS ?= $(RUST_FLAGS) -C link-arg=$(COVERAGE_LINKER_FLAGS)
-# `.cargo/config.toml` picks Cranelift and mold for fast dev builds. Both are
-# wrong for coverage, and in different ways: rustc refuses
-# `-C instrument-coverage` outright under Cranelift, and mold does not carry
-# the instrumentation sections llvm-cov reads. `COVERAGE_RUST_FLAGS` already
-# displaces mold, because `RUSTFLAGS` replaces the config's target flags
-# wholesale; the two variables below displace Cranelift, which no rustflag can
-# reach. Overridable so a host with its own working toolchain can opt out.
+# Coverage explicitly selects LLVM even though it is the development default,
+# so inherited backend overrides cannot change the instrumentation route.
+# `COVERAGE_RUST_FLAGS` displaces the development mold flag, because RUSTFLAGS
+# replaces Cargo's configured target flags wholesale. The coverage linker is
+# lld; a host with a different supported toolchain may override these values.
 COVERAGE_CODEGEN_BACKEND ?= llvm
 # `-fuse-ld=lld` needs an `ld.lld` on PATH, which a host may not have even
 # with clang installed. The rustup toolchain always ships one, so fall back to
 # it rather than requiring a system lld just to run the gate locally.
 COVERAGE_LLD_DIR ?= $(shell $(RUSTC) --print sysroot)/lib/rustlib/$(shell $(RUSTC) -vV | sed -n 's/^host: //p')/bin/gcc-ld
+BUN ?= bun
 MDLINT ?= markdownlint-cli2
 # `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
 # Markdown files Git tracks and `--include-untracked` adds the untracked files
@@ -60,17 +81,22 @@ MDTABLEFIX ?= mdtablefix
 MDTABLEFIX_SELECT = --git --include-untracked
 MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 NIXIE ?= nixie
-TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.1
+TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.3
 TYPOS_CONFIG_BUILDER = uv tool run --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
-WHITAKER ?= $(or $(shell command -v whitaker 2>/dev/null),$(wildcard $(USER_WHITAKER)),whitaker)
+WHITAKER ?= whitaker
 SCENE_BUILDER ?= uv run --script scripts/build_fixture_scenes.py
 
-build: target/debug/$(TARGET) ## Build debug binary
-release: target/release/$(TARGET) ## Build release binary
+build: check-build-tools ## Build debug binary
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) build $(BUILD_JOBS) --bin $(TARGET)
+release: ## Build release binary with production Cargo routing
+	(cd / && $(RELEASE_RUSTFLAGS) $(CARGO) +stable build --manifest-path "$(abspath Cargo.toml)" $(BUILD_JOBS) --release --bin $(TARGET))
 
-all: check-fmt lint test ## Perform a comprehensive check of code
+all: ## Perform a comprehensive check of code, sequentially
+	+$(MAKE) check-fmt
+	+$(MAKE) lint
+	+$(MAKE) test
 	+$(MAKE) spelling
 	+$(MAKE) scripts-test
 	+$(MAKE) scenes-check
@@ -79,32 +105,54 @@ clean: ## Remove build artifacts
 	$(CARGO) clean
 	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
-test: ## Run tests with warnings treated as errors
-	RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-	RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --doc --workspace --all-features
+test: check-build-tools ## Run tests with warnings treated as errors
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --doc --workspace --all-features $(BUILD_JOBS)
 
-target/%/$(TARGET): ## Build binary in debug or release mode
-	$(if $(findstring release,$(@)),$(RELEASE_RUSTFLAGS) )$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
-
-coverage: ## Generate lcov coverage with lld for llvm-tools compatibility
+coverage: check-build-tools ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"
-	PATH="$(COVERAGE_LLD_DIR):$$PATH" \
+	env -u CARGO_ENCODED_RUSTFLAGS PATH="$(COVERAGE_LLD_DIR):$$PATH" \
 		CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
 		CARGO_UNSTABLE_CODEGEN_BACKEND=true \
 		CARGO_PROFILE_DEV_CODEGEN_BACKEND=$(COVERAGE_CODEGEN_BACKEND) \
+		CARGO_PROFILE_TEST_CODEGEN_BACKEND=$(COVERAGE_CODEGEN_BACKEND) \
+		CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND=$(COVERAGE_CODEGEN_BACKEND) \
+		CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND=$(COVERAGE_CODEGEN_BACKEND) \
 		RUSTFLAGS="$(COVERAGE_RUST_FLAGS)" \
 		CFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		$(CARGO) llvm-cov --lcov --output-path lcov.info $(COVERAGE_IGNORE) $(TEST_FLAGS)
 
-lint: ## Run Clippy with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
-	$(CARGO) clippy $(CLIPPY_FLAGS)
-	@echo "Whitaker binary: $(WHITAKER)"
-	PATH="$(USER_BIN_PATH):$(PATH)" RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+lint: lint-clippy lint-whitaker ## Run the Rust lint gates in order
 
-typecheck: ## Type-check without building
-	RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS)
+lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
+
+# Make 4.4 serializes these prerequisites even under `make -j lint`. Keep the
+# Whitaker leaf independent so its failure path can be checked without Cargo.
+lint-whitaker: ## Run the installer-managed rolling Whitaker suite
+	@command -v "$(WHITAKER)" >/dev/null 2>&1 || { \
+		printf 'Whitaker is unavailable; install it with the shared installer before make lint.\n' >&2; \
+		exit 1; \
+	}
+	@echo "Whitaker binary: $(WHITAKER)"
+	env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) RUSTFLAGS="" \
+		CARGO_UNSTABLE_CODEGEN_BACKEND=true \
+		CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm \
+		CARGO_PROFILE_TEST_CODEGEN_BACKEND=llvm \
+		CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND=llvm \
+		CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND=llvm \
+		$(WHITAKER) --all -- $(CARGO_FLAGS)
+
+typecheck: check-build-tools ## Type-check without building
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS)
+
+install-build-tools: ## Install the pinned development linker and toolchain
+	@scripts/install-build-tools.sh
+
+check-build-tools: ## Check development linker and toolchain prerequisites
+	@scripts/check-build-tools.sh
 
 # Supported demos are derived from the demo binaries on disk, so the guard
 # below cannot drift from reality. DEMO and the derived list reach the shell
@@ -117,7 +165,7 @@ DEMOS := $(patsubst demo-%,%,$(basename $(notdir $(wildcard crates/demos/src/bin
 
 demo: export DEMO_SLUG = $(value DEMO)
 demo: export DEMO_ALLOWED = $(DEMOS)
-demo: ## Run a capability demonstration binary (DEMO=empty by default)
+demo: check-build-tools ## Run a capability demonstration binary (DEMO=empty by default)
 	@case " $$DEMO_ALLOWED " in \
 		*" $$DEMO_SLUG "*) : ;; \
 		*) \
@@ -125,11 +173,11 @@ demo: ## Run a capability demonstration binary (DEMO=empty by default)
 				"$$DEMO_ALLOWED" "$$DEMO_SLUG" >&2; \
 			exit 2 ;; \
 	esac
-	$(CARGO) run -p thysalion-demos --features "demo-$$DEMO_SLUG" \
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) run -p thysalion-demos --features "demo-$$DEMO_SLUG" \
 		--bin "demo-$$DEMO_SLUG"
 
 fmt: ## Format Rust and Markdown sources
-	$(CARGO) +nightly fmt --all
+	$(CARGO) fmt --all
 	$(MDTABLEFIX) --in-place $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 	@unset FORCE_COLOR; $(MDLINT) --fix "**/*.md"
 
@@ -140,6 +188,14 @@ check-fmt: ## Verify formatting
 markdownlint: ## Lint Markdown files
 	$(MDLINT) '**/*.md'
 	+$(MAKE) spelling
+
+install-markdownlint: ## Install the CI-matched Markdown linter locally
+	@if ! command -v "$(BUN)" >/dev/null 2>&1; then \
+		printf 'Bun is required; install Bun, then rerun make install-markdownlint.\n' >&2; \
+		exit 127; \
+	fi
+	$(BUN) add --global --exact markdownlint-cli2@0.22.1
+
 spelling: ## Enforce en-GB-oxendict spelling in Markdown prose
 	$(TYPOS_CONFIG_BUILDER) gate --repository .
 

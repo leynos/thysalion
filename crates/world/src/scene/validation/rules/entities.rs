@@ -90,9 +90,13 @@ fn location(ordinal: usize) -> DocumentLocation {
 
 /// The prototype table and the policy a spawn is resolved against.
 struct Resolver<'a> {
+    /// Prototype definitions available for inheritance and lookup.
     prototypes: &'a BTreeMap<SmolStr, PrototypeDocument>,
+    /// Prefixes accepted when resolving inherited concept names.
     namespaces: &'a NamespaceTable,
+    /// Scene bounds used to reject out-of-scene spawn positions.
     extent: Extent,
+    /// Maximum permitted prototype inheritance depth.
     max_depth: usize,
 }
 
@@ -322,7 +326,7 @@ fn is_supported(position: VoxelPos, grid: &VoxelGrid, palette: &Palette) -> bool
         return true;
     };
     let beneath = VoxelPos::new(position.x, position.y, below);
-    voxel_type_at(beneath, grid, palette).is_some_and(|kind| !kind.passable.pos_z)
+    voxel_type_at(beneath, grid, palette).is_some_and(|kind| !kind.passable.pos_z.is_passable())
 }
 
 /// The voxel type at `position`, when the position is in the scene and its

@@ -24,64 +24,76 @@ through `required-features`, so both coverage steps pass that feature and
 select the same 215 tests `make test` does. `tests/workflow_suite_contract.rs`
 holds the split, including that coverage enables every declared feature.
 
-`coverage-main.yml` measures coverage on pushes to `main` and on dispatch from
-`main`, and is the only CodeScene caller; `ci.yml` measures pull requests for
+`coverage-main.yml` measures coverage on pushes to `main` and workflow
+dispatch, and is the only CodeScene caller; `ci.yml` measures pull requests for
 their own ratchet, at the same `generate-coverage` revision with
 `publish-artefact: 'false'`, and names no CodeScene token, host, or command.
 The publisher job runs in the `codescene` environment, which admits `main`
-alone and holds `CS_ACCESS_TOKEN` as an environment secret. A
-`Check CodeScene token availability` step (id `codescene_token`) runs exactly
+alone and holds `CS_ACCESS_TOKEN` as an environment secret. The
+`Check CodeScene token` step (id `codescene-token`) runs exactly
 `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
 with no `if:` and no `env`. The upload runs only when that output is `true` and
 `github.ref` is `refs/heads/main`, takes the token as its `access-token` input
 so the workflow binds it in no `env` of its own, and uploads with
-`mode: upload` and no checksum input. Publisher runs share the concurrency group
-`coverage-main-${{ github.ref }}` with `cancel-in-progress: false`: a running
-publisher is never cancelled, and a newer trigger replaces an older pending
-run, so the newest trigger's run is the one that publishes. A merge made by the
-Dependabot automerge workflow's `GITHUB_TOKEN` fires no push event, so it
-publishes nothing until a dispatch from `main` or the next push.
+`mode: upload` and no checksum input. Publishers use the concurrency group
+`${{ github.workflow }}-${{ github.ref }}` with `cancel-in-progress: false`:
+runs in the group do not overlap or cancel, and a newer trigger replaces an
+older pending run. The coverage action writes the ratchet baseline on pushes to
+`main`; a dispatch can upload coverage but does not write that baseline.
 `tests/codescene_publisher.rs` holds the shape over the committed workflows.
 
 ## Tooling
 
-Development builds use LLVM; see *Cranelift exception* below. Every `rustflags`
-source in `.cargo/config.toml` enables the parallel `rustc` frontend with
-`-Zthreads=8`, and on Linux targets it also configures clang to link with
-`mold` so debug builds link quickly. Cargo applies one `rustflags` source and
-an assigned `RUSTFLAGS` replaces them all, so the Makefile restates both flags
-as `STANDARD_RUSTFLAGS` for the targets that assign `RUSTFLAGS`. Release builds
-assign an empty inherited `RUSTFLAGS` and coverage assigns its own, so neither
-takes the standard flags. `tests/build_standard_contract.rs` holds the
-configuration sources and those recipes to this. Coverage generation uses `lld`
-because LLVM coverage tooling expects LLVM-compatible linker behaviour.
+Bare Cargo development builds discover `.cargo/config.toml`, which enables the
+parallel `rustc` frontend (`-Zthreads=8`) and uses `mold` for Linux linking.
+The configuration contains no `codegen-backend` setting: development builds use
+LLVM on the pinned nightly because the release workflow uses stable Cargo,
+which rejects that setting. The stable-release exception is covered by
+`tests/stable_release_config.rs`, which checks both the configuration and a
+real stable Cargo invocation. Cargo selects one `rustflags` source rather than
+merging them. Make recipes that assign `RUSTFLAGS` therefore restate the
+development flags and warnings policy. The build-routing contracts cover direct
+Cargo defaults and the evaluated Make recipes.
 
-`mold` is wrong for coverage, and `make coverage` displaces it rather than
-expecting the developer to. `RUSTFLAGS` replaces the config's target flags
-wholesale, which is what takes `mold` out of the picture; `mold` cannot be used
-here because it does not carry the instrumentation sections `llvm-cov` reads.
-The recipe also pins the development profile to LLVM through
-`CARGO_PROFILE_DEV_CODEGEN_BACKEND`, because no rustflag can reach a profile
-setting and rustc refuses `-C instrument-coverage` under Cranelift outright;
-the configuration no longer selects Cranelift, so the override is inert today.
-`CARGO_UNSTABLE_CODEGEN_BACKEND` accompanies it so that the throwaway project
-`trybuild` generates — which sits under `CARGO_TARGET_DIR` and so may never see
-this repository's `.cargo/config.toml` — accepts the same override.
+On Linux, run `make install-build-tools` to install the pinned `mold` 2.41.0
+binary and the required components for `nightly-2026-05-28`, including
+`rustfmt`, `clippy`, `llvm-tools-preview`, and `rust-analyzer`. Install clang
+separately, then run `make check-build-tools` to verify the prerequisites.
+Build, test, lint, coverage, typecheck, and demo targets run the preflight
+before compiling. The installer skips Linux-specific linker setup on other
+platforms.
 
-A system `lld` is therefore convenient but not required: `COVERAGE_LLD_DIR`
-falls back to the `ld.lld` every rustup toolchain ships. Set
-`COVERAGE_CODEGEN_BACKEND` or `COVERAGE_LLD_DIR` to opt out on a host whose own
-toolchain already works.
+Coverage and Whitaker use explicit LLVM routing. Coverage replaces the
+development linker flags with `lld` and sets LLVM for dev, test, and build
+override profiles; its build-tool preflight still runs first. The linker path
+falls back to the `ld.lld` shipped with the selected Rust toolchain when a
+system `lld` is not on `PATH`. Whitaker clears inherited Rust flags and sets
+LLVM for its Cargo driver. CI installs the pinned build tools before the
+coverage test suite because tests can reach the same Make preflight. The shared
+`install-whitaker` action provisions its toolchain; the lint suite remains
+rolling and does not use the repository's development flags.
 
-Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
-full generated workflow locally on Linux.
+Release builds clear development flags and invoke `cross +stable` from outside
+the repository with an explicit manifest path. Cross runs Cargo inside the
+build container rooted at `/project`, where Cargo reads the repository's
+`.cargo/config.toml`; the external host working directory does not isolate that
+container configuration. The release workflow's stable Cargo therefore needs
+the configuration to omit `codegen-backend`.
+
+Install `python3` and `cargo-audit` as well when running the full generated
+workflow locally.
+
+For local Markdown formatting and linting, run `make install-markdownlint` to
+install `markdownlint-cli2` 0.22.1 with Bun. This exact package version matches
+the immutable CI action pin
+`DavidAnson/markdownlint-cli2-action@2df9e28eb87988518ef3880c34edad45d65b1668`.
 
 ### Cranelift exception
 
-The build standard makes Cranelift the development-profile backend where the
-suite passes under it. Thysalion cannot carry that default: `release.yml`
-builds release binaries with `cross +stable`, Cargo reads `.cargo/config.toml`
-inside that build, and stable Cargo refuses any `codegen-backend` key there:
+The estate build standard uses Cranelift for the development profile where the
+suite passes under it. Thysalion uses LLVM because `release.yml` builds release
+binaries with `cross +stable`, and stable Cargo reads `.cargo/config.toml` in
+that build. Stable Cargo refuses a configuration naming a `codegen-backend` key:
 
 ```text
 error: config profile `dev` is not valid (defined in `.cargo/config.toml`)
@@ -90,10 +102,37 @@ Caused by:
   feature `codegen-backend` is required
 ```
 
-So `.cargo/config.toml` names no backend and development builds use LLVM on the
-pinned `nightly-2026-05-28`. `tests/stable_release_config.rs` fails if a
-`codegen-backend` key returns while the release workflow builds on stable.
-Revisit the exception if releases move to the pinned nightly.
+Accordingly, `.cargo/config.toml` names no backend and development builds use
+LLVM on the pinned `nightly-2026-05-28`. `tests/stable_release_config.rs` fails
+if a `codegen-backend` key returns while releases build on stable. Revisit the
+exception if releases move to the pinned nightly.
+
+## Lint baseline
+
+The authoritative workspace Clippy, Rust and rustdoc tables live in
+`Cargo.toml`. The root package and all six members inherit them through
+`[lints] workspace = true`. They apply the Concordat Rust baseline at
+`902d034d9da8e7ca33a0d4032770519dd1609de2`. This retains the repository's
+stricter `unexpected_cfgs` check and `doc-valid-idents` list. The approved
+environment-method policy is in `clippy.toml`.
+
+`clippy.toml` sets thresholds of 9 for cognitive complexity, 4 arguments, 70
+lines and 4 nested levels. Its disallowed-method list requires environment
+reads to use an injected reader and tests to use a stub environment instead of
+mutating process-global variables. It requires an injected base-directory seam
+instead of changing the process directory; subprocesses may use
+`Command::current_dir`. The seven methods come from the maintainer-approved
+[Netsuke policy revision](https://github.com/leynos/netsuke/blob/924cb215d3841048dbf6649767a510d2a5dfb1b7/clippy.toml),
+tracked for Concordat publication in
+[concordat #157](https://github.com/leynos/concordat/issues/157). The frozen
+Concordat revision does not yet contain that list. The required components in
+`rust-toolchain.toml` include `clippy`, `rustfmt`, and `rust-analyzer`;
+coverage also uses `llvm-tools-preview`.
+
+Fix findings at source. Never add `#[allow]`. Use `#[expect]` only for
+macro-expansion artefacts or floating-point arithmetic, with a reason. The
+`allow-expect-in-tests` setting applies to recognized ordinary `#[test]` and
+`#[rstest]` bodies; fixtures, BDD steps and helpers remain fallible.
 
 ## Demo harness
 

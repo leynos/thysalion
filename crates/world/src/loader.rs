@@ -124,8 +124,11 @@ impl SceneLoadError {
 
 /// Loads and validates scenes through an injected [`SceneSource`].
 pub struct SceneLoader {
+    /// Injected boundary for reading scene documents and referenced resources.
     source: Arc<dyn SceneSource>,
+    /// Prefixes permitted when resolving concept identifiers.
     namespaces: NamespaceTable,
+    /// Resource limits applied while loading and validating a scene.
     bounds: Bounds,
 }
 

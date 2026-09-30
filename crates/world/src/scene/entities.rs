@@ -39,6 +39,7 @@ pub struct SpawnPoint {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct Entities {
+    /// Validated spawn points, preserving document order.
     spawns: Vec<SpawnPoint>,
 }
 

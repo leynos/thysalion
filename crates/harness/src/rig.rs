@@ -5,7 +5,7 @@
 
 use bevy::{
     ecs::message::MessageReader,
-    prelude::{Res, ResMut, Resource},
+    prelude::{ResMut, Resource},
 };
 use thysalion_presentation::Quadrant;
 
@@ -20,7 +20,9 @@ const ZOOM_STEP: f32 = 1.25;
 /// action-application system and respects the configured bounds.
 #[derive(Resource, Debug, Clone, Copy)]
 pub struct RigState {
+    /// View quadrant currently selected by the action system.
     quadrant: Quadrant,
+    /// Current factor clamped to the configured zoom bounds.
     zoom: f32,
 }
 
@@ -51,18 +53,15 @@ impl RigState {
 /// Rotation follows the camera contract's cyclic order: `RotateLeft` is
 /// [`Quadrant::prev`], `RotateRight` is [`Quadrant::next`]. Zoom steps
 /// multiply by [`ZOOM_STEP`] and clamp to the configured bounds.
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy system parameters are taken by value"
-)]
+/// Bevy registration closures borrow their extracted system parameters here.
 #[expect(
     clippy::float_arithmetic,
     reason = "zoom stepping is inherently floating point"
 )]
 pub(crate) fn apply_actions(
-    mut reader: MessageReader<HarnessAction>,
-    mut rig: ResMut<RigState>,
-    config: Res<HarnessConfig>,
+    reader: &mut MessageReader<HarnessAction>,
+    rig: &mut ResMut<RigState>,
+    config: &HarnessConfig,
 ) {
     for action in reader.read() {
         match action {
@@ -89,7 +88,11 @@ mod tests {
     //! clamped multiplicative zoom fold), and the zoom must stay inside
     //! the configured bounds after every single action.
 
-    use bevy::{app::App, ecs::message::Messages, prelude::Update};
+    use bevy::{
+        app::App,
+        ecs::message::Messages,
+        prelude::{Res, Update},
+    };
     use proptest::prelude::*;
     use thysalion_presentation::ZoomBounds;
 
@@ -141,7 +144,14 @@ mod tests {
         app.add_message::<HarnessAction>()
             .insert_resource(RigState::from_config(&config))
             .insert_resource(config)
-            .add_systems(Update, apply_actions);
+            .add_systems(
+                Update,
+                |mut reader: MessageReader<HarnessAction>,
+                 mut rig: ResMut<RigState>,
+                 harness_config: Res<HarnessConfig>| {
+                    apply_actions(&mut reader, &mut rig, &harness_config);
+                },
+            );
         app
     }
 

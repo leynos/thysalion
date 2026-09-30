@@ -73,6 +73,58 @@ pub enum Face {
     NegZ,
 }
 
+/// Whether an agent may cross one named voxel face.
+///
+/// Serde and JSON Schema represent this domain marker as its underlying
+/// boolean, so each [`Passability`] field remains a flat boolean on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+// Keep the documented wrapper's schema inline at each named face property.
+#[schemars(inline)]
+#[serde(transparent)]
+pub struct FacePassability(bool);
+
+impl FacePassability {
+    /// Creates a face passability value from its wire boolean.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::scene::document::FacePassability;
+    ///
+    /// let face = FacePassability::new(true);
+    /// assert!(face.is_passable());
+    /// ```
+    #[must_use]
+    pub const fn new(is_passable: bool) -> Self { Self(is_passable) }
+
+    /// Whether an agent may cross this face.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::scene::document::FacePassability;
+    ///
+    /// let face = FacePassability::new(false);
+    /// assert!(!face.is_passable());
+    /// ```
+    #[must_use]
+    pub const fn is_passable(self) -> bool { self.0 }
+}
+
+/// Converts a wire boolean into its face-specific domain value.
+///
+/// # Examples
+///
+/// ```
+/// use thysalion_world::scene::document::FacePassability;
+///
+/// let face = FacePassability::from(true);
+/// assert!(face.is_passable());
+/// ```
+impl From<bool> for FacePassability {
+    fn from(is_passable: bool) -> Self { Self::new(is_passable) }
+}
+
 /// Per-face passability for pathfinding.
 ///
 /// Six named fields rather than design §7.2's `[bool; 6]`. An array requires
@@ -82,26 +134,19 @@ pub enum Face {
 /// implemented.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "a voxel has exactly six faces, each independently passable. The lint's remedy is to \
-              collapse booleans into a state enum, which does not apply here, and both \
-              alternative encodings were considered and rejected: an array loses the face names, \
-              and a bitmask loses the legibility of a hand-authored `pos_x: true`."
-)]
 pub struct Passability {
     /// Whether an agent may cross the `+x` face.
-    pub pos_x: bool,
+    pub pos_x: FacePassability,
     /// Whether an agent may cross the `-x` face.
-    pub neg_x: bool,
+    pub neg_x: FacePassability,
     /// Whether an agent may cross the `+y` face.
-    pub pos_y: bool,
+    pub pos_y: FacePassability,
     /// Whether an agent may cross the `-y` face.
-    pub neg_y: bool,
+    pub neg_y: FacePassability,
     /// Whether an agent may cross the `+z` face.
-    pub pos_z: bool,
+    pub pos_z: FacePassability,
     /// Whether an agent may cross the `-z` face.
-    pub neg_z: bool,
+    pub neg_z: FacePassability,
 }
 
 impl Passability {
@@ -109,12 +154,12 @@ impl Passability {
     #[must_use]
     pub const fn open() -> Self {
         Self {
-            pos_x: true,
-            neg_x: true,
-            pos_y: true,
-            neg_y: true,
-            pos_z: true,
-            neg_z: true,
+            pos_x: FacePassability::new(true),
+            neg_x: FacePassability::new(true),
+            pos_y: FacePassability::new(true),
+            neg_y: FacePassability::new(true),
+            pos_z: FacePassability::new(true),
+            neg_z: FacePassability::new(true),
         }
     }
 
@@ -122,19 +167,24 @@ impl Passability {
     #[must_use]
     pub const fn closed() -> Self {
         Self {
-            pos_x: false,
-            neg_x: false,
-            pos_y: false,
-            neg_y: false,
-            pos_z: false,
-            neg_z: false,
+            pos_x: FacePassability::new(false),
+            neg_x: FacePassability::new(false),
+            pos_y: FacePassability::new(false),
+            neg_y: FacePassability::new(false),
+            pos_z: FacePassability::new(false),
+            neg_z: FacePassability::new(false),
         }
     }
 
     /// Whether any face admits passage.
     #[must_use]
     pub const fn is_any_passable(&self) -> bool {
-        self.pos_x || self.neg_x || self.pos_y || self.neg_y || self.pos_z || self.neg_z
+        self.pos_x.is_passable()
+            || self.neg_x.is_passable()
+            || self.pos_y.is_passable()
+            || self.neg_y.is_passable()
+            || self.pos_z.is_passable()
+            || self.neg_z.is_passable()
     }
 }
 

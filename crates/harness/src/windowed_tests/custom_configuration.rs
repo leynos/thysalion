@@ -8,7 +8,7 @@
 //! capturing would touch the filesystem; the isolated scheduling tests
 //! in `screenshot.rs` cover the capture path itself.
 
-use thysalion_presentation::{Quadrant, ZoomBounds};
+use thysalion_presentation::{Quadrant, ZoomBounds, ZoomBoundsError};
 
 use super::*;
 
@@ -25,48 +25,45 @@ const CUSTOM_QUADRANT: Quadrant = Quadrant::SouthEast;
 /// than looping.
 const ZOOM_STEPS_TO_SATURATE: usize = 8;
 
-fn custom_bounds() -> ZoomBounds {
-    match ZoomBounds::new(CUSTOM_MIN_ZOOM, CUSTOM_MAX_ZOOM) {
-        Ok(bounds) => bounds,
-        Err(error) => panic!("the custom zoom range must be valid: {error}"),
-    }
+fn custom_bounds() -> Result<ZoomBounds, ZoomBoundsError> {
+    ZoomBounds::new(CUSTOM_MIN_ZOOM, CUSTOM_MAX_ZOOM)
 }
 
-fn custom_config() -> HarnessConfig {
-    HarnessConfig::new(CUSTOM_SLUG)
-        .with_zoom_bounds(custom_bounds())
-        .with_initial_quadrant(CUSTOM_QUADRANT)
+fn custom_config() -> Result<HarnessConfig, ZoomBoundsError> {
+    Ok(HarnessConfig::new(CUSTOM_SLUG)
+        .with_zoom_bounds(custom_bounds()?)
+        .with_initial_quadrant(CUSTOM_QUADRANT))
 }
 
 /// Reads the camera's fixed-vertical viewport height.
-fn viewport_height(app: &mut App) -> f32 {
+fn viewport_height(app: &mut App) -> Result<f32, String> {
     let mut query = app
         .world_mut()
         .query_filtered::<&Projection, With<HarnessCamera>>();
-    let projection = match query.single(app.world()) {
-        Ok(projection) => projection,
-        Err(error) => panic!("exactly one harness camera expected: {error}"),
-    };
+    let projection = query
+        .single(app.world())
+        .map_err(|error| format!("exactly one harness camera expected: {error}"))?;
     let Projection::Orthographic(orthographic) = projection else {
-        panic!("the harness camera must stay orthographic");
+        return Err("the harness camera must stay orthographic".to_owned());
     };
     let ScalingMode::FixedVertical { viewport_height } = orthographic.scaling_mode else {
-        panic!("the harness camera must use fixed-vertical scaling");
+        return Err("the harness camera must use fixed-vertical scaling".to_owned());
     };
-    viewport_height
+    Ok(viewport_height)
 }
 
 #[rstest]
 fn the_plugin_installs_the_supplied_configuration() {
-    let app = windowed_app_with(custom_config());
+    let config = custom_config().expect("custom windowed configuration must be valid");
+    let app = windowed_app_with(config);
     let installed = app.world().resource::<HarnessConfig>();
     assert_eq!(
         installed.slug, CUSTOM_SLUG,
         "screenshot filenames derive from this slug, so it must survive the plugin"
     );
+    let expected_bounds = custom_bounds().expect("custom zoom bounds must be valid");
     assert_eq!(
-        installed.zoom_bounds,
-        custom_bounds(),
+        installed.zoom_bounds, expected_bounds,
         "the windowed plugin must install the supplied zoom bounds"
     );
     assert_eq!(
@@ -78,9 +75,10 @@ fn the_plugin_installs_the_supplied_configuration() {
 #[rstest]
 #[expect(clippy::float_arithmetic, reason = "epsilon comparison of camera yaw")]
 fn the_camera_starts_aimed_at_the_configured_quadrant() {
-    let mut app = windowed_app_with(custom_config());
+    let config = custom_config().expect("custom windowed configuration must be valid");
+    let mut app = windowed_app_with(config);
     let expected = CUSTOM_QUADRANT.yaw_radians();
-    let yaw = camera_yaw(&mut app);
+    let yaw = camera_yaw(&mut app).expect("startup must spawn one harness camera");
     assert!(
         (yaw - expected).abs() < f32::EPSILON,
         "the camera must spawn aimed at the configured quadrant ({CUSTOM_QUADRANT:?}, yaw \
@@ -99,12 +97,14 @@ fn the_camera_starts_aimed_at_the_configured_quadrant() {
     reason = "epsilon comparison of viewport heights"
 )]
 fn the_viewport_height_derives_from_the_configured_bounds() {
-    let mut app = windowed_app_with(custom_config());
-    let bounds = custom_bounds();
+    let config = custom_config().expect("custom windowed configuration must be valid");
+    let mut app = windowed_app_with(config);
+    let bounds = custom_bounds().expect("custom zoom bounds must be valid");
 
     // At startup the zoom is clamped up to the custom minimum, so the
     // viewport already differs from a default-bounds camera.
-    let initial = viewport_height(&mut app);
+    let initial =
+        viewport_height(&mut app).expect("startup camera must use fixed-vertical scaling");
     let expected_initial = bounds.viewport_height(bounds.clamp(1.0));
     assert!(
         (initial - expected_initial).abs() < f32::EPSILON,
@@ -124,7 +124,8 @@ fn the_viewport_height_derives_from_the_configured_bounds() {
         send(&mut app, HarnessAction::ZoomIn);
         app.update();
     }
-    let saturated = viewport_height(&mut app);
+    let saturated =
+        viewport_height(&mut app).expect("zoomed camera must use fixed-vertical scaling");
     let expected_saturated = bounds.viewport_height(CUSTOM_MAX_ZOOM);
     assert!(
         (saturated - expected_saturated).abs() < f32::EPSILON,

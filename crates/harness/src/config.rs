@@ -96,7 +96,10 @@ mod tests {
     #[rstest]
     fn new_derives_the_window_title_from_the_slug() {
         let config = HarnessConfig::new("demo-empty");
-        assert_eq!(config.window_title, "Thysalion — demo-empty");
+        assert_eq!(
+            config.window_title, "Thysalion — demo-empty",
+            "the default title should include the scene slug"
+        );
     }
 
     #[rstest]
@@ -104,7 +107,14 @@ mod tests {
         let config = HarnessConfig::new("demo-empty")
             .with_window_title("custom")
             .with_initial_quadrant(Quadrant::SouthEast);
-        assert_eq!(config.window_title, "custom");
-        assert_eq!(config.initial_quadrant, Quadrant::SouthEast);
+        assert_eq!(
+            config.window_title, "custom",
+            "the builder should preserve the custom window title"
+        );
+        assert_eq!(
+            config.initial_quadrant,
+            Quadrant::SouthEast,
+            "the builder should preserve the requested starting quadrant"
+        );
     }
 }

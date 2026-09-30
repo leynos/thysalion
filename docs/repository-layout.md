@@ -39,7 +39,7 @@ omits build output such as `target/`.
 │   ├── users-guide.md
 │   └── ...
 ├── references/         # concept art (Git LFS)
-├── scripts/            # uv-run helper scripts
+├── scripts/            # uv-run helpers and build-tool installer
 │   └── tests/          # pytest suite for the helper scripts
 ├── src/
 │   ├── lib.rs
@@ -53,7 +53,9 @@ omits build output such as `target/`.
 ├── README.md
 ├── clippy.toml
 ├── codecov.yml
-└── rust-toolchain.toml
+├── rust-toolchain.toml
+└── tools/
+    └── mold/           # pinned Linux linker version and checksums
 ```
 
 ## Workspace shape
@@ -62,10 +64,9 @@ The repository is a non-virtual Cargo workspace. The root package `thysalion`
 is the phase-9 integrated game binary and the composition root: the only crate
 that may depend on all four plane crates and own cross-plane wiring; it hosts
 no plane logic. Release artefacts build from the root package alone
-(`-p thysalion`). Members live under `crates/`; each member inherits the shared
-lint table (`[lints] workspace = true`) and dependency pins
-(`[workspace.dependencies]`, the single source of truth for version literals)
-from the root `Cargo.toml`.
+(`-p thysalion`). Members live under `crates/`; the root package and every
+member inherit the shared lint tables through `[lints] workspace = true` and
+dependency pins from `[workspace.dependencies]` in the root `Cargo.toml`.
 
 ## Path responsibilities
 
@@ -125,7 +126,10 @@ from the root `Cargo.toml`.
   guide).
 - `scripts/`: Python helper scripts run through `uv` (see
   `docs/scripting-standards.md`), including `build_fixture_scenes.py`, the
-  fixture-scene generator behind `make scenes` and `make scenes-check`.
+  fixture-scene generator behind `make scenes` and `make scenes-check`, plus
+  the shell helpers for installing and checking build tools.
+- `tools/mold/`: The pinned Linux `mold` version and release checksums consumed
+  by `scripts/install-build-tools.sh` and `scripts/check-build-tools.sh`.
 - `scripts/tests/`: The pytest suite for the helper scripts, run by
   `make scripts-test`.
 - `src/lib.rs`: Composition-root library support and doctested examples.
@@ -142,7 +146,8 @@ from the root `Cargo.toml`.
 - `README.md`: Introduces the project and gives the shortest useful
   getting-started path.
 - `clippy.toml`: Configures Clippy lint behaviour that is not expressed
-  directly in `Cargo.toml`. Applies workspace-wide.
+  directly in `Cargo.toml`, including workspace thresholds and the approved
+  environment-method policy.
 - `codecov.yml`: Configures coverage reporting behaviour.
 - `rust-toolchain.toml`: Pins the Rust toolchain channel and required
   components for the whole workspace.

@@ -59,15 +59,11 @@ impl CaptureSequence {
 
 /// Spawns a screenshot capture, with a distinct destination path, for
 /// each requested action in the frame's batch.
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy system parameters are taken by value"
-)]
 pub(crate) fn trigger_screenshots(
-    mut reader: MessageReader<HarnessAction>,
-    mut commands: Commands,
-    config: Res<HarnessConfig>,
-    mut sequence: ResMut<CaptureSequence>,
+    reader: &mut MessageReader<HarnessAction>,
+    commands: &mut Commands,
+    config: &HarnessConfig,
+    sequence: &mut ResMut<CaptureSequence>,
 ) {
     let requested = reader
         .read()
@@ -216,7 +212,15 @@ mod tests {
         app.add_message::<HarnessAction>()
             .insert_resource(HarnessConfig::default())
             .init_resource::<CaptureSequence>()
-            .add_systems(Update, trigger_screenshots);
+            .add_systems(
+                Update,
+                |mut reader: MessageReader<HarnessAction>,
+                 mut commands: Commands,
+                 config: Res<HarnessConfig>,
+                 mut sequence: ResMut<CaptureSequence>| {
+                    trigger_screenshots(&mut reader, &mut commands, &config, &mut sequence);
+                },
+            );
         app
     }
 

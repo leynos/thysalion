@@ -1,243 +1,385 @@
-//! Contract tests for the Rust build standard.
-//!
-//! The standard makes the parallel `rustc` frontend the default for every
-//! development build and mold the default linker on Linux. Cargo reads both
-//! from `.cargo/config.toml`, but it applies a single `rustflags` source rather
-//! than merging them, and an assigned `RUSTFLAGS` replaces every source. So the
-//! flags must be repeated in each configuration source, restated wherever the
-//! Makefile assigns `RUSTFLAGS` for a development target, and kept out of the
-//! coverage and release recipes, which measure or ship and so stay on the
-//! default flags.
-//!
-//! The Makefile clauses run `make -n` and read the commands it would run,
-//! rather than the Makefile's text, so a flag lost through a variable or a
-//! recipe edit fails here. They run once as a Linux host and once as a macOS
-//! host, because mold is added on Linux alone. File access goes through a
-//! `cap_std` directory handle rooted at the crate manifest directory.
+//! Contract tests verify evaluated Cargo and Make backend, flags, exclusions and gate ordering.
+//! Helpers live in a child module so this test file stays below the 400-line policy limit.
 
-use std::{error::Error, process::Command};
+#[path = "build_standard_contract/fmt_route.rs"]
+mod fmt_route;
+#[path = "build_standard_contract/helpers.rs"]
+mod helpers;
+#[path = "build_standard_contract/stable_cross.rs"]
+mod stable_cross;
 
-use cap_std::{ambient_authority, fs::Dir};
+use std::process::Command;
 
-/// The parallel-frontend flag every `rustflags` source must carry.
-const THREADS_FLAG: &str = "-Zthreads=8";
+use helpers::{
+    LINUX_TABLES,
+    MOLD_FLAG,
+    PROFILE_BACKEND_SELECTORS,
+    THREADS_FLAG,
+    build_override_mutations,
+    cargo_lines,
+    coverage_mutations,
+    coverage_route_matches,
+    development_route_matches,
+    make_output,
+    names,
+    preflight_precedes_cargo,
+    release_route_matches,
+    sources,
+    whitaker_route_matches,
+};
 
-/// The linker flag the Linux source must add, normalized to one token.
-const MOLD_FLAG: &str = "-Clink-arg=-fuse-ld=mold";
-
-/// Target table keys that apply on Linux alone.
-const LINUX_TABLES: [&str; 2] = ["x86_64-unknown-linux-gnu", "cfg(target_os = \"linux\")"];
-
-/// Makefile targets that build for development. A command in one either
-/// assigns `RUSTFLAGS` with the standard flags or assigns none and so takes
-/// the configuration's.
-const DEVELOPMENT_TARGETS: [&str; 4] = ["test", "typecheck", "lint", "build"];
-
-/// Makefile targets that measure or ship, so every command assigns
-/// `RUSTFLAGS` and none carries a standard flag.
-const HELD_OUT_TARGETS: [&str; 2] = ["coverage", "release"];
-
-/// The result of a reader, which the tests unwrap.
-type Read<T> = Result<T, Box<dyn Error>>;
-
-/// Joins `-C value` pairs into `-Cvalue`, so both spellings compare equal.
-fn normalized(flags: &[String]) -> Vec<String> {
-    let mut joined: Vec<String> = Vec::new();
-    for flag in flags {
-        match joined.last_mut() {
-            Some(last) if last == "-C" => *last = format!("-C{flag}"),
-            _ => joined.push(flag.clone()),
-        }
-    }
-    joined
-}
-
-/// Returns whether a flag list names one flag.
-fn names(flags: &[String], flag: &str) -> bool { flags.iter().any(|candidate| candidate == flag) }
-
-/// Reads one table's `rustflags` as a list of strings, if it has one.
-fn table_flags(table: &toml::Value) -> Option<Vec<String>> {
-    let flags = table.get("rustflags")?.as_array()?;
-    Some(
-        flags
-            .iter()
-            .filter_map(|flag| flag.as_str().map(str::to_owned))
-            .collect(),
-    )
-}
-
-/// Returns every `rustflags` source in the configuration, by table name.
-fn sources() -> Read<Vec<(String, Vec<String>)>> {
-    let root = Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())?;
-    let text = root.read_to_string(".cargo/config.toml")?;
-    let config: toml::Value = toml::from_str(&text)?;
-    let mut found = Vec::new();
-    if let Some(flags) = config.get("build").and_then(table_flags) {
-        found.push(("build".to_owned(), normalized(&flags)));
-    }
-    if let Some(targets) = config.get("target").and_then(toml::Value::as_table) {
-        for (key, table) in targets {
-            if let Some(flags) = table_flags(table) {
-                found.push((key.clone(), normalized(&flags)));
-            }
-        }
-    }
-    Ok(found)
-}
-
-/// Returns, for each cargo or whitaker command `make -n TARGET` would run on
-/// the named host, the `RUSTFLAGS` it assigns, or `None` when it assigns none.
-fn make_rustflags(target: &str, host: &str) -> Read<Vec<Option<Vec<String>>>> {
-    let output = Command::new("make")
-        .args(["-n", "-B", &format!("BUILD_HOST_OS={host}"), target])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()?;
-    if !output.status.success() {
-        return Err(format!("`make -n {target}` failed").into());
-    }
-    // A recipe continued with a trailing backslash is one command.
-    let stdout = String::from_utf8_lossy(&output.stdout).replace("\\\n", " ");
-    let mut commands: Vec<Option<Vec<String>>> = Vec::new();
-    for line in stdout
-        .lines()
-        .filter(|line| line.contains("cargo") || line.contains("whitaker"))
-    {
-        let assigned = match line.split_once("RUSTFLAGS=\"") {
-            Some((_, rest)) => {
-                let (value, _) = rest
-                    .split_once('"')
-                    .ok_or_else(|| format!("unterminated RUSTFLAGS in `{line}`"))?;
-                let words: Vec<String> = value.split_whitespace().map(str::to_owned).collect();
-                Some(normalized(&words))
-            }
-            // Any other spelling still replaces the configuration's sources,
-            // so a form this reader cannot parse fails rather than passing.
-            None if line.contains("RUSTFLAGS=") => {
-                return Err(format!("unreadable RUSTFLAGS assignment in `{line}`").into());
-            }
-            None => None,
-        };
-        commands.push(assigned);
-    }
-    if commands.is_empty() {
-        return Err(format!("`make -n {target}` runs no cargo command").into());
-    }
-    Ok(commands)
-}
-
-/// Checks every development target on one host: an assigned `RUSTFLAGS`
-/// carries the frontend flag, and carries mold exactly when the host is Linux.
-fn check_development_targets(host: &str, expects_mold: bool) -> Read<Vec<String>> {
-    let mut problems = Vec::new();
-    for target in DEVELOPMENT_TARGETS {
-        for flags in make_rustflags(target, host)?.into_iter().flatten() {
-            if !names(&flags, THREADS_FLAG) {
-                problems.push(format!(
-                    "`make {target}` on {host} drops {THREADS_FLAG}: {flags:?}"
-                ));
-            }
-            if names(&flags, MOLD_FLAG) != expects_mold {
-                problems.push(format!(
-                    "`make {target}` on {host} gets mold wrong: {flags:?}"
-                ));
-            }
-        }
-    }
-    Ok(problems)
-}
-
+/// Cargo defaults retain the parallel frontend and Linux-only mold.
 #[test]
-fn every_rustflags_source_carries_the_parallel_frontend() {
-    let found = sources().expect("read the configuration sources");
+fn cargo_defaults_keep_platform_flags() {
+    let found = sources().expect("read Cargo rustflag sources");
     assert!(
         found.iter().any(|(key, _)| key == "build"),
-        "no [build] rustflags for non-Linux hosts"
+        "Cargo rustflags must come from the build table"
     );
-    let missing: Vec<&str> = found
+    let missing: Vec<_> = found
         .iter()
         .filter(|(_, flags)| !names(flags, THREADS_FLAG))
-        .map(|(key, _)| key.as_str())
+        .map(|(key, _)| key)
         .collect();
     assert!(
         missing.is_empty(),
         "{THREADS_FLAG} missing from {missing:?}"
     );
-}
-
-#[test]
-fn mold_is_confined_to_linux() {
-    let found = sources().expect("read the configuration sources");
     let linux: Vec<_> = found
         .iter()
         .filter(|(key, _)| LINUX_TABLES.contains(&key.as_str()))
         .collect();
-    assert!(!linux.is_empty(), "no Linux target table carries rustflags");
+    assert!(!linux.is_empty(), "no Linux rustflags source carries mold");
     assert!(
         linux.iter().all(|(_, flags)| names(flags, MOLD_FLAG)),
-        "a Linux table lost mold"
+        "Linux rustflags sources must select mold"
     );
-    let wider: Vec<&str> = found
+    let wider: Vec<_> = found
         .iter()
         .filter(|(key, flags)| !LINUX_TABLES.contains(&key.as_str()) && names(flags, MOLD_FLAG))
-        .map(|(key, _)| key.as_str())
+        .map(|(key, _)| key)
         .collect();
-    assert!(wider.is_empty(), "mold named beyond Linux in {wider:?}");
-}
-
-#[test]
-fn sources_differ_only_by_the_linker() {
-    let mut stripped: Vec<Vec<String>> = sources()
-        .expect("read the configuration sources")
-        .into_iter()
-        .map(|(_, flags)| flags.into_iter().filter(|flag| flag != MOLD_FLAG).collect())
-        .collect();
-    stripped.dedup();
-    assert_eq!(
-        stripped.len(),
-        1,
-        "rustflags sources disagree: {stripped:?}"
-    );
-}
-
-#[test]
-fn development_targets_restate_both_flags_on_linux() {
-    let problems = check_development_targets("Linux", true).expect("read `make -n` output");
-    assert!(problems.is_empty(), "{problems:#?}");
-    let assigned = make_rustflags("test", "Linux")
-        .expect("read `make -n` output")
-        .into_iter()
-        .flatten()
-        .count();
     assert!(
-        assigned > 0,
-        "`make test` assigns no RUSTFLAGS, so the check above proves nothing"
+        wider.is_empty(),
+        "mold is configured beyond Linux: {wider:?}"
     );
+    let unique_sources: std::collections::BTreeSet<Vec<&String>> = found
+        .iter()
+        .map(|(_, flags)| flags.iter().filter(|flag| *flag != MOLD_FLAG).collect())
+        .collect();
+    assert_eq!(unique_sources.len(), 1, "rustflag sources disagree");
 }
 
+/// Evaluated dev routes keep flags and preflight with caller LLVM overrides.
 #[test]
-fn development_targets_keep_the_frontend_but_not_mold_elsewhere() {
-    let problems = check_development_targets("Darwin", false).expect("read `make -n` output");
-    assert!(problems.is_empty(), "{problems:#?}");
-}
-
-/// Coverage measures and release ships, so both stay on the default flags.
-/// Every command must assign `RUSTFLAGS`, since only an assignment displaces
-/// the configuration's sources.
-#[test]
-fn coverage_and_release_take_neither_flag() {
-    for target in HELD_OUT_TARGETS {
-        for assigned in make_rustflags(target, "Linux").expect("read `make -n` output") {
-            let flags = assigned.unwrap_or_else(|| {
-                panic!("`make {target}` runs a command that takes the configuration's flags")
-            });
-            assert!(
-                !names(&flags, THREADS_FLAG),
-                "`make {target}` takes {THREADS_FLAG}"
+fn development_make_routes_restate_flags_and_run_preflight_first() {
+    for host in ["Linux", "Darwin"] {
+        for (target, expected) in [
+            ("build", 1),
+            ("typecheck", 1),
+            ("lint-clippy", 2),
+            ("demo", 1),
+        ] {
+            let output = make_output(
+                target,
+                &[
+                    "CARGO=probe-cargo",
+                    "DEMO=empty",
+                    &format!("BUILD_HOST_OS={host}"),
+                ],
+            )
+            .expect("evaluate Make target");
+            let commands = cargo_lines(&output);
+            assert_eq!(
+                commands.len(),
+                expected,
+                "make {target} must keep every Cargo invocation: {output}"
             );
+            for command in commands {
+                assert!(
+                    development_route_matches(command, host).expect("read effective flags"),
+                    "make {target} on {host} loses its standard: {command}"
+                );
+            }
             assert!(
-                !names(&flags, MOLD_FLAG),
-                "`make {target}` takes {MOLD_FLAG}"
+                preflight_precedes_cargo(&output),
+                "preflight order changed: {output}"
+            );
+            let without_preflight = output.replace("scripts/check-build-tools.sh\n", "");
+            assert!(
+                !preflight_precedes_cargo(&without_preflight),
+                "accepted route after removing build-tool preflight: {without_preflight}"
             );
         }
     }
+}
+
+/// Both suite launchers keep development flags and preflight for doctests.
+#[test]
+fn test_make_routes_restate_flags_and_run_preflight_first() {
+    for (test_cmd, expected_first) in [("nextest run", "nextest run"), ("test", "test ")] {
+        let output = make_output(
+            "test",
+            &[
+                "CARGO=probe-cargo",
+                "BUILD_HOST_OS=Linux",
+                "BUILD_JOBS=--jobs=3",
+                &format!("TEST_CMD={test_cmd}"),
+            ],
+        )
+        .expect("evaluate Make test target");
+        let commands = cargo_lines(&output);
+        assert_eq!(
+            commands.len(),
+            2,
+            "test and doctest must both invoke Cargo: {output}"
+        );
+        let suite = commands.first().expect("suite command must be present");
+        let doctest = commands.get(1).expect("doctest command must be present");
+        assert!(suite.contains(expected_first), "wrong suite route: {suite}");
+        assert!(
+            doctest.contains("probe-cargo test --doc"),
+            "missing doctest: {doctest}"
+        );
+        assert!(
+            suite.contains("--jobs=3") && doctest.contains("--jobs=3"),
+            "BUILD_JOBS must reach suite and doctests: {commands:?}"
+        );
+        for command in commands {
+            assert!(
+                development_route_matches(command, "Linux").expect("read effective flags"),
+                "test route loses its standard flags: {command}"
+            );
+        }
+        assert!(
+            preflight_precedes_cargo(&output),
+            "test preflight must precede Cargo: {output}"
+        );
+    }
+}
+
+/// Removing any one development requirement invalidates the route.
+#[test]
+fn development_route_rejects_missing_requirements() {
+    let output = make_output("build", &["CARGO=probe-cargo", "BUILD_HOST_OS=Linux"])
+        .expect("evaluate development route with hostile backend environment");
+    let clean = cargo_lines(&output)
+        .into_iter()
+        .find(|line| line.contains("probe-cargo build"))
+        .expect("development Cargo invocation must be present");
+    for missing_requirement in [
+        "-u CARGO_ENCODED_RUSTFLAGS ",
+        "-u CARGO_UNSTABLE_CODEGEN_BACKEND ",
+        "-Zthreads=8 ",
+        "-Clink-arg=-fuse-ld=mold",
+    ] {
+        let injected = clean.replace(missing_requirement, "");
+        assert_ne!(
+            injected, clean,
+            "mutation must change {missing_requirement}"
+        );
+        assert!(
+            !development_route_matches(&injected, "Linux").expect("read mutated route"),
+            "accepted development route missing {missing_requirement}"
+        );
+    }
+    for selector in PROFILE_BACKEND_SELECTORS {
+        let missing = clean.replace(&format!("-u {selector} "), "");
+        let later = clean.replace(
+            "RUSTFLAGS=\"",
+            &format!("{selector}=cranelift RUSTFLAGS=\""),
+        );
+        assert_ne!(missing, clean, "missing-{selector} mutation was a no-op");
+        assert_ne!(later, clean, "later-{selector} mutation was a no-op");
+        assert!(
+            !development_route_matches(&missing, "Linux").expect("read missing selector"),
+            "development route accepted removal of {selector}"
+        );
+        assert!(
+            !development_route_matches(&later, "Linux").expect("read later override"),
+            "development route accepted a later {selector} override"
+        );
+    }
+}
+
+/// Coverage explicitly selects LLVM, lld, and no development flags.
+#[test]
+fn coverage_make_route_uses_llvm_and_clears_higher_precedence_flags() {
+    let output = make_output("coverage", &["CARGO=probe-cargo", "BUILD_HOST_OS=Linux"])
+        .expect("evaluate coverage target");
+    let commands = cargo_lines(&output);
+    assert_eq!(
+        commands.len(),
+        1,
+        "coverage must invoke one Cargo route: {output}"
+    );
+    let command = commands.first().expect("coverage command must be present");
+    assert!(
+        coverage_route_matches(command),
+        "coverage route is not isolated: {command}"
+    );
+    assert!(
+        preflight_precedes_cargo(&output),
+        "coverage preflight must precede Cargo"
+    );
+    for (label, mutated) in coverage_mutations(command)
+        .into_iter()
+        .chain(build_override_mutations(command))
+    {
+        assert_ne!(
+            mutated.as_str(),
+            *command,
+            "{label} mutation must change the route"
+        );
+        assert!(
+            !coverage_route_matches(&mutated),
+            "accepted {label} route: {mutated}"
+        );
+    }
+}
+
+/// Release invokes Cargo outside the repository with ambient Rust flags cleared.
+#[test]
+fn release_make_route_uses_external_manifest_and_clears_flags() {
+    let output = make_output("release", &["CARGO=probe-cargo"]).expect("evaluate release target");
+    let commands = cargo_lines(&output);
+    assert_eq!(
+        commands.len(),
+        1,
+        "release must invoke one Cargo route: {output}"
+    );
+    let command = commands.first().expect("release command must be present");
+    let manifest = format!("{}/Cargo.toml", env!("CARGO_MANIFEST_DIR"));
+    assert!(
+        release_route_matches(command, &manifest),
+        "wrong release route: {command}"
+    );
+    for selector in PROFILE_BACKEND_SELECTORS {
+        let missing = command.replace(&format!("-u {selector} "), "");
+        let later = command.replace(
+            "RUSTFLAGS=\"",
+            &format!("{selector}=cranelift RUSTFLAGS=\""),
+        );
+        assert_ne!(missing, *command, "missing-{selector} mutation was a no-op");
+        assert_ne!(later, *command, "later-{selector} mutation was a no-op");
+        assert!(
+            !release_route_matches(&missing, &manifest),
+            "accepted missing {selector}"
+        );
+        assert!(
+            !release_route_matches(&later, &manifest),
+            "accepted later {selector}"
+        );
+    }
+}
+
+/// Whitaker clears ambient flags after checking that the executable exists.
+#[test]
+fn whitaker_route_is_isolated_and_ordered() {
+    let leaf = make_output(
+        "lint-whitaker",
+        &["WHITAKER=probe-whitaker", "CARGO=probe-cargo"],
+    )
+    .expect("evaluate Whitaker target");
+    let availability = leaf
+        .find("command -v \"probe-whitaker\"")
+        .expect("Whitaker availability check is required");
+    let invocation = leaf
+        .find("probe-whitaker --all")
+        .expect("Whitaker invocation is required");
+    assert!(
+        availability < invocation,
+        "check must precede suite: {leaf}"
+    );
+    let command = leaf
+        .lines()
+        .find(|line| line.contains("probe-whitaker --all"))
+        .expect("Whitaker command must be present");
+    assert!(
+        whitaker_route_matches(command),
+        "Whitaker inherited dev flags: {command}"
+    );
+    for selector in PROFILE_BACKEND_SELECTORS {
+        let missing = command.replace(&format!("-u {selector} "), "");
+        assert_ne!(missing, command, "missing-{selector} mutation was a no-op");
+        assert!(
+            !whitaker_route_matches(&missing),
+            "accepted missing {selector}"
+        );
+    }
+    for selector in PROFILE_BACKEND_SELECTORS.iter().take(4) {
+        let wrong = command.replace(
+            &format!("{selector}=llvm"),
+            &format!("{selector}=cranelift"),
+        );
+        assert_ne!(wrong, command, "wrong-{selector} mutation was a no-op");
+        assert!(
+            !whitaker_route_matches(&wrong),
+            "accepted hostile {selector}"
+        );
+    }
+}
+
+/// Parallel lint runs rustdoc, Clippy, and Whitaker in order.
+#[test]
+fn parallel_lint_route_preserves_flags_and_order() {
+    let parallel = make_output(
+        "lint",
+        &[
+            "-j",
+            "CARGO=probe-cargo",
+            "WHITAKER=probe-whitaker",
+            "BUILD_HOST_OS=Linux",
+        ],
+    )
+    .expect("evaluate parallel lint target");
+    let cargo_commands = cargo_lines(&parallel);
+    assert_eq!(
+        cargo_commands.len(),
+        2,
+        "rustdoc and Clippy stay separate: {parallel}"
+    );
+    let docs_command = cargo_commands
+        .iter()
+        .find(|line| line.contains("probe-cargo doc"))
+        .expect("lint must run rustdoc");
+    assert!(
+        docs_command.contains("RUSTDOCFLAGS=")
+            && docs_command.contains("--cfg docsrs")
+            && docs_command.contains("-D warnings"),
+        "rustdoc must receive docsrs and denied warnings: {docs_command}"
+    );
+    let docs = parallel
+        .find("probe-cargo doc")
+        .expect("lint must run rustdoc");
+    let clippy = parallel
+        .find("probe-cargo clippy")
+        .expect("lint must run Clippy");
+    let suite = parallel
+        .find("probe-whitaker --all")
+        .expect("lint must run Whitaker");
+    let preflight = parallel
+        .find("scripts/check-build-tools.sh")
+        .expect("Clippy must check build tools");
+    assert!(
+        preflight < docs && docs < clippy && clippy < suite,
+        "lint order changed: {parallel}"
+    );
+    for command in cargo_commands {
+        assert!(
+            development_route_matches(command, "Linux").expect("read lint flags"),
+            "lint Cargo invocation lost the standard: {command}"
+        );
+    }
+}
+
+/// Whitaker failures must propagate through the Make target.
+#[test]
+fn whitaker_route_propagates_failure() {
+    let failing = Command::new("make")
+        .args(["--silent", "lint-whitaker", "WHITAKER=false"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("run failing Whitaker probe");
+    assert!(!failing.status.success(), "Whitaker's failure was ignored");
 }

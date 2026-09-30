@@ -121,9 +121,13 @@ pub fn validate(
 
 /// Everything phases two and three produce when they all pass.
 struct Sections {
+    /// Voxel kinds accepted before voxel indices are resolved.
     palette: Palette,
+    /// Voxel data resolved against the accepted palette.
     voxels: VoxelGrid,
+    /// Spawn points resolved against prototypes and scene bounds.
     entities: Entities,
+    /// Named graph and checked resource paths.
     knowledge: SceneKnowledge,
 }
 

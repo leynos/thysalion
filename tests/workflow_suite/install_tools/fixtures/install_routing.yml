@@ -1,0 +1,39 @@
+
+name: routes
+on: push
+jobs:
+  scalar:
+    runs-on: ubuntu-latest
+    steps:
+      - run: make install-build-tools
+      - run: cargo test --workspace
+      - run: make test
+      - uses: leynos/shared-actions/.github/actions/generate-coverage@abc123
+  sequence:
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - run: make install-build-tools
+      - run: cargo nextest run
+      - run: make all
+  mapping:
+    runs-on:
+      group: linux-runners
+      labels: [ubuntu-24.04, x64]
+    steps:
+      - run: make install-build-tools
+      - run: cargo llvm-cov nextest
+      - run: make coverage
+  matrix:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        runner: [windows-latest]
+        include:
+          - runner: ubuntu-latest
+    steps:
+      - run: make install-build-tools
+      - run: cargo test
+  windows:
+    runs-on: windows-latest
+    steps:
+      - run: cargo test
