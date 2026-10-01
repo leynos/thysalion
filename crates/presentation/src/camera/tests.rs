@@ -32,7 +32,11 @@ fn assert_close(actual: f32, expected: f32) {
 #[case(Quadrant::SouthWest, Quadrant::NorthWest)]
 #[case(Quadrant::NorthWest, Quadrant::NorthEast)]
 fn next_moves_to_the_adjacent_quadrant(#[case] from: Quadrant, #[case] expected: Quadrant) {
-    assert_eq!(from.next(), expected);
+    assert_eq!(
+        from.next(),
+        expected,
+        "next must select the expected adjacent quadrant"
+    );
 }
 
 /// Exhaustive proof of the quadrant cycle laws.
@@ -65,12 +69,14 @@ fn quadrant_cycle_laws_hold_for_every_quadrant() {
     reason = "computing expected yaws and epsilon comparisons"
 )]
 fn yaws_are_the_four_quarter_turn_diagonals() {
-    for (index, quadrant) in Quadrant::ALL.iter().enumerate() {
-        #[expect(
-            clippy::cast_precision_loss,
-            reason = "index is at most three; exact in f32"
-        )]
-        let expected = FRAC_PI_4 + (index as f32) * FRAC_PI_2;
+    let quarter_turns = [0.0, 1.0, 2.0, 3.0];
+    assert_eq!(
+        Quadrant::ALL.len(),
+        quarter_turns.len(),
+        "yaw values must cover every quadrant"
+    );
+    for (quadrant, turns) in Quadrant::ALL.iter().zip(quarter_turns) {
+        let expected = FRAC_PI_4 + turns * FRAC_PI_2;
         assert!(
             (quadrant.yaw_radians() - expected).abs() < f32::EPSILON,
             "{quadrant:?} yaw should be {expected}"
@@ -90,7 +96,11 @@ fn invalid_bounds_are_rejected(
     #[case] max: f32,
     #[case] expected: ZoomBoundsError,
 ) {
-    assert_eq!(ZoomBounds::new(min, max), Err(expected));
+    assert_eq!(
+        ZoomBounds::new(min, max),
+        Err(expected),
+        "invalid bounds must report the expected validation error"
+    );
 }
 
 #[rstest]

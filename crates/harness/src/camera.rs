@@ -26,11 +26,7 @@ const CAMERA_PITCH: f32 = 0.615_479_7;
 const YAW_SETTLE_RATE: f32 = 8.0;
 
 /// Spawns the harness camera at the configured quadrant and zoom.
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy system parameters are taken by value"
-)]
-pub(crate) fn spawn_camera(mut commands: Commands, config: Res<HarnessConfig>, rig: Res<RigState>) {
+pub(crate) fn spawn_camera(commands: &mut Commands, config: &HarnessConfig, rig: RigState) {
     let yaw = rig.quadrant().yaw_radians();
     commands.spawn((
         HarnessCamera,
@@ -48,10 +44,6 @@ pub(crate) fn spawn_camera(mut commands: Commands, config: Res<HarnessConfig>, r
 
 /// Settles the camera toward the rig's target yaw and applies zoom.
 #[expect(
-    clippy::needless_pass_by_value,
-    reason = "Bevy system parameters are taken by value"
-)]
-#[expect(
     clippy::float_arithmetic,
     reason = "camera geometry is inherently floating point (design §8.2)"
 )]
@@ -59,16 +51,19 @@ pub(crate) fn sync_camera(
     time: Res<Time>,
     rig: Res<RigState>,
     config: Res<HarnessConfig>,
-    mut cameras: Query<(&mut Transform, &mut Projection, &mut CameraYaw), With<HarnessCamera>>,
+    cameras: Query<(&mut Transform, &mut Projection, &mut CameraYaw), With<HarnessCamera>>,
 ) {
-    let target = rig.quadrant().yaw_radians();
-    let blend = 1.0 - (-YAW_SETTLE_RATE * time.delta_secs()).exp();
-    for (mut transform, mut projection, mut yaw) in &mut cameras {
+    let time_ref = time.into_inner();
+    let rig_ref = rig.into_inner();
+    let config_ref = config.into_inner();
+    let target = rig_ref.quadrant().yaw_radians();
+    let blend = 1.0 - (-YAW_SETTLE_RATE * time_ref.delta_secs()).exp();
+    for (mut transform, mut projection, mut yaw) in cameras.iter_inner() {
         yaw.0 += shortest_angle_delta(yaw.0, target) * blend;
         *transform = camera_transform(yaw.0);
         if let Projection::Orthographic(ref mut orthographic) = *projection {
             orthographic.scaling_mode = ScalingMode::FixedVertical {
-                viewport_height: config.zoom_bounds.viewport_height(rig.zoom()),
+                viewport_height: config_ref.zoom_bounds.viewport_height(rig_ref.zoom()),
             };
         }
     }
@@ -99,4 +94,7 @@ pub(crate) fn shortest_angle_delta(from: f32, to: f32) -> f32 {
 
 /// Compile-time guard: the baseline viewport height must be positive so
 /// the projection is never degenerate.
-const _: () = assert!(ZoomBounds::BASE_VIEWPORT_HEIGHT > 0.0);
+const _: () = assert!(
+    ZoomBounds::BASE_VIEWPORT_HEIGHT > 0.0,
+    "the baseline viewport height must be positive"
+);

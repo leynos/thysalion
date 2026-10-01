@@ -16,6 +16,10 @@ use smol_str::SmolStr;
 use super::{CodecError, Encoding};
 use crate::scene::document::{DocumentVersion, SceneDocument, VersionProbe};
 
+/// Encodes a scene with named MessagePack fields for a stable wire shape.
+///
+/// For example, a scene's section names remain visible to a MessagePack map
+/// reader rather than becoming positional array entries.
 pub(super) fn encode(document: &SceneDocument) -> Result<Vec<u8>, CodecError> {
     rmp_serde::to_vec_named(document).map_err(|error| CodecError::Encode {
         encoding: Encoding::MessagePack,
@@ -54,8 +58,15 @@ fn located<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, CodecError> {
     Ok(value)
 }
 
+/// Reads the version before decoding the full MessagePack scene.
+///
+/// For example, a structurally valid map with an invalid later section can
+/// still be classified by version before full decoding reports the fault.
 pub(super) fn probe_version(bytes: &[u8]) -> Result<DocumentVersion, CodecError> {
     located::<VersionProbe>(bytes).map(|probe| probe.version)
 }
 
+/// Decodes one complete MessagePack scene, including the end-of-input check.
+///
+/// For example, trailing bytes after an otherwise valid scene are rejected.
 pub(super) fn decode(bytes: &[u8]) -> Result<SceneDocument, CodecError> { located(bytes) }

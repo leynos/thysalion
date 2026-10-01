@@ -10,7 +10,7 @@
 
 use bevy::{app::App, ecs::message::Messages, prelude::*};
 use rstest::{fixture, rstest};
-use thysalion_presentation::{Quadrant, ZoomBounds};
+use thysalion_presentation::{Quadrant, ZoomBounds, ZoomBoundsError};
 
 use crate::{HarnessConfig, HarnessCorePlugin, input::HarnessAction, rig::RigState};
 
@@ -34,18 +34,17 @@ const CUSTOM_QUADRANT: Quadrant = Quadrant::SouthWest;
 const ZOOM_STEPS_TO_SATURATE: usize = 8;
 
 #[fixture]
-fn custom_bounds() -> ZoomBounds {
-    match ZoomBounds::new(CUSTOM_MIN_ZOOM, CUSTOM_MAX_ZOOM) {
-        Ok(bounds) => bounds,
-        Err(error) => panic!("the custom zoom range must be valid: {error}"),
-    }
+fn custom_bounds() -> Result<ZoomBounds, ZoomBoundsError> {
+    ZoomBounds::new(CUSTOM_MIN_ZOOM, CUSTOM_MAX_ZOOM)
 }
 
 #[fixture]
-fn custom_config(custom_bounds: ZoomBounds) -> HarnessConfig {
-    HarnessConfig::new(CUSTOM_SLUG)
-        .with_zoom_bounds(custom_bounds)
-        .with_initial_quadrant(CUSTOM_QUADRANT)
+fn custom_config(
+    custom_bounds: Result<ZoomBounds, ZoomBoundsError>,
+) -> Result<HarnessConfig, ZoomBoundsError> {
+    Ok(HarnessConfig::new(CUSTOM_SLUG)
+        .with_zoom_bounds(custom_bounds?)
+        .with_initial_quadrant(CUSTOM_QUADRANT))
 }
 
 /// Builds a headless app from the supplied configuration through the real
@@ -87,8 +86,11 @@ fn assert_zoom_at(zoom: f32, expected_bound: f32, bound_name: &str, default_boun
 }
 
 #[rstest]
-fn the_plugin_installs_the_supplied_configuration(custom_config: HarnessConfig) {
-    let app = core_app(custom_config);
+fn the_plugin_installs_the_supplied_configuration(
+    custom_config: Result<HarnessConfig, ZoomBoundsError>,
+) {
+    let config = custom_config.expect("custom fixture configuration must be valid");
+    let app = core_app(config);
     let installed = app.world().resource::<HarnessConfig>();
     assert_eq!(
         installed.slug, CUSTOM_SLUG,
@@ -103,16 +105,19 @@ fn the_plugin_installs_the_supplied_configuration(custom_config: HarnessConfig) 
         installed.initial_quadrant, CUSTOM_QUADRANT,
         "the plugin must install the supplied initial quadrant"
     );
+    let expected_bounds = custom_bounds().expect("custom zoom bounds must be valid");
     assert_eq!(
-        installed.zoom_bounds,
-        custom_bounds(),
+        installed.zoom_bounds, expected_bounds,
         "the plugin must install the supplied zoom bounds"
     );
 }
 
 #[rstest]
-fn the_rig_starts_in_the_configured_quadrant(custom_config: HarnessConfig) {
-    let app = core_app(custom_config);
+fn the_rig_starts_in_the_configured_quadrant(
+    custom_config: Result<HarnessConfig, ZoomBoundsError>,
+) {
+    let config = custom_config.expect("custom fixture configuration must be valid");
+    let app = core_app(config);
     assert_eq!(
         app.world().resource::<RigState>().quadrant(),
         CUSTOM_QUADRANT,
@@ -125,8 +130,11 @@ fn the_rig_starts_in_the_configured_quadrant(custom_config: HarnessConfig) {
     clippy::float_arithmetic,
     reason = "epsilon comparison of the clamped zoom level"
 )]
-fn the_initial_zoom_is_clamped_into_the_configured_range(custom_config: HarnessConfig) {
-    let app = core_app(custom_config);
+fn the_initial_zoom_is_clamped_into_the_configured_range(
+    custom_config: Result<HarnessConfig, ZoomBoundsError>,
+) {
+    let config = custom_config.expect("custom fixture configuration must be valid");
+    let app = core_app(config);
     // The baseline zoom is 1.0, which this range excludes, so a rig that
     // ignored the configured bounds would report 1.0 here.
     assert!(
@@ -153,7 +161,9 @@ fn zooming_clamps_at_the_configured_bound(
     // The configuration is built directly rather than injected as a
     // fixture: with four `#[case]` parameters, a fifth argument would
     // exceed the workspace's `too_many_arguments` limit.
-    let mut app = core_app(custom_config(custom_bounds()));
+    let config =
+        custom_config(custom_bounds()).expect("custom fixture configuration must be valid");
+    let mut app = core_app(config);
     for _ in 0..ZOOM_STEPS_TO_SATURATE {
         send_and_update(&mut app, action);
     }
@@ -165,8 +175,11 @@ fn zooming_clamps_at_the_configured_bound(
     clippy::float_arithmetic,
     reason = "epsilon comparison of the clamped zoom level"
 )]
-fn zoom_moves_within_the_configured_range_before_clamping(custom_config: HarnessConfig) {
-    let mut app = core_app(custom_config);
+fn zoom_moves_within_the_configured_range_before_clamping(
+    custom_config: Result<HarnessConfig, ZoomBoundsError>,
+) {
+    let config = custom_config.expect("custom fixture configuration must be valid");
+    let mut app = core_app(config);
     let start = rig_zoom(&app);
     send_and_update(&mut app, HarnessAction::ZoomIn);
     let stepped = rig_zoom(&app);

@@ -10,11 +10,8 @@ settings, and documented starter code. Library projects render `src/lib.rs`.
 Application projects render `src/main.rs`, `src/lib.rs`, release automation, and
 `[package.metadata.binstall]` metadata for binary installation.
 
-Development builds use the default LLVM backend: release builds run on stable,
-which refuses a Cranelift configuration. On Linux targets, `.cargo/config.toml`
-configures clang to link with `mold` so local debug builds link quickly.
-Coverage generation uses `lld` instead because LLVM coverage tools expect
-LLVM-compatible linker behaviour.
+For source builds, see the [developer's guide](developers-guide.md) for the
+development, coverage, and release build routes.
 
 ## Makefile Targets
 
@@ -37,13 +34,9 @@ The generated `Makefile` exposes these public targets:
   `typos.local.toml` overlay and then checks the prose.
 - `make nixie` validates Mermaid diagrams.
 
-Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
-full generated workflow locally on Linux.
-
-Development builds, including `make build`, `make test`, `make lint`, and
-`make typecheck`, use the parallel `rustc` frontend (`-Zthreads=8`) and, on
-Linux, link with `mold`. `make release` and `make coverage` use their own flag
-sets and take neither.
+On Linux, run `make install-build-tools` before source builds; install clang
+separately. Install `python3` and `cargo-audit` to run the full generated
+workflow.
 
 - `make demo` runs a capability demonstration binary (`DEMO=empty` by
   default, so `make demo DEMO=empty` and `make demo` are equivalent).

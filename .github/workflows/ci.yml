@@ -22,14 +22,16 @@ jobs:
         uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
         with:
           expect-cache: any
-      - name: Install mold linker
-        if: runner.os == 'Linux'
+      - name: Install coverage linker prerequisites
         run: |
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
-          # mold accelerates dev builds; coverage uses lld for llvm-tools compatibility.
+          # Coverage uses lld for llvm-tools compatibility. The pinned mold
+          # linker and Rust components are installed by the repository target.
           sudo apt-get update \
-            && sudo apt-get install --yes --no-install-recommends clang lld mold
+            && sudo apt-get install --yes --no-install-recommends clang lld
+      - name: Install pinned development build tools
+        run: make install-build-tools
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
@@ -47,9 +49,17 @@ jobs:
         uses: astral-sh/setup-uv@c6081965dd0577ae48820cb8c288e12509571f0c
       - name: Check spelling
         run: make spelling
+      - name: Setup Bun for Markdown contracts
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.3.14'
+      - name: Install Markdown test linter
+        run: make install-markdownlint
       # The pytest suite for the Python helper scripts under `scripts/`,
       # chiefly the fixture-scene generator behind `make scenes`.
       - name: Test the Python helper scripts
+        env:
+          REQUIRE_MARKDOWNLINT_CLI: 'true'
         run: make scripts-test
       - name: Install test runner
         env:
@@ -77,10 +87,23 @@ jobs:
           echo "Coverage RUSTFLAGS: -C link-arg=-fuse-ld=lld"
           echo "Coverage CFLAGS: -fuse-ld=lld"
           echo "Coverage LDFLAGS: -fuse-ld=lld"
+      # The shared coverage action cannot unset an inherited variable from a
+      # caller's `uses:` step. Fail before measurement rather than silently
+      # letting encoded flags outrank the LLVM/lld coverage RUSTFLAGS.
+      - name: Check coverage flag isolation
+        run: |
+          if [ "${CARGO_ENCODED_RUSTFLAGS+x}" = x ]; then
+            echo 'CARGO_ENCODED_RUSTFLAGS must be unset for coverage' >&2
+            exit 1
+          fi
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@dbe2e22ceaf498d85512679ccded38be9dbe7777
+        uses: leynos/shared-actions/.github/actions/generate-coverage@d4d248bbbecdcf7b4f5bc79ffd4d6caee370bd79
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
+          CARGO_UNSTABLE_CODEGEN_BACKEND: 'true'
+          CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm
+          CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND: llvm
+          CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND: llvm
           RUSTFLAGS: -C link-arg=-fuse-ld=lld
           CFLAGS: -fuse-ld=lld
           LDFLAGS: -fuse-ld=lld
@@ -96,11 +119,10 @@ jobs:
           # coverage names it to select the same tests.
           features: thysalion-demos/demo-empty
       # The doctests are the only part of `make test` the coverage step does
-      # not run. The step denies warnings as `make test`'s doctest line does;
-      # the build standard's frontend and linker flags are a local build-speed
-      # default and change no result, so CI does not restate them.
+      # not run. Keep the development frontend and linker flags alongside the
+      # warning policy because this direct Cargo invocation bypasses Make.
       # tests/workflow_suite_contract.rs holds the split.
       - name: Run doctests
         env:
-          RUSTFLAGS: -D warnings
+          RUSTFLAGS: -D warnings -Zthreads=8 -Clink-arg=-fuse-ld=mold
         run: cargo test --doc --workspace --all-features

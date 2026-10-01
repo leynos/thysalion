@@ -95,8 +95,11 @@ impl ChunkStore {
 /// makes re-encoding byte-stable and therefore hashable (design §12.3).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VoxelGrid {
+    /// Validated bounds used to reject out-of-scene chunk coordinates.
     extent: Extent,
+    /// Chunk edge length used to interpret coordinates and payloads.
     chunk_size: ChunkSize,
+    /// Sparse chunks keyed in deterministic coordinate order.
     chunks: BTreeMap<ChunkCoord, ChunkStore>,
 }
 

@@ -86,6 +86,7 @@ pub enum HarnessSet {
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct HarnessCorePlugin {
+    /// Demo settings shared with the core action and camera systems.
     config: HarnessConfig,
 }
 
@@ -115,7 +116,16 @@ impl Plugin for HarnessCorePlugin {
             .configure_sets(Update, HarnessSet::Windowed.after(HarnessSet::Core))
             .add_systems(
                 Update,
-                (input::read_input, rig::apply_actions)
+                (|keys: bevy::prelude::Res<ButtonInput<KeyCode>>,
+                  scroll: bevy::prelude::Res<AccumulatedMouseScroll>,
+                  mut writer: bevy::ecs::message::MessageWriter<HarnessAction>| {
+                    input::read_input(&keys, &scroll, &mut writer);
+                },
+                 |mut reader: bevy::ecs::message::MessageReader<HarnessAction>,
+                  mut rig: bevy::prelude::ResMut<RigState>,
+                  config: bevy::prelude::Res<HarnessConfig>| {
+                    rig::apply_actions(&mut reader, &mut rig, &config);
+                })
                     .chain()
                     .in_set(HarnessSet::Core),
             );
@@ -155,6 +165,7 @@ fn clear_synthetic_input(
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct DemoHarnessPlugin {
+    /// Demo settings passed to the core plugin and windowed systems.
     config: HarnessConfig,
 }
 
@@ -169,14 +180,34 @@ impl Plugin for DemoHarnessPlugin {
         app.add_plugins(HarnessCorePlugin::new(self.config.clone()))
             .init_resource::<overlay::OverlayTimer>()
             .init_resource::<screenshot::CaptureSequence>()
-            .add_systems(Startup, (camera::spawn_camera, overlay::setup_overlay))
+            .add_systems(
+                Startup,
+                (
+                    |mut commands: bevy::prelude::Commands,
+                     config: bevy::prelude::Res<HarnessConfig>,
+                     rig: bevy::prelude::Res<rig::RigState>| {
+                        camera::spawn_camera(&mut commands, &config, *rig);
+                    },
+                    overlay::setup_overlay,
+                ),
+            )
             .add_systems(
                 Update,
                 (
                     camera::sync_camera,
                     overlay::toggle_overlay,
                     overlay::refresh_overlay,
-                    screenshot::trigger_screenshots,
+                    |mut reader: bevy::ecs::message::MessageReader<HarnessAction>,
+                     mut commands: bevy::prelude::Commands,
+                     config: bevy::prelude::Res<HarnessConfig>,
+                     mut sequence: bevy::prelude::ResMut<screenshot::CaptureSequence>| {
+                        screenshot::trigger_screenshots(
+                            &mut reader,
+                            &mut commands,
+                            &config,
+                            &mut sequence,
+                        );
+                    },
                 )
                     .in_set(HarnessSet::Windowed),
             );

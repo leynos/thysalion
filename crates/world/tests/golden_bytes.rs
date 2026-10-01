@@ -76,7 +76,10 @@ fn the_content_hash_input_agrees_across_the_two_encodings() {
     let msgpack = read(GOLDEN_MSGPACK).expect("read msgpack");
     let from_json = decode_document(&json, Encoding::Json).expect("decode json");
     let from_msgpack = decode_document(&msgpack, Encoding::MessagePack).expect("decode msgpack");
-    assert_eq!(from_json, from_msgpack);
+    assert_eq!(
+        from_json, from_msgpack,
+        "both golden encodings should decode to the same document"
+    );
 
     let via_json = encode_document(&from_json, Encoding::MessagePack).expect("encode");
     let via_msgpack = encode_document(&from_msgpack, Encoding::MessagePack).expect("encode");

@@ -25,17 +25,13 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 /// Runs a `make` invocation in the repository root with inherited make
 /// flags removed, so a parent `make` (or a test harness that exports
 /// `MAKEFLAGS`) cannot alter the recipe under test.
-fn run_make(args: &[&str]) -> std::process::Output {
-    match Command::new("make")
+fn run_make(args: &[&str]) -> std::io::Result<std::process::Output> {
+    Command::new("make")
         .args(args)
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .env_remove("MAKEFLAGS")
         .env_remove("MFLAGS")
         .output()
-    {
-        Ok(output) => output,
-        Err(error) => panic!("running `make {}` failed: {error}", args.join(" ")),
-    }
 }
 
 #[test]
@@ -56,7 +52,7 @@ fn makefile_derives_the_demo_whitelist_from_the_demo_binaries() {
 
 #[test]
 fn make_demo_rejects_an_unsupported_demo_before_invoking_cargo() {
-    let output = run_make(&["demo", "DEMO=not-a-real-demo"]);
+    let output = run_make(&["demo", "DEMO=not-a-real-demo"]).expect("run make demo guard");
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -75,7 +71,7 @@ fn make_demo_rejects_an_unsupported_demo_before_invoking_cargo() {
 
 #[test]
 fn make_dry_run_demo_renders_a_quoted_cargo_invocation() {
-    let output = run_make(&["--dry-run", "demo"]);
+    let output = run_make(&["--dry-run", "demo"]).expect("dry-run make demo");
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -104,7 +100,7 @@ fn make_demo_resolves_the_default_launcher_to_demo_empty() {
     // `CARGO` is a Makefile variable, so overriding it replaces the whole
     // command: the recipe's guard and shell expansion still run, but the
     // windowed binary is never launched.
-    let output = run_make(&["demo", "CARGO=echo RESOLVED:"]);
+    let output = run_make(&["demo", "CARGO=echo RESOLVED:"]).expect("run make demo probe");
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(

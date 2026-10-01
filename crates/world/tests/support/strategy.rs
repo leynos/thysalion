@@ -26,6 +26,7 @@ use thysalion_world::scene::document::{
     EntitiesDocument,
     ExtentDocument,
     Face,
+    FacePassability,
     KnowledgeDocument,
     Lighting,
     MaterialClass,
@@ -99,12 +100,12 @@ fn passability() -> impl Strategy<Value = Passability> {
         any::<bool>(),
     )
         .prop_map(|(pos_x, neg_x, pos_y, neg_y, pos_z, neg_z)| Passability {
-            pos_x,
-            neg_x,
-            pos_y,
-            neg_y,
-            pos_z,
-            neg_z,
+            pos_x: FacePassability::new(pos_x),
+            neg_x: FacePassability::new(neg_x),
+            pos_y: FacePassability::new(pos_y),
+            neg_y: FacePassability::new(neg_y),
+            pos_z: FacePassability::new(pos_z),
+            neg_z: FacePassability::new(neg_z),
         })
 }
 

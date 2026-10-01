@@ -17,7 +17,7 @@
 //! `DiagnosticCode` with no fixture here is invisible to review, so the last
 //! test asserts the two agree.
 
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
@@ -40,26 +40,23 @@ mod corrupt_classes;
 
 use corrupt_classes::{CLASSES, WARNINGS};
 
+/// The fallible result returned by fixture setup and report readers.
+type Read<T> = Result<T, Box<dyn Error>>;
+
 /// Opens the fixture directory as a capability, per AGENTS.md's filesystem
 /// policy. Ambient authority is taken once, here.
-///
-/// # Panics
-///
-/// Panics when the fixture directory is missing, which is a broken checkout.
-fn fixtures() -> Dir {
+fn fixtures() -> Read<Dir> {
     let root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(FIXTURES);
-    match Dir::open_ambient_dir(&root, ambient_authority()) {
-        Ok(directory) => directory,
-        Err(error) => panic!("the corrupt fixture directory must exist at {root}: {error}"),
-    }
+    Dir::open_ambient_dir(&root, ambient_authority())
+        .map_err(|error| format!("open corrupt fixture directory {root}: {error}").into())
 }
 
 /// Checks one fixture by name, in the requested format and strictness.
-fn check_fixture(name: &str, options: Options) -> Outcome {
+fn check_fixture(name: &str, options: Options) -> Read<Outcome> {
     let document = Utf8PathBuf::from(format!("{name}.scene.json"));
-    let source = DirSceneSource::new(fixtures(), FIXTURES);
+    let source = DirSceneSource::new(fixtures()?, FIXTURES);
     let loader = SceneLoader::new(Arc::new(source));
-    check::run(&loader, &document, FIXTURES, options)
+    Ok(check::run(&loader, &document, FIXTURES, options))
 }
 
 /// The codes a fixture's report carries, read back from the `--json` form.
@@ -68,27 +65,25 @@ fn check_fixture(name: &str, options: Options) -> Outcome {
 /// that is what a program is supposed to consume — and because the text is
 /// simultaneously pinned as a wording contract, so scraping it here would make a
 /// message tweak break two things at once.
-fn codes_of(name: &str, member: &str) -> Vec<String> {
-    let outcome = check_fixture(name, json_options());
-    let parsed: serde_json::Value = match serde_json::from_str(&outcome.output) {
-        Ok(parsed) => parsed,
-        Err(error) => panic!(
-            "{name}: the --json form must parse: {error}\n{}",
-            outcome.output
-        ),
-    };
-    parsed
+fn codes_of(name: &str, member: &str) -> Read<Vec<String>> {
+    let outcome = check_fixture(name, json_options())?;
+    let parsed: serde_json::Value = serde_json::from_str(&outcome.output)
+        .map_err(|error| format!("{name}: parse --json report: {error}\n{}", outcome.output))?;
+    let entries = parsed
         .get(member)
         .and_then(serde_json::Value::as_array)
-        .map(|entries| {
-            entries
-                .iter()
-                .filter_map(|entry| entry.get("code"))
-                .filter_map(serde_json::Value::as_str)
-                .map(ToOwned::to_owned)
-                .collect()
+        .ok_or_else(|| format!("{name}: --json report has no {member:?} array"))?;
+    entries
+        .iter()
+        .enumerate()
+        .map(|(index, entry)| {
+            entry
+                .get("code")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .ok_or_else(|| format!("{name}: {member}[{index}] has no string code").into())
         })
-        .unwrap_or_default()
+        .collect()
 }
 
 /// Structured output, lenient, no measurements.
@@ -104,7 +99,7 @@ fn every_corrupt_fixture_reports_its_own_class() {
         let Some(expected) = *class else {
             continue;
         };
-        let codes = codes_of(name, "errors");
+        let codes = codes_of(name, "errors").expect("read corrupt fixture error codes");
         assert!(
             codes.iter().any(|code| code == expected),
             "{name}: expected {expected:?} among the reported codes, got {codes:?}"
@@ -123,7 +118,7 @@ fn every_corrupt_fixture_reports_exactly_one_problem() {
         if expected.is_none() {
             continue;
         }
-        let codes = codes_of(name, "errors");
+        let codes = codes_of(name, "errors").expect("read corrupt fixture error codes");
         assert_eq!(
             codes.len(),
             1,
@@ -139,7 +134,7 @@ fn every_corrupt_fixture_fails_the_check() {
     // their file is unreadable when one key is misspelled sends them looking in
     // the wrong place entirely.
     for (name, _) in CLASSES {
-        let outcome = check_fixture(name, Options::default());
+        let outcome = check_fixture(name, Options::default()).expect("check corrupt fixture");
         assert_eq!(
             outcome.code,
             ExitCode::Invalid,
@@ -153,14 +148,14 @@ fn every_corrupt_fixture_fails_the_check() {
 #[test]
 fn the_warning_fixtures_load_and_name_their_finding() {
     for (name, expected) in WARNINGS {
-        let outcome = check_fixture(name, Options::default());
+        let outcome = check_fixture(name, Options::default()).expect("check warning fixture");
         assert_eq!(
             outcome.code,
             ExitCode::Valid,
             "{name}: a warning must not fail a lenient check\n{}",
             outcome.output
         );
-        let codes = codes_of(name, "warnings");
+        let codes = codes_of(name, "warnings").expect("read warning fixture codes");
         assert!(
             codes.iter().any(|code| code == expected),
             "{name}: expected {expected:?} among the warnings, got {codes:?}"
@@ -173,7 +168,7 @@ fn the_warning_fixtures_fail_under_strict() {
     let mut options = Options::default();
     options.strictness = Strictness::Strict;
     for (name, _) in WARNINGS {
-        let outcome = check_fixture(name, options);
+        let outcome = check_fixture(name, options).expect("check strict warning fixture");
         assert_eq!(
             outcome.code,
             ExitCode::Invalid,
@@ -194,7 +189,7 @@ fn the_corrupt_reports_match_their_snapshots() {
     let _guard = settings.bind_to_scope();
 
     for (name, _) in CLASSES.iter().chain(warning_names().iter()) {
-        let outcome = check_fixture(name, Options::default());
+        let outcome = check_fixture(name, Options::default()).expect("check snapshot fixture");
         insta::assert_snapshot!(*name, outcome.output);
     }
 }
@@ -301,7 +296,7 @@ fn the_fixture_directory_holds_nothing_the_contract_omits() {
         .map(|(name, _)| (*name).to_owned())
         .chain(WARNINGS.iter().map(|(name, _)| (*name).to_owned()))
         .collect();
-    for entry in fixture_names() {
+    for entry in fixture_names().expect("enumerate corrupt fixture names") {
         assert!(
             named.contains(&entry),
             "{entry:?} is in {FIXTURES} but no test names it"
@@ -310,24 +305,24 @@ fn the_fixture_directory_holds_nothing_the_contract_omits() {
 }
 
 /// The fixture stems on disk, without their `.scene.json` suffix.
-///
-/// # Panics
-///
-/// Panics when the directory cannot be read, which is a broken checkout.
-fn fixture_names() -> Vec<String> {
-    let Ok(entries) = fixtures().entries() else {
-        panic!("the corrupt fixture directory must be readable");
-    };
-    entries
-        .filter_map(Result::ok)
-        .filter_map(|entry| entry.file_name().ok())
-        .filter_map(|name| {
-            Utf8Path::new(&name)
-                .file_name()
-                .and_then(|file| file.strip_suffix(".scene.json"))
-                .map(ToOwned::to_owned)
-        })
-        .collect()
+fn fixture_names() -> Read<Vec<String>> {
+    let mut names = Vec::new();
+    let entries = fixtures()?
+        .entries()
+        .map_err(|error| format!("list {FIXTURES}: {error}"))?;
+    for directory_entry in entries {
+        let entry = directory_entry.map_err(|error| format!("read {FIXTURES} entry: {error}"))?;
+        let name = entry
+            .file_name()
+            .map_err(|error| format!("read {FIXTURES} entry name: {error}"))?;
+        if let Some(stem) = Utf8Path::new(&name)
+            .file_name()
+            .and_then(|file| file.strip_suffix(".scene.json"))
+        {
+            names.push(stem.to_owned());
+        }
+    }
+    Ok(names)
 }
 
 /// A source whose every read fails as unreadable rather than as absent.
@@ -351,7 +346,10 @@ fn an_unreadable_resource_is_distinguished_from_an_absent_one() {
     // these two, and an author told their scene "names a file that is not there"
     // about a file sitting right in front of them has been actively misled.
     let loader = SceneLoader::new(Arc::new(UnreadableSource));
-    let bytes = match fixtures().read("spawn-obstructed.scene.json") {
+    let bytes = match fixtures()
+        .expect("open corrupt fixture directory")
+        .read("spawn-obstructed.scene.json")
+    {
         Ok(bytes) => bytes,
         Err(error) => panic!("the fixture must be readable: {error}"),
     };
@@ -382,6 +380,7 @@ fn the_too_deep_fixture_outruns_the_bound_it_tests() {
     // workspace forbids `std::fs`, and a test is not exempt from the policy
     // that a reader can see the whole filesystem surface a module touches.
     let document = fixtures()
+        .expect("open corrupt fixture directory")
         .read("prototype-too-deep.scene.json")
         .expect("the fixture must be readable");
     let parsed: serde_json::Value =

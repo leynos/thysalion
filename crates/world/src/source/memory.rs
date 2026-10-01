@@ -13,6 +13,7 @@ use super::{SceneSource, SceneSourceError, check_resource_path};
 /// sandbox to fall back on, and the trust boundary applies to both.
 #[derive(Debug, Clone, Default)]
 pub struct MemorySceneSource {
+    /// Resource bytes keyed by relative UTF-8 path.
     files: BTreeMap<Utf8PathBuf, Vec<u8>>,
 }
 
