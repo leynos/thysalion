@@ -123,44 +123,34 @@ fn only_the_doctest_step_runs_the_suite_outside_coverage() {
     );
 }
 
-#[test]
-fn build_test_keeps_the_doctest_step_unconditional() {
-    let found = workflows().expect("failed to read the workflows");
-    let job = suite_job(&found).expect("ci.yml must define build-test");
-    let doctest = Command::from_line(DOCTEST_COMMAND);
-    let steps: Vec<_> = job
-        .steps()
-        .into_iter()
-        .filter(|step| step.runs(doctest))
-        .collect();
-    assert_eq!(
-        steps.len(),
-        1,
-        "{SUITE_JOB} must run the doctests in one step"
-    );
-    assert!(
-        !steps.iter().any(reading::Step::is_conditional),
-        "the doctest step must always run"
-    );
+#[derive(Clone, Copy, Debug)]
+enum RequiredSuiteStep {
+    Doctests,
+    Coverage,
 }
 
-#[test]
-fn build_test_runs_coverage_unconditionally() {
+#[rstest]
+#[case::doctests(RequiredSuiteStep::Doctests)]
+#[case::coverage(RequiredSuiteStep::Coverage)]
+fn build_test_runs_required_step_unconditionally(#[case] required_step: RequiredSuiteStep) {
     let found = workflows().expect("failed to read the workflows");
     let job = suite_job(&found).expect("ci.yml must define build-test");
     let steps: Vec<_> = job
         .steps()
         .into_iter()
-        .filter(|step| step.uses(COVERAGE_ACTION))
+        .filter(|step| match required_step {
+            RequiredSuiteStep::Doctests => step.runs(Command::from_line(DOCTEST_COMMAND)),
+            RequiredSuiteStep::Coverage => step.uses(COVERAGE_ACTION),
+        })
         .collect();
     assert_eq!(
         steps.len(),
         1,
-        "{SUITE_JOB} must run the coverage action once"
+        "{required_step:?} must match exactly one step in {SUITE_JOB}"
     );
     assert!(
-        !steps.iter().any(reading::Step::is_conditional),
-        "coverage must always run"
+        steps.first().is_some_and(|step| !step.is_conditional()),
+        "{required_step:?} step must carry no step-level `if:`"
     );
 }
 
