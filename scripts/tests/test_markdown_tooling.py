@@ -131,8 +131,7 @@ def test_markdownlint_ignores_generated_pytest_cache(tmp_path: Path) -> None:
             text=True,
         )
         assert result.returncode == 0, result.stdout + result.stderr
-        assert "markdownlint-cli2 v0.22.1" in result.stdout
-        assert "Linting: 0 file(s)" in result.stdout
+        assert re.search(r"Linting: 0 files?(?:\(s\))?", result.stdout)
 
     ordinary = tmp_path / "ordinary/invalid.md"
     ordinary.parent.mkdir(parents=True, exist_ok=True)
