@@ -5,25 +5,26 @@
 mod fmt_route;
 #[path = "build_standard_contract/helpers.rs"]
 mod helpers;
+#[path = "build_standard_contract/route_tests.rs"]
+mod route_tests;
 #[path = "build_standard_contract/stable_cross.rs"]
 mod stable_cross;
 
 use std::process::Command;
 
 use helpers::{
+    BuildHost,
     LINUX_TABLES,
     MOLD_FLAG,
+    MakeTarget,
     PROFILE_BACKEND_SELECTORS,
+    RouteText,
     THREADS_FLAG,
-    build_override_mutations,
     cargo_lines,
-    coverage_mutations,
-    coverage_route_matches,
     development_route_matches,
     make_output,
     names,
     preflight_precedes_cargo,
-    release_route_matches,
     sources,
     whitaker_route_matches,
 };
@@ -73,12 +74,12 @@ fn cargo_defaults_keep_platform_flags() {
 /// Evaluated dev routes keep flags and preflight with caller LLVM overrides.
 #[test]
 fn development_make_routes_restate_flags_and_run_preflight_first() {
-    for host in ["Linux", "Darwin"] {
+    for (host, host_kind) in [("Linux", BuildHost::Linux), ("Darwin", BuildHost::Other)] {
         for (target, expected) in [
-            ("build", 1),
-            ("typecheck", 1),
-            ("lint-clippy", 2),
-            ("demo", 1),
+            (MakeTarget::Build, 1),
+            (MakeTarget::Typecheck, 1),
+            (MakeTarget::Clippy, 2),
+            (MakeTarget::Demo, 1),
         ] {
             let output = make_output(
                 target,
@@ -89,25 +90,28 @@ fn development_make_routes_restate_flags_and_run_preflight_first() {
                 ],
             )
             .expect("evaluate Make target");
-            let commands = cargo_lines(&output);
+            let commands = cargo_lines(RouteText(&output));
             assert_eq!(
                 commands.len(),
                 expected,
-                "make {target} must keep every Cargo invocation: {output}"
+                "make {} must keep every Cargo invocation: {output}",
+                target.as_str()
             );
             for command in commands {
                 assert!(
-                    development_route_matches(command, host).expect("read effective flags"),
-                    "make {target} on {host} loses its standard: {command}"
+                    development_route_matches(RouteText(command), host_kind)
+                        .expect("read effective flags"),
+                    "make {} on {host} loses its standard: {command}",
+                    target.as_str()
                 );
             }
             assert!(
-                preflight_precedes_cargo(&output),
+                preflight_precedes_cargo(RouteText(&output)),
                 "preflight order changed: {output}"
             );
             let without_preflight = output.replace("scripts/check-build-tools.sh\n", "");
             assert!(
-                !preflight_precedes_cargo(&without_preflight),
+                !preflight_precedes_cargo(RouteText(&without_preflight)),
                 "accepted route after removing build-tool preflight: {without_preflight}"
             );
         }
@@ -119,7 +123,7 @@ fn development_make_routes_restate_flags_and_run_preflight_first() {
 fn test_make_routes_restate_flags_and_run_preflight_first() {
     for (test_cmd, expected_first) in [("nextest run", "nextest run"), ("test", "test ")] {
         let output = make_output(
-            "test",
+            MakeTarget::Test,
             &[
                 "CARGO=probe-cargo",
                 "BUILD_HOST_OS=Linux",
@@ -128,7 +132,7 @@ fn test_make_routes_restate_flags_and_run_preflight_first() {
             ],
         )
         .expect("evaluate Make test target");
-        let commands = cargo_lines(&output);
+        let commands = cargo_lines(RouteText(&output));
         assert_eq!(
             commands.len(),
             2,
@@ -147,12 +151,13 @@ fn test_make_routes_restate_flags_and_run_preflight_first() {
         );
         for command in commands {
             assert!(
-                development_route_matches(command, "Linux").expect("read effective flags"),
+                development_route_matches(RouteText(command), BuildHost::Linux)
+                    .expect("read effective flags"),
                 "test route loses its standard flags: {command}"
             );
         }
         assert!(
-            preflight_precedes_cargo(&output),
+            preflight_precedes_cargo(RouteText(&output)),
             "test preflight must precede Cargo: {output}"
         );
     }
@@ -161,9 +166,12 @@ fn test_make_routes_restate_flags_and_run_preflight_first() {
 /// Removing any one development requirement invalidates the route.
 #[test]
 fn development_route_rejects_missing_requirements() {
-    let output = make_output("build", &["CARGO=probe-cargo", "BUILD_HOST_OS=Linux"])
-        .expect("evaluate development route with hostile backend environment");
-    let clean = cargo_lines(&output)
+    let output = make_output(
+        MakeTarget::Build,
+        &["CARGO=probe-cargo", "BUILD_HOST_OS=Linux"],
+    )
+    .expect("evaluate development route with hostile backend environment");
+    let clean = cargo_lines(RouteText(&output))
         .into_iter()
         .find(|line| line.contains("probe-cargo build"))
         .expect("development Cargo invocation must be present");
@@ -179,96 +187,34 @@ fn development_route_rejects_missing_requirements() {
             "mutation must change {missing_requirement}"
         );
         assert!(
-            !development_route_matches(&injected, "Linux").expect("read mutated route"),
+            !development_route_matches(RouteText(&injected), BuildHost::Linux)
+                .expect("read mutated route"),
             "accepted development route missing {missing_requirement}"
         );
     }
     for selector in PROFILE_BACKEND_SELECTORS {
-        let missing = clean.replace(&format!("-u {selector} "), "");
+        let missing = clean.replace(&format!("-u {} ", selector.0), "");
         let later = clean.replace(
             "RUSTFLAGS=\"",
-            &format!("{selector}=cranelift RUSTFLAGS=\""),
+            &format!("{}=cranelift RUSTFLAGS=\"", selector.0),
         );
-        assert_ne!(missing, clean, "missing-{selector} mutation was a no-op");
-        assert_ne!(later, clean, "later-{selector} mutation was a no-op");
-        assert!(
-            !development_route_matches(&missing, "Linux").expect("read missing selector"),
-            "development route accepted removal of {selector}"
-        );
-        assert!(
-            !development_route_matches(&later, "Linux").expect("read later override"),
-            "development route accepted a later {selector} override"
-        );
-    }
-}
-
-/// Coverage explicitly selects LLVM, lld, and no development flags.
-#[test]
-fn coverage_make_route_uses_llvm_and_clears_higher_precedence_flags() {
-    let output = make_output("coverage", &["CARGO=probe-cargo", "BUILD_HOST_OS=Linux"])
-        .expect("evaluate coverage target");
-    let commands = cargo_lines(&output);
-    assert_eq!(
-        commands.len(),
-        1,
-        "coverage must invoke one Cargo route: {output}"
-    );
-    let command = commands.first().expect("coverage command must be present");
-    assert!(
-        coverage_route_matches(command),
-        "coverage route is not isolated: {command}"
-    );
-    assert!(
-        preflight_precedes_cargo(&output),
-        "coverage preflight must precede Cargo"
-    );
-    for (label, mutated) in coverage_mutations(command)
-        .into_iter()
-        .chain(build_override_mutations(command))
-    {
         assert_ne!(
-            mutated.as_str(),
-            *command,
-            "{label} mutation must change the route"
+            missing, clean,
+            "missing-{} mutation was a no-op",
+            selector.0
+        );
+        assert_ne!(later, clean, "later-{} mutation was a no-op", selector.0);
+        assert!(
+            !development_route_matches(RouteText(&missing), BuildHost::Linux)
+                .expect("read missing selector"),
+            "development route accepted removal of {}",
+            selector.0
         );
         assert!(
-            !coverage_route_matches(&mutated),
-            "accepted {label} route: {mutated}"
-        );
-    }
-}
-
-/// Release invokes Cargo outside the repository with ambient Rust flags cleared.
-#[test]
-fn release_make_route_uses_external_manifest_and_clears_flags() {
-    let output = make_output("release", &["CARGO=probe-cargo"]).expect("evaluate release target");
-    let commands = cargo_lines(&output);
-    assert_eq!(
-        commands.len(),
-        1,
-        "release must invoke one Cargo route: {output}"
-    );
-    let command = commands.first().expect("release command must be present");
-    let manifest = format!("{}/Cargo.toml", env!("CARGO_MANIFEST_DIR"));
-    assert!(
-        release_route_matches(command, &manifest),
-        "wrong release route: {command}"
-    );
-    for selector in PROFILE_BACKEND_SELECTORS {
-        let missing = command.replace(&format!("-u {selector} "), "");
-        let later = command.replace(
-            "RUSTFLAGS=\"",
-            &format!("{selector}=cranelift RUSTFLAGS=\""),
-        );
-        assert_ne!(missing, *command, "missing-{selector} mutation was a no-op");
-        assert_ne!(later, *command, "later-{selector} mutation was a no-op");
-        assert!(
-            !release_route_matches(&missing, &manifest),
-            "accepted missing {selector}"
-        );
-        assert!(
-            !release_route_matches(&later, &manifest),
-            "accepted later {selector}"
+            !development_route_matches(RouteText(&later), BuildHost::Linux)
+                .expect("read later override"),
+            "development route accepted a later {} override",
+            selector.0
         );
     }
 }
@@ -277,7 +223,7 @@ fn release_make_route_uses_external_manifest_and_clears_flags() {
 #[test]
 fn whitaker_route_is_isolated_and_ordered() {
     let leaf = make_output(
-        "lint-whitaker",
+        MakeTarget::LintWhitaker,
         &["WHITAKER=probe-whitaker", "CARGO=probe-cargo"],
     )
     .expect("evaluate Whitaker target");
@@ -296,26 +242,32 @@ fn whitaker_route_is_isolated_and_ordered() {
         .find(|line| line.contains("probe-whitaker --all"))
         .expect("Whitaker command must be present");
     assert!(
-        whitaker_route_matches(command),
+        whitaker_route_matches(RouteText(command)),
         "Whitaker inherited dev flags: {command}"
     );
     for selector in PROFILE_BACKEND_SELECTORS {
-        let missing = command.replace(&format!("-u {selector} "), "");
-        assert_ne!(missing, command, "missing-{selector} mutation was a no-op");
+        let missing = command.replace(&format!("-u {} ", selector.0), "");
+        assert_ne!(
+            missing, command,
+            "missing-{} mutation was a no-op",
+            selector.0
+        );
         assert!(
-            !whitaker_route_matches(&missing),
-            "accepted missing {selector}"
+            !whitaker_route_matches(RouteText(&missing)),
+            "accepted missing {}",
+            selector.0
         );
     }
     for selector in PROFILE_BACKEND_SELECTORS.iter().take(4) {
         let wrong = command.replace(
-            &format!("{selector}=llvm"),
-            &format!("{selector}=cranelift"),
+            &format!("{}=llvm", selector.0),
+            &format!("{}=cranelift", selector.0),
         );
-        assert_ne!(wrong, command, "wrong-{selector} mutation was a no-op");
+        assert_ne!(wrong, command, "wrong-{} mutation was a no-op", selector.0);
         assert!(
-            !whitaker_route_matches(&wrong),
-            "accepted hostile {selector}"
+            !whitaker_route_matches(RouteText(&wrong)),
+            "accepted hostile {}",
+            selector.0
         );
     }
 }
@@ -324,7 +276,7 @@ fn whitaker_route_is_isolated_and_ordered() {
 #[test]
 fn parallel_lint_route_preserves_flags_and_order() {
     let parallel = make_output(
-        "lint",
+        MakeTarget::Lint,
         &[
             "-j",
             "CARGO=probe-cargo",
@@ -333,7 +285,7 @@ fn parallel_lint_route_preserves_flags_and_order() {
         ],
     )
     .expect("evaluate parallel lint target");
-    let cargo_commands = cargo_lines(&parallel);
+    let cargo_commands = cargo_lines(RouteText(&parallel));
     assert_eq!(
         cargo_commands.len(),
         2,
@@ -367,7 +319,8 @@ fn parallel_lint_route_preserves_flags_and_order() {
     );
     for command in cargo_commands {
         assert!(
-            development_route_matches(command, "Linux").expect("read lint flags"),
+            development_route_matches(RouteText(command), BuildHost::Linux)
+                .expect("read lint flags"),
             "lint Cargo invocation lost the standard: {command}"
         );
     }

@@ -42,6 +42,13 @@ older pending run. The coverage action writes the ratchet baseline on pushes to
 `main`; a dispatch can upload coverage but does not write that baseline.
 `tests/codescene_publisher.rs` holds the shape over the committed workflows.
 
+Workflow and build-route contract readers use private types for values with
+distinct meanings, such as a YAML field, job location, or evaluated command.
+Keep those types within the integration-test contract that owns their parser;
+share them only when another concrete caller needs the same interpretation.
+Contract readers verify repository configuration and do not form application
+interfaces.
+
 ## Tooling
 
 Bare Cargo development builds discover `.cargo/config.toml`, which enables the

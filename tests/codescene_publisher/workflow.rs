@@ -145,21 +145,20 @@ fn steps(job: &Value) -> Result<&[Value], String> { sequence(required(job, "step
 
 /// Finds direct calls to an action, such as `generate-coverage`, in normal jobs.
 fn action_step<'a>(document: &'a Value, action: &str) -> Result<Vec<&'a Value>, String> {
-    let mut found = Vec::new();
-    for job in jobs(document)?.values() {
-        if field(job, "uses").is_some() {
-            continue;
-        }
-        for step in steps(job)? {
-            if field(step, "uses")
+    let job_steps = jobs(document)?
+        .values()
+        .filter(|job| field(job, "uses").is_none())
+        .map(steps)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(job_steps
+        .into_iter()
+        .flatten()
+        .filter(|step| {
+            field(step, "uses")
                 .and_then(Value::as_str)
                 .is_some_and(|uses| uses.starts_with(action))
-            {
-                found.push(step);
-            }
-        }
-    }
-    Ok(found)
+        })
+        .collect())
 }
 
 /// Requires exactly one matching action; two uploaders are an error.

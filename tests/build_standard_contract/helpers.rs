@@ -1,6 +1,6 @@
 //! Fallible readers and predicates shared by the Make routing contract tests.
 
-use std::{error::Error, process::Command};
+use std::{error::Error, fmt, process::Command};
 
 use cap_std::{ambient_authority, fs_utf8::Dir};
 
@@ -17,20 +17,145 @@ const LLD_FLAG: &str = "fuse-ld=lld";
 pub(super) const LINUX_TABLES: [&str; 2] =
     ["x86_64-unknown-linux-gnu", "cfg(target_os = \"linux\")"];
 
+/// A shell excerpt emitted by an evaluated Make route.
+#[derive(Clone, Copy)]
+pub(crate) struct RouteText<'a>(pub(super) &'a str);
+
+impl std::ops::Deref for RouteText<'_> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target { self.0 }
+}
+
+impl fmt::Display for RouteText<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self.0, formatter)
+    }
+}
+
+/// A built-in Cargo environment variable selecting a profile backend.
+#[derive(Clone, Copy)]
+pub(super) struct EnvVariable(pub(super) &'static str);
+
 /// Built-in profile selectors that may override a route's codegen backend.
-pub(super) const PROFILE_BACKEND_SELECTORS: [&str; 8] = [
-    "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-    "CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND",
-    "CARGO_PROFILE_TEST_CODEGEN_BACKEND",
-    "CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND",
-    "CARGO_PROFILE_RELEASE_CODEGEN_BACKEND",
-    "CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND",
-    "CARGO_PROFILE_BENCH_CODEGEN_BACKEND",
-    "CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND",
+pub(super) const PROFILE_BACKEND_SELECTORS: [EnvVariable; 8] = [
+    EnvVariable("CARGO_PROFILE_DEV_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_TEST_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_RELEASE_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_BENCH_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND"),
 ];
 
+/// Host categories that affect the development linker flags.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BuildHost {
+    Linux,
+    Other,
+}
+
+/// Make entrypoints exercised by the build-routing contract.
+#[derive(Clone, Copy)]
+pub(super) enum MakeTarget {
+    Build,
+    Test,
+    Typecheck,
+    Clippy,
+    Demo,
+    Coverage,
+    Release,
+    Fmt,
+    CheckFmt,
+    Lint,
+    LintWhitaker,
+}
+
+impl MakeTarget {
+    /// Returns the Make target selected by this case.
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Build => "build",
+            Self::Test => "test",
+            Self::Typecheck => "typecheck",
+            Self::Clippy => "lint-clippy",
+            Self::Demo => "demo",
+            Self::Coverage => "coverage",
+            Self::Release => "release",
+            Self::Fmt => "fmt",
+            Self::CheckFmt => "check-fmt",
+            Self::Lint => "lint",
+            Self::LintWhitaker => "lint-whitaker",
+        }
+    }
+}
+
+/// One expected shell environment assignment used by a route contract.
+#[derive(Clone, Copy)]
+struct EnvAssignment {
+    name: &'static str,
+    value: &'static str,
+}
+
+const COVERAGE_ASSIGNMENTS: [EnvAssignment; 5] = [
+    EnvAssignment {
+        name: "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
+        value: "llvm",
+    },
+    EnvAssignment {
+        name: "CARGO_PROFILE_TEST_CODEGEN_BACKEND",
+        value: "llvm",
+    },
+    EnvAssignment {
+        name: "CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND",
+        value: "llvm",
+    },
+    EnvAssignment {
+        name: "CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND",
+        value: "llvm",
+    },
+    EnvAssignment {
+        name: "CARGO_UNSTABLE_CODEGEN_BACKEND",
+        value: "true",
+    },
+];
+
+const WHITAKER_ASSIGNMENTS: [EnvAssignment; 5] = [
+    EnvAssignment {
+        name: "CARGO_UNSTABLE_CODEGEN_BACKEND",
+        value: "true",
+    },
+    EnvAssignment {
+        name: "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
+        value: "llvm",
+    },
+    EnvAssignment {
+        name: "CARGO_PROFILE_TEST_CODEGEN_BACKEND",
+        value: "llvm",
+    },
+    EnvAssignment {
+        name: "CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND",
+        value: "llvm",
+    },
+    EnvAssignment {
+        name: "CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND",
+        value: "llvm",
+    },
+];
+
+const WHITAKER_UNSET_BACKEND_SELECTORS: [EnvVariable; 4] = [
+    EnvVariable("CARGO_PROFILE_RELEASE_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_BENCH_CODEGEN_BACKEND"),
+    EnvVariable("CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND"),
+];
+
+const ENCODED_FLAGS: EnvVariable = EnvVariable("CARGO_ENCODED_RUSTFLAGS");
+const UNSTABLE_BACKEND: EnvVariable = EnvVariable("CARGO_UNSTABLE_CODEGEN_BACKEND");
+
 /// The result of a fallible contract reader.
-pub(super) type Read<T> = Result<T, Box<dyn Error>>;
+pub(crate) type Read<T> = Result<T, Box<dyn Error>>;
 
 /// Joins `-C value` pairs into `-Cvalue`, so both spellings compare equal.
 fn normalized(flags: &[String]) -> Vec<String> {
@@ -85,19 +210,19 @@ pub(super) fn sources() -> Read<Vec<(String, Vec<String>)>> {
 }
 
 /// Returns evaluated dry-run output with hostile ambient backend overrides.
-pub(super) fn make_output(target: &str, overrides: &[&str]) -> Read<String> {
+pub(super) fn make_output(target: MakeTarget, overrides: &[&str]) -> Read<String> {
     let mut command = Command::new("make");
     command
         .args(["--dry-run", "--always-make"])
         .current_dir(env!("CARGO_MANIFEST_DIR"));
-    command.args(overrides).arg(target).envs([
+    command.args(overrides).arg(target.as_str()).envs([
         ("CARGO_ENCODED_RUSTFLAGS", "-Copt-level=0"),
         ("CARGO_UNSTABLE_CODEGEN_BACKEND", "true"),
     ]);
     for selector in PROFILE_BACKEND_SELECTORS {
-        command.env(selector, "cranelift");
+        command.env(selector.0, "cranelift");
     }
-    if target == "coverage" {
+    if matches!(target, MakeTarget::Coverage) {
         command.envs([
             ("CARGO_PROFILE_DEV_CODEGEN_BACKEND", "cranelift"),
             ("CARGO_PROFILE_TEST_CODEGEN_BACKEND", "cranelift"),
@@ -118,271 +243,15 @@ pub(super) fn make_output(target: &str, overrides: &[&str]) -> Read<String> {
     Ok(String::from_utf8_lossy(&output.stdout).replace("\\\n", " "))
 }
 
-/// Returns logical command lines that invoke the injected Cargo executable.
-pub(super) fn cargo_lines(output: &str) -> Vec<&str> {
-    output
-        .lines()
-        .filter(|line| line.contains("probe-cargo"))
-        .collect()
-}
-
-/// Returns the rustflags assigned to one evaluated Cargo command.
-fn assigned_flags(command: &str) -> Read<Vec<String>> {
-    let (_, rest) = command
-        .split_once("RUSTFLAGS=\"")
-        .ok_or_else(|| format!("Cargo command does not assign RUSTFLAGS: {command}"))?;
-    let (value, _) = rest
-        .split_once('"')
-        .ok_or_else(|| format!("unterminated RUSTFLAGS in `{command}`"))?;
-    let words: Vec<String> = value.split_whitespace().map(str::to_owned).collect();
-    Ok(normalized(&words))
-}
-
-/// Requires one unset of a caller's override before the route assigns flags.
-fn unset_before_flags(command: &str, selector: &str) -> bool {
-    let Some((environment, _)) = command.split_once("RUSTFLAGS=\"") else {
-        return false;
-    };
-    environment
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .windows(2)
-        .filter(|pair| pair.first() == Some(&"-u") && pair.get(1) == Some(&selector))
-        .count()
-        == 1
-}
-
-/// Checks that all Cargo profile backend selectors are isolated from callers.
-fn backend_selectors_unset(command: &str) -> bool {
-    PROFILE_BACKEND_SELECTORS
-        .iter()
-        .all(|selector| unset_before_flags(command, selector))
-}
-
-/// Checks that a development command clears encoded and backend overrides.
-pub(super) fn development_route_matches(command: &str, host: &str) -> Read<bool> {
-    let flags = assigned_flags(command)?;
-    Ok(unset_before_flags(command, "CARGO_ENCODED_RUSTFLAGS")
-        && unset_before_flags(command, "CARGO_UNSTABLE_CODEGEN_BACKEND")
-        && backend_selectors_unset(command)
-        && !PROFILE_BACKEND_SELECTORS
-            .iter()
-            .any(|selector| command.contains(format!("{selector}=").as_str()))
-        && flags.join(" ").contains("-D warnings")
-        && names(&flags, THREADS_FLAG)
-        && names(&flags, MOLD_FLAG) == (host == "Linux"))
-}
-
-/// Checks the explicit LLVM coverage backend and linker exclusion.
-pub(super) fn coverage_route_matches(command: &str) -> bool {
-    let Some((environment, arguments)) = command.split_once("probe-cargo llvm-cov") else {
-        return false;
-    };
-    let has_llvm_backend =
-        single_env_assignment(environment, "CARGO_PROFILE_DEV_CODEGEN_BACKEND", "llvm")
-            && single_env_assignment(environment, "CARGO_PROFILE_TEST_CODEGEN_BACKEND", "llvm")
-            && single_env_assignment(
-                environment,
-                "CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND",
-                "llvm",
-            )
-            && single_env_assignment(
-                environment,
-                "CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND",
-                "llvm",
-            )
-            && single_env_assignment(environment, "CARGO_UNSTABLE_CODEGEN_BACKEND", "true");
-    let has_no_config_override = !arguments
-        .split_whitespace()
-        .any(|argument| argument == "--config" || argument.starts_with("--config="));
-    let clears_encoded = environment.starts_with("env -u CARGO_ENCODED_RUSTFLAGS ")
-        && !environment.contains("CARGO_ENCODED_RUSTFLAGS=");
-    let has_coverage_rustflags = environment.matches("RUSTFLAGS=\"").count() == 1
-        && environment
-            .split_once("RUSTFLAGS=\"")
-            .and_then(|(_, rest)| rest.split_once('"').map(|(flags, _)| flags))
-            .is_some_and(|flags| {
-                flags.contains("-D warnings")
-                    && flags.contains(LLD_FLAG)
-                    && !flags.contains(THREADS_FLAG)
-                    && !flags.contains(MOLD_FLAG)
-            });
-    has_llvm_backend && has_no_config_override && clears_encoded && has_coverage_rustflags
-}
-
-/// Requires one effective pre-Cargo assignment, such as `BACKEND=llvm`.
-fn single_env_assignment(environment: &str, name: &str, value: &str) -> bool {
-    let prefix = format!("{name}=");
-    let expected = format!("{prefix}{value}");
-    let mut assignments = environment
-        .split_whitespace()
-        .filter(|word| word.starts_with(&prefix));
-    assignments.next() == Some(expected.as_str()) && assignments.next().is_none()
-}
-
-/// Mutates each profile's build-script backend and its command-line precedence.
-pub(super) fn build_override_mutations(command: &str) -> Vec<(&'static str, String)> {
-    let mut mutations = Vec::new();
-    for (profile, missing, cranelift, duplicate, config) in [
-        (
-            "DEV",
-            "missing dev build override",
-            "Cranelift dev build override",
-            "later dev build override",
-            "dev build-override config",
-        ),
-        (
-            "TEST",
-            "missing test build override",
-            "Cranelift test build override",
-            "later test build override",
-            "test build-override config",
-        ),
-    ] {
-        let variable = format!("CARGO_PROFILE_{profile}_BUILD_OVERRIDE_CODEGEN_BACKEND");
-        let llvm = format!("{variable}=llvm");
-        let hostile = format!("{variable}=cranelift");
-        mutations.push((missing, command.replace(&format!("{llvm} "), "")));
-        mutations.push((cranelift, command.replace(&llvm, &hostile)));
-        mutations.push((
-            duplicate,
-            command.replace("RUSTFLAGS=\"", &format!("{hostile} RUSTFLAGS=\"")),
-        ));
-        let profile_name = profile.to_ascii_lowercase();
-        let override_arg = format!(
-            "probe-cargo llvm-cov --config \
-             profile.{profile_name}.build-override.codegen-backend=cranelift"
-        );
-        mutations.push((
-            config,
-            command.replace("probe-cargo llvm-cov", &override_arg),
-        ));
-    }
-    mutations
-}
-
-/// Changes one coverage route requirement at a time.
-pub(super) fn coverage_mutations(command: &str) -> [(&'static str, String); 11] {
-    [
-        (
-            "Cranelift backend",
-            command.replace(
-                "CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm",
-                "CARGO_PROFILE_DEV_CODEGEN_BACKEND=cranelift",
-            ),
-        ),
-        (
-            "later backend override",
-            command.replace(
-                "RUSTFLAGS=\"",
-                "CARGO_PROFILE_DEV_CODEGEN_BACKEND=cranelift RUSTFLAGS=\"",
-            ),
-        ),
-        (
-            "missing test backend",
-            command.replace("CARGO_PROFILE_TEST_CODEGEN_BACKEND=llvm ", ""),
-        ),
-        (
-            "Cranelift test backend",
-            command.replace(
-                "CARGO_PROFILE_TEST_CODEGEN_BACKEND=llvm",
-                "CARGO_PROFILE_TEST_CODEGEN_BACKEND=cranelift",
-            ),
-        ),
-        (
-            "later test backend override",
-            command.replace(
-                "RUSTFLAGS=\"",
-                "CARGO_PROFILE_TEST_CODEGEN_BACKEND=cranelift RUSTFLAGS=\"",
-            ),
-        ),
-        (
-            "disabled backend feature",
-            command.replace(
-                "CARGO_UNSTABLE_CODEGEN_BACKEND=true",
-                "CARGO_UNSTABLE_CODEGEN_BACKEND=false",
-            ),
-        ),
-        (
-            "Cargo config override",
-            command.replace(
-                "probe-cargo llvm-cov",
-                "probe-cargo --config profile.dev.codegen-backend=cranelift llvm-cov",
-            ),
-        ),
-        (
-            "test config override",
-            command.replace(
-                "probe-cargo llvm-cov",
-                "probe-cargo llvm-cov --config profile.test.codegen-backend=cranelift",
-            ),
-        ),
-        (
-            "mold linker",
-            command.replace("fuse-ld=lld", "fuse-ld=mold"),
-        ),
-        (
-            "missing encoded-flag guard",
-            command.replace("env -u CARGO_ENCODED_RUSTFLAGS ", ""),
-        ),
-        (
-            "reassigned encoded flags",
-            command.replace("PATH=", "CARGO_ENCODED_RUSTFLAGS=-Zthreads=8 PATH="),
-        ),
-    ]
-}
-
-/// Returns whether the build-tool preflight precedes all Cargo commands.
-pub(super) fn preflight_precedes_cargo(output: &str) -> bool {
-    let Some(preflight) = output.find("scripts/check-build-tools.sh") else {
-        return false;
-    };
-    cargo_lines(output).iter().all(|line| {
-        output
-            .find(line)
-            .is_some_and(|position| preflight < position)
-    })
-}
-
-/// Returns whether a release route selects stable from outside the repository.
-pub(super) fn release_route_matches(command: &str, manifest: &str) -> bool {
-    command.starts_with("(cd / && env -u CARGO_ENCODED_RUSTFLAGS ")
-        && unset_before_flags(command, "CARGO_ENCODED_RUSTFLAGS")
-        && unset_before_flags(command, "CARGO_UNSTABLE_CODEGEN_BACKEND")
-        && backend_selectors_unset(command)
-        && !PROFILE_BACKEND_SELECTORS
-            .iter()
-            .any(|selector| command.contains(format!("{selector}=").as_str()))
-        && command.contains("RUSTFLAGS=\"\" probe-cargo +stable build")
-        && command.contains("--manifest-path")
-        && command.contains(manifest)
-        && command.contains("--release")
-        && command.contains("--bin thysalion")
-        && !command.contains(THREADS_FLAG)
-        && !command.contains(MOLD_FLAG)
-}
-
-/// Checks the isolated LLVM route used by the installer-managed Whitaker suite.
-pub(super) fn whitaker_route_matches(command: &str) -> bool {
-    let Some((environment, _)) = command.split_once("probe-whitaker --all") else {
-        return false;
-    };
-    unset_before_flags(environment, "CARGO_ENCODED_RUSTFLAGS")
-        && backend_selectors_unset(environment)
-        && environment.contains("RUSTFLAGS=\"\"")
-        && single_env_assignment(environment, "CARGO_UNSTABLE_CODEGEN_BACKEND", "true")
-        && [
-            "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-            "CARGO_PROFILE_TEST_CODEGEN_BACKEND",
-            "CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND",
-            "CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND",
-        ]
-        .iter()
-        .all(|selector| single_env_assignment(environment, selector, "llvm"))
-        && PROFILE_BACKEND_SELECTORS
-            .iter()
-            .skip(4)
-            .all(|selector| !environment.contains(format!("{selector}=").as_str()))
-        && !command.contains(THREADS_FLAG)
-        && !command.contains(MOLD_FLAG)
-}
+#[path = "route_matchers.rs"]
+mod route_matchers;
+pub(super) use route_matchers::{
+    build_override_mutations,
+    cargo_lines,
+    coverage_mutations,
+    coverage_route_matches,
+    development_route_matches,
+    preflight_precedes_cargo,
+    release_route_matches,
+    whitaker_route_matches,
+};
