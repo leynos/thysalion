@@ -104,11 +104,15 @@ fn coverage_guard_is_binding(workflow: &str) -> bool {
         })
     });
 
-    directly_before_coverage
-        && uses_coverage_action
-        && is_unconditional
-        && propagates_failure
-        && action_does_not_set_encoded_flags
+    [
+        directly_before_coverage,
+        uses_coverage_action,
+        is_unconditional,
+        propagates_failure,
+        action_does_not_set_encoded_flags,
+    ]
+    .into_iter()
+    .all(|condition| condition)
 }
 
 /// For example, it retains linker and LLVM settings while adding an empty encoded-flags key.

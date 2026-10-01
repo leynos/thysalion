@@ -54,6 +54,13 @@ repository parameter is wrong, `make all` drops the target or CI stops running
 it. The decision is recorded in
 [ADR 007](adr-007-adopt-the-shared-cv005-contract-library.md).
 
+Workflow and build-route contract readers use private types for values with
+distinct meanings, such as a YAML field, job location, or evaluated command.
+Keep those types within the integration-test contract that owns their parser;
+share them only when another concrete caller needs the same interpretation.
+Contract readers verify repository configuration and do not form application
+interfaces.
+
 ## Tooling
 
 Bare Cargo development builds discover `.cargo/config.toml`, which enables the

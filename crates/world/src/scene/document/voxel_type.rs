@@ -150,31 +150,37 @@ pub struct Passability {
 }
 
 impl Passability {
-    /// Every face passable, as air is.
+    /// Creates a value with the same passability on every face.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::scene::document::Passability;
+    ///
+    /// let solid = Passability::closed();
+    /// assert!(!solid.pos_x.is_passable());
+    /// assert!(!solid.neg_z.is_passable());
+    /// ```
     #[must_use]
-    pub const fn open() -> Self {
+    const fn uniform(is_passable: bool) -> Self {
+        let face = FacePassability::new(is_passable);
         Self {
-            pos_x: FacePassability::new(true),
-            neg_x: FacePassability::new(true),
-            pos_y: FacePassability::new(true),
-            neg_y: FacePassability::new(true),
-            pos_z: FacePassability::new(true),
-            neg_z: FacePassability::new(true),
+            pos_x: face,
+            neg_x: face,
+            pos_y: face,
+            neg_y: face,
+            pos_z: face,
+            neg_z: face,
         }
     }
 
+    /// Every face passable, as air is.
+    #[must_use]
+    pub const fn open() -> Self { Self::uniform(true) }
+
     /// No face passable, as a solid block is.
     #[must_use]
-    pub const fn closed() -> Self {
-        Self {
-            pos_x: FacePassability::new(false),
-            neg_x: FacePassability::new(false),
-            pos_y: FacePassability::new(false),
-            neg_y: FacePassability::new(false),
-            pos_z: FacePassability::new(false),
-            neg_z: FacePassability::new(false),
-        }
-    }
+    pub const fn closed() -> Self { Self::uniform(false) }
 
     /// Whether any face admits passage.
     #[must_use]

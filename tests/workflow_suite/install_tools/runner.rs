@@ -1,48 +1,82 @@
 //! Resolve static and matrix workflow runner labels to supported operating systems.
 
-use yaml_rust2::Yaml;
+use yaml_rust2::{Yaml, yaml::Hash};
 
-use super::field;
+use super::{WorkflowField, field};
 
-/// Resolves scalar, sequence, mapping, and one-axis matrix runner forms.
+/// A literal runner label from workflow YAML.
+#[derive(Clone, Copy)]
+struct RunnerLabel<'a>(&'a str);
+
+/// The name of a matrix axis used by a runner expression.
+#[derive(Clone, Copy)]
+struct MatrixAxis<'a>(&'a str);
+
+/// The YAML sequence that supplied a list of runner labels.
+#[derive(Clone, Copy)]
+enum LabelSequence {
+    RunsOn,
+    RunnerLabels,
+}
+
+impl LabelSequence {
+    const fn error(self) -> &'static str {
+        match self {
+            Self::RunsOn => "runs-on sequence has a non-string label",
+            Self::RunnerLabels => "runs-on labels has a non-string value",
+        }
+    }
+}
+
+/// A runner label resolved either literally or from a matrix axis.
+enum ResolvedRunnerLabel {
+    Literal(String),
+    Matrix(Vec<String>),
+}
+
+/// Resolves static, scalar, sequence, mapping, and one-axis matrix runners.
 pub(super) fn runner_systems(job: &Yaml, runs_on: &Yaml) -> Result<bool, String> {
     let labels = runner_labels(runs_on)?;
     let mut static_labels = Vec::new();
     let mut matrix_labels = None;
     for label in labels {
-        let (is_matrix, resolved) = resolve_runner_label(job, label)?;
-        if is_matrix {
-            if matrix_labels.replace(resolved).is_some() {
-                return Err("multiple matrix expressions in runs-on are unsupported".to_owned());
+        match resolve_runner_label(job, label)? {
+            ResolvedRunnerLabel::Literal(literal) => static_labels.push(literal),
+            ResolvedRunnerLabel::Matrix(values) => {
+                if matrix_labels.replace(values).is_some() {
+                    return Err("multiple matrix expressions in runs-on are unsupported".to_owned());
+                }
             }
-        } else {
-            static_labels.push(label.to_owned());
         }
     }
-    let candidates = matrix_labels.unwrap_or_else(|| vec![String::new()]);
-    let mut has_linux = false;
-    for candidate in candidates {
-        let mut candidate_labels = static_labels.clone();
-        if !candidate.is_empty() {
-            candidate_labels.push(candidate);
-        }
-        has_linux |= classify_runner_labels(&candidate_labels)?;
-    }
-    Ok(has_linux)
+    let candidates = matrix_labels.map_or_else(
+        || vec![None],
+        |values| values.into_iter().map(Some).collect(),
+    );
+    candidates
+        .into_iter()
+        .try_fold(false, |has_linux, candidate| {
+            let candidate_labels = candidate.map_or_else(
+                || static_labels.clone(),
+                |label| static_labels.iter().cloned().chain([label]).collect(),
+            );
+            classify_runner_labels(&candidate_labels)
+                .map(|candidate_is_linux| has_linux || candidate_is_linux)
+        })
 }
 
 /// Reads scalar, sequence, and mapping labels without accepting computed shapes.
-fn runner_labels(runs_on: &Yaml) -> Result<Vec<&str>, String> {
+fn runner_labels(runs_on: &Yaml) -> Result<Vec<RunnerLabel<'_>>, String> {
     match runs_on {
-        Yaml::String(label) => Ok(vec![label.as_str()]),
-        Yaml::Array(values) => sequence_labels(values, "runs-on sequence has a non-string label"),
+        Yaml::String(label) => Ok(vec![RunnerLabel(label)]),
+        Yaml::Array(values) => sequence_labels(values, LabelSequence::RunsOn),
         Yaml::Hash(mapping) => mapping_labels(mapping),
         _ => Err("runs-on is neither a scalar, sequence, nor mapping".to_owned()),
     }
 }
 
 /// Reads labels from a runner mapping after validating its supported keys.
-fn mapping_labels(mapping: &yaml_rust2::yaml::Hash) -> Result<Vec<&str>, String> {
+fn mapping_labels(mapping: &Hash) -> Result<Vec<RunnerLabel<'_>>, String> {
     if mapping.keys().any(|key| {
         key.as_str()
             .is_none_or(|name| !["group", "labels"].contains(&name))
@@ -50,129 +84,167 @@ fn mapping_labels(mapping: &yaml_rust2::yaml::Hash) -> Result<Vec<&str>, String>
         return Err("runs-on mapping has unsupported keys".to_owned());
     }
     if mapping
-        .get(&Yaml::String("group".to_owned()))
+        .get(&Yaml::String(WorkflowField::Group.as_str().to_owned()))
         .is_some_and(|group| group.as_str().is_none())
     {
         return Err("runs-on group is not a string".to_owned());
     }
     let labels = mapping
-        .get(&Yaml::String("labels".to_owned()))
+        .get(&Yaml::String(WorkflowField::Labels.as_str().to_owned()))
         .ok_or_else(|| "runs-on mapping has no labels".to_owned())?;
     match labels {
-        Yaml::String(label) => Ok(vec![label.as_str()]),
-        Yaml::Array(values) => sequence_labels(values, "runs-on labels has a non-string value"),
+        Yaml::String(label) => Ok(vec![RunnerLabel(label)]),
+        Yaml::Array(values) => sequence_labels(values, LabelSequence::RunnerLabels),
         _ => Err("runs-on labels is neither a string nor a sequence".to_owned()),
     }
 }
 
-/// Requires every label in a sequence to be a string.
-fn sequence_labels<'a>(values: &'a [Yaml], error: &str) -> Result<Vec<&'a str>, String> {
+/// Requires every label in a runner sequence to be a string.
+fn sequence_labels(values: &[Yaml], source: LabelSequence) -> Result<Vec<RunnerLabel<'_>>, String> {
     values
         .iter()
-        .map(|value| value.as_str().ok_or_else(|| error.to_owned()))
+        .map(|value| {
+            value
+                .as_str()
+                .map(RunnerLabel)
+                .ok_or_else(|| source.error().to_owned())
+        })
         .collect()
 }
 
 /// Resolves a literal runner label or one complete `${{ matrix.axis }}` value.
-fn resolve_runner_label(job: &Yaml, label: &str) -> Result<(bool, Vec<String>), String> {
-    let trimmed = label.trim();
+fn resolve_runner_label(job: &Yaml, label: RunnerLabel<'_>) -> Result<ResolvedRunnerLabel, String> {
+    let trimmed = label.0.trim();
     if !trimmed.contains("${{") {
-        return Ok((false, vec![trimmed.to_owned()]));
+        return Ok(ResolvedRunnerLabel::Literal(trimmed.to_owned()));
     }
     let expression = trimmed
         .strip_prefix("${{")
         .and_then(|value| value.strip_suffix("}}"))
         .map(str::trim)
-        .ok_or_else(|| format!("unsupported runner expression {label:?}"))?;
+        .ok_or_else(|| format!("unsupported runner expression {:?}", label.0))?;
     let axis = expression
         .strip_prefix("matrix.")
         .filter(|name| {
             !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
         })
-        .ok_or_else(|| format!("unsupported runner expression {label:?}"))?;
-    Ok((true, matrix_values(job, axis)?))
+        .ok_or_else(|| format!("unsupported runner expression {:?}", label.0))?;
+    Ok(ResolvedRunnerLabel::Matrix(matrix_values(
+        job,
+        MatrixAxis(axis),
+    )?))
 }
 
 /// Reads literal matrix-axis and include values; excludes are rejected as ambiguous.
-fn matrix_values(job: &Yaml, axis: &str) -> Result<Vec<String>, String> {
-    let matrix = field(job, "strategy")
-        .and_then(|strategy| field(strategy, "matrix"))
-        .and_then(Yaml::as_hash)
-        .ok_or_else(|| format!("matrix.{axis} has no matrix mapping"))?;
-    if matrix.contains_key(&Yaml::String("exclude".to_owned())) {
-        return Err(format!("matrix.{axis} uses unsupported exclusions"));
-    }
-    let mut found = Vec::new();
-    if let Some(axis_values) = matrix.get(&Yaml::String(axis.to_owned())) {
-        let values = axis_values
-            .as_vec()
-            .ok_or_else(|| format!("matrix.{axis} is not a sequence"))?;
-        found.extend(
-            values
-                .iter()
-                .map(|value| {
-                    value
-                        .as_str()
-                        .map(str::to_owned)
-                        .ok_or_else(|| format!("matrix.{axis} has a non-string runner"))
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-        );
-    }
-    if let Some(include) = matrix.get(&Yaml::String("include".to_owned())) {
-        let rows = include
-            .as_vec()
-            .ok_or_else(|| "matrix.include is not a sequence".to_owned())?;
-        for row in rows {
-            if let Some(value) = field(row, axis) {
-                found.push(
-                    value
-                        .as_str()
-                        .ok_or_else(|| format!("matrix.include {axis} is not a string"))?
-                        .to_owned(),
-                );
-            }
-        }
-    }
+fn matrix_values(job: &Yaml, axis: MatrixAxis<'_>) -> Result<Vec<String>, String> {
+    let matrix = matrix_mapping(job, axis)?;
+    let mut found = axis_values(matrix, axis)?;
+    found.extend(included_axis_values(matrix, axis)?);
     if found.is_empty() {
-        return Err(format!("matrix.{axis} has no literal or include values"));
+        return Err(format!(
+            "matrix.{} has no literal or include values",
+            axis.0
+        ));
+    }
+    Ok(found)
+}
+
+fn matrix_mapping<'a>(job: &'a Yaml, axis: MatrixAxis<'_>) -> Result<&'a Hash, String> {
+    let matrix = field(job, WorkflowField::Strategy)
+        .and_then(|strategy| field(strategy, WorkflowField::Matrix))
+        .and_then(Yaml::as_hash)
+        .ok_or_else(|| format!("matrix.{} has no matrix mapping", axis.0))?;
+    if matrix.contains_key(&Yaml::String(WorkflowField::Exclude.as_str().to_owned())) {
+        return Err(format!("matrix.{} uses unsupported exclusions", axis.0));
+    }
+    Ok(matrix)
+}
+
+fn axis_values(matrix: &Hash, axis: MatrixAxis<'_>) -> Result<Vec<String>, String> {
+    let Some(values) = matrix.get(&Yaml::String(axis.0.to_owned())) else {
+        return Ok(Vec::new());
+    };
+    values
+        .as_vec()
+        .ok_or_else(|| format!("matrix.{} is not a sequence", axis.0))?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("matrix.{} has a non-string runner", axis.0))
+        })
+        .collect()
+}
+
+fn included_axis_values(matrix: &Hash, axis: MatrixAxis<'_>) -> Result<Vec<String>, String> {
+    let Some(include) = matrix.get(&Yaml::String(WorkflowField::Include.as_str().to_owned()))
+    else {
+        return Ok(Vec::new());
+    };
+    let rows = include
+        .as_vec()
+        .ok_or_else(|| "matrix.include is not a sequence".to_owned())?;
+    let mut found = Vec::new();
+    for row in rows {
+        if let Some(value) = field(row, WorkflowField::Axis(axis.0)) {
+            found.push(
+                value
+                    .as_str()
+                    .ok_or_else(|| format!("matrix.include {} is not a string", axis.0))?
+                    .to_owned(),
+            );
+        }
     }
     Ok(found)
 }
 
 /// Classifies one runner label set, rejecting sets without a known OS label.
 fn classify_runner_labels(labels: &[String]) -> Result<bool, String> {
-    let mut detected = None;
-    for label in labels {
-        let normalized = label.to_ascii_lowercase();
-        let current = if is_linux_label(&normalized) {
-            Some(true)
-        } else if is_non_linux_label(&normalized) {
-            Some(false)
-        } else {
-            None
-        };
-        if let Some(is_linux) = current {
-            if detected.is_some_and(|prior| prior != is_linux) {
-                return Err(format!("conflicting runner OS labels: {labels:?}"));
-            }
-            detected = Some(is_linux);
-        }
-    }
+    let detected = labels
+        .iter()
+        .filter_map(|label| runner_os(RunnerLabel(label)))
+        .try_fold(None, |detected, current| {
+            merge_runner_os(detected, current, labels)
+        })?;
     detected.ok_or_else(|| format!("runner labels do not identify an OS: {labels:?}"))
 }
 
+fn merge_runner_os(
+    detected: Option<bool>,
+    current: bool,
+    labels: &[String],
+) -> Result<Option<bool>, String> {
+    match detected {
+        Some(previous) if previous != current => {
+            Err(format!("conflicting runner OS labels: {labels:?}"))
+        }
+        _ => Ok(Some(current)),
+    }
+}
+
+fn runner_os(label: RunnerLabel<'_>) -> Option<bool> {
+    let normalized = label.0.to_ascii_lowercase();
+    if is_linux_label(RunnerLabel(&normalized)) {
+        Some(true)
+    } else if is_non_linux_label(RunnerLabel(&normalized)) {
+        Some(false)
+    } else {
+        None
+    }
+}
+
 /// Identifies Linux runner labels accepted by the workflow contract.
-fn is_linux_label(label: &str) -> bool {
-    label == "linux"
+fn is_linux_label(label: RunnerLabel<'_>) -> bool {
+    label.0 == "linux"
         || ["linux-", "ubuntu", "debian"]
             .iter()
-            .any(|prefix| label.starts_with(prefix))
+            .any(|prefix| label.0.starts_with(prefix))
 }
 
 /// Identifies supported runners that must not count as Linux suite routes.
-fn is_non_linux_label(label: &str) -> bool {
+fn is_non_linux_label(label: RunnerLabel<'_>) -> bool {
     ["windows", "win-", "macos", "mac-", "darwin", "freebsd"]
         .iter()
-        .any(|prefix| label.starts_with(prefix))
+        .any(|prefix| label.0.starts_with(prefix))
 }
