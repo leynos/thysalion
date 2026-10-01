@@ -22,6 +22,9 @@ ignore = [
   '`color`',
   # A path to a serde_json trait, quoted in the scene-format execplan.
   '`serde_json::ser::Formatter`',
+  # Tokio's runtime-selection attribute argument, quoted in the rstest-bdd
+  # user's guide.
+  '`#\[tokio::test\(flavor = "current_thread"\)\]`',
 ]
 
 [files]

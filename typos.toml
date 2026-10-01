@@ -35,6 +35,7 @@ extend-ignore-re = [
     "Center \\| Microsoft Learn",
     "GitHub\\s+Flavored\\s+Markdown\\b(?:\\s\\(GFM\\))?",
     "\\brust-analyzer\\b",
+    "`#\\[tokio::test\\(flavor = \"current_thread\"\\)\\]`",
     "`color`",
     "`serde_json::ser::Formatter`",
     "game engine for modeling",
