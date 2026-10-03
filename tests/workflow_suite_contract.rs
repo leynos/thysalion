@@ -1,4 +1,4 @@
-//! Contract test that each pull request runs the test suite once.
+//! Contract tests for the CI build-test job's required steps.
 //!
 //! `make test` runs the suite with `--all-targets --all-features` and then
 //! the doctests. The coverage step in `ci.yml`'s `build-test` job runs the
@@ -13,9 +13,8 @@
 //! - no workflow line runs the suite, in any spelling of `make test`, `make all`, a bare `make`,
 //!   `cargo test`, `cargo nextest` or `cargo llvm-cov`, whatever the options or separators around
 //!   it, except the one doctest step;
-//! - that doctest step is in `build-test` and carries no `if:`; the job skips same-repository
-//!   pull-request events because the head push already ran, while pushes and fork pull requests
-//!   still run it;
+//! - that doctest step is in `build-test` and carries no step-level `if:`; the unguarded job runs
+//!   on pushes and pull requests, so it checks branch heads and pull-request merge commits;
 //! - `build-test` runs the coverage action in one unguarded step, and no workflow turns on its
 //!   doctests;
 //! - the coverage steps in `ci.yml` and `coverage-main.yml` pass every declared feature, so `make

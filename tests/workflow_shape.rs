@@ -198,20 +198,15 @@ fn ci_keeps_one_run_per_ref() {
 }
 
 #[test]
-fn ci_skips_the_redundant_pull_request_run_for_same_repository_branches() {
-    // A same-repository pull request's head push already ran this workflow, so
-    // its pull_request event carries no new information. Required status
-    // checks match on job name regardless of the triggering event, so the
-    // push-triggered run on the same head commit satisfies the check.
+fn ci_runs_build_test_for_pull_request_merge_results() {
+    // A push checks the branch head, while the pull_request event checks the
+    // synthetic merge commit. Skipping the latter can let an unchecked merge
+    // result satisfy required status checks.
     let workflow = ci_workflow();
     let jobs = top_level_block(&workflow, "jobs").expect("ci.yml must declare jobs");
     let job = child_block(&jobs, 2, "build-test").expect("ci.yml must declare a build-test job");
-    let guard = child_block(&job, 4, "if").expect("the build-test job must carry a guard");
-    let condition = guard.split_whitespace().collect::<Vec<&str>>().join(" ");
-    assert_eq!(
-        condition,
-        "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != \
-         github.repository",
-        "the guard must skip same-repository pull requests and still run fork ones"
+    assert!(
+        child_block(&job, 4, "if").is_none(),
+        "build-test must run on pull_request merge commits as well as pushes"
     );
 }

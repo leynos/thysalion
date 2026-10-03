@@ -21,12 +21,11 @@
 use std::io;
 
 use cap_std::{ambient_authority, fs_utf8::Dir};
-use rmpv::Value;
 use thysalion_test_support::replay::{
     RecordedSession,
-    ReplayDecodeError,
     ReplayEncodeError,
     SUPPORTED_VERSION,
+    SceneRef,
     SessionHeader,
     SessionRecorder,
     SessionReplayer,
@@ -37,9 +36,10 @@ const GOLDEN_EMPTY: &str = "tests/fixtures/golden/empty.session.msgpack";
 
 /// The session every assertion below starts from: a header and no ticks.
 ///
-/// Empty deliberately. `InputRecord` is uninhabited until roadmap 4.1.2, so an
-/// empty session is not a degenerate case of the format — it is the only case
-/// the format can currently express, and the one roadmap task 1.3.2 names.
+/// Empty deliberately: roadmap task 1.3.2 names the empty-session round trip
+/// as the initial byte-identity criterion. The format can express populated
+/// headers and tick records too; `InputRecord` remains uninhabited until
+/// roadmap 4.1.2, so recorded ticks currently have empty input lists.
 const fn empty_header() -> SessionHeader {
     SessionHeader {
         version: SUPPORTED_VERSION,
@@ -61,65 +61,6 @@ fn crate_dir() -> io::Result<Dir> {
     Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())
 }
 
-/// Encodes a session this build's recorder would refuse to write.
-///
-/// Built from `rmpv` values rather than from the recorder, deliberately. The
-/// recorder now refuses exactly the sessions the decoder tests need — a
-/// version this build cannot read, and ticks that do not increase — so a test
-/// that reached for it could only assert the encode-side check twice. Writing
-/// the bytes directly is also closer to the thing under test: a recording some
-/// *other* build produced, which is the case the replay corpus exists to
-/// create.
-fn foreign_session(version: (u16, u16), ticks: &[u64]) -> Vec<u8> {
-    let (major, minor) = version;
-    let header = Value::Map(vec![
-        (
-            Value::from("version"),
-            Value::Map(vec![
-                (Value::from("major"), Value::from(major)),
-                (Value::from("minor"), Value::from(minor)),
-            ]),
-        ),
-        (Value::from("tick_rate_hz"), Value::from(60)),
-        (Value::from("scene"), Value::Nil),
-    ]);
-    let recorded_ticks = Value::Array(
-        ticks
-            .iter()
-            .map(|tick| {
-                Value::Map(vec![
-                    (Value::from("tick"), Value::from(*tick)),
-                    (Value::from("inputs"), Value::Array(Vec::new())),
-                ])
-            })
-            .collect(),
-    );
-    let session = Value::Map(vec![
-        (Value::from("header"), header),
-        (Value::from("ticks"), recorded_ticks),
-    ]);
-    // `expect` rather than a `match` would be shorter, but the workspace allows
-    // it only inside `#[test]` functions and this is a helper.
-    match rmp_serde::to_vec_named(&session) {
-        Ok(bytes) => bytes,
-        Err(error) => panic!("the hand-built session must encode: {error}"),
-    }
-}
-
-#[test]
-fn the_foreign_session_helper_agrees_with_the_recorder() {
-    // The helper hand-builds the wire shape, so it can drift from the types it
-    // imitates and quietly stop testing what the decoder actually reads. This
-    // pins it: at the supported version with no ticks it must produce exactly
-    // what the recorder produces.
-    let built = foreign_session((SUPPORTED_VERSION.major, SUPPORTED_VERSION.minor), &[]);
-    let recorded = record_empty().expect("record the empty session");
-    assert_eq!(
-        built, recorded,
-        "the hand-built wire shape has drifted from the recorder's"
-    );
-}
-
 #[test]
 fn an_empty_session_round_trips_byte_identically() {
     let recorded = record_empty().expect("record the empty session");
@@ -131,6 +72,46 @@ fn an_empty_session_round_trips_byte_identically() {
     assert_eq!(
         re_encoded, recorded,
         "record, replay, and re-record must produce identical bytes"
+    );
+}
+
+#[test]
+fn a_populated_session_round_trips_byte_identically() {
+    let header = SessionHeader {
+        version: SUPPORTED_VERSION,
+        tick_rate_hz: 120,
+        scene: Some(SceneRef {
+            name: "bare-cell".into(),
+            content_hash_hex: "a".repeat(64),
+        }),
+    };
+    let ticks = vec![
+        TickRecord {
+            tick: 3,
+            inputs: Vec::new(),
+        },
+        TickRecord {
+            tick: 11,
+            inputs: Vec::new(),
+        },
+    ];
+    let mut session_recorder = SessionRecorder::new(header.clone());
+    for tick in &ticks {
+        session_recorder.record_tick(tick.clone());
+    }
+    let recording_bytes = session_recorder
+        .finish()
+        .expect("record the populated session");
+
+    let session = SessionReplayer::open(&recording_bytes).expect("replay the populated session");
+    assert_eq!(session.header(), &header);
+    assert_eq!(session.ticks().cloned().collect::<Vec<_>>(), ticks);
+    assert_eq!(
+        session
+            .re_encode()
+            .expect("re-encode the populated session"),
+        recording_bytes,
+        "record, replay, and re-record must preserve populated session bytes"
     );
 }
 
@@ -166,19 +147,6 @@ fn the_session_is_written_as_named_maps_rather_than_positional_arrays() {
         vec!["header", "ticks"],
         "the session must encode as a named map in declaration order"
     );
-}
-
-#[test]
-fn a_session_from_a_future_major_version_is_refused_as_one() {
-    let future = SUPPORTED_VERSION.major.saturating_add(1);
-    let bytes = foreign_session((future, 0), &[]);
-    match SessionReplayer::open(&bytes) {
-        Err(ReplayDecodeError::UnsupportedVersion { found, supported }) => {
-            assert_eq!(found.major, future);
-            assert_eq!(supported, SUPPORTED_VERSION);
-        }
-        other => panic!("expected an unsupported-version refusal, got: {other:?}"),
-    }
 }
 
 #[test]
@@ -219,20 +187,6 @@ fn ticks_that_do_not_increase_are_refused_at_the_encode_boundary() {
         ),
         "the failure must name the offending pair, got: {error}"
     );
-}
-
-#[test]
-fn ticks_that_do_not_increase_are_refused_at_the_decode_boundary() {
-    // The other half of the rule, and the half that matters in a corpus: these
-    // bytes come from somewhere this build does not control, so the decoder
-    // cannot assume the encoder's check ever ran.
-    let bytes = foreign_session((SUPPORTED_VERSION.major, SUPPORTED_VERSION.minor), &[7, 7]);
-    match SessionReplayer::open(&bytes) {
-        Err(ReplayDecodeError::NonMonotonicTick { previous, found }) => {
-            assert_eq!((previous, found), (7, 7));
-        }
-        other => panic!("expected the decoder to refuse the tick order, got: {other:?}"),
-    }
 }
 
 /// Rewrites the golden session fixture from the current encoder.

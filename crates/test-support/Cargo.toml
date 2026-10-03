@@ -30,12 +30,14 @@ thysalion-harness = { workspace = true, optional = true }
 thysalion-world = { workspace = true }
 
 [dev-dependencies]
+proptest = { workspace = true }
 # `with-serde` is required for `rmpv::Value` to implement `Deserialize`; the
 # wire-shape assertion decodes the encoder's output into it.
 rmpv = { workspace = true }
 rstest = { workspace = true }
 rstest-bdd = { workspace = true }
 rstest-bdd-macros = { workspace = true }
+trybuild = { workspace = true }
 
 [lints]
 workspace = true

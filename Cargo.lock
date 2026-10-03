@@ -5025,6 +5025,7 @@ dependencies = [
  "bevy",
  "camino",
  "cap-std 4.0.2",
+ "proptest",
  "rmp-serde",
  "rmpv",
  "rstest",
@@ -5036,6 +5037,7 @@ dependencies = [
  "thiserror 2.0.19",
  "thysalion-harness",
  "thysalion-world",
+ "trybuild",
 ]
 
 [[package]]

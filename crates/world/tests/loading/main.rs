@@ -327,13 +327,17 @@ fn given_named_fixture(#[from(rstest_bdd_harness_context)] session: &mut LoaderS
 #[when("each fixture scene is loaded from disk")]
 fn when_each_fixture_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
     for name in FIXTURE_NAMES {
-        session.load_fixture(name);
+        if let Err(error) = session.load_fixture(name) {
+            panic!("failed to load fixture {name} from disk: {error}");
+        }
     }
 }
 
 #[when("the fixture is loaded from disk")]
 fn when_fixture_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    session.load_fixture("keep-interior");
+    if let Err(error) = session.load_fixture("keep-interior") {
+        panic!("failed to load keep-interior from disk: {error}");
+    }
 }
 
 #[then("every fixture scene loads")]
