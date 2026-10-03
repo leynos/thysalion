@@ -4,12 +4,11 @@
 //! `thysalion-world` has no Bevy dependency at this phase and ADR 005 stages
 //! one in later, so hosting these scenarios in an app would put the whole
 //! render feature set into the state plane's graph to satisfy a test harness.
-//! The adapter is deliberately the same *shape* as the Bevy one in
-//! `crates/harness/tests/headless/support.rs`, so roadmap step 1.3.1 can
-//! promote both into one shared test-support crate — the promotion point the
-//! developers' guide already names.
+//! This module is therefore on the crate's *default-feature* path: consumers
+//! that want an app opt into the `bevy` feature and
+//! `BevyHarness` instead, which is deliberately the same shape.
 
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::fs_utf8::Dir;
@@ -57,14 +56,14 @@ impl LoaderSession {
     /// the *committed artefacts* load, which an in-memory copy of them could
     /// not: it would prove the constructor agrees with itself.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics when `assets/scenes` is missing, which is a broken checkout.
-    pub fn load_fixture(&mut self, name: &str) {
-        let directory = crate::scenes::scene_dir();
-        let Ok(replica) = directory.try_clone() else {
-            panic!("the fixture directory must be cloneable");
-        };
+    /// Returns filesystem I/O errors when the fixture directory cannot be
+    /// opened or cloned, or when a referenced resource cannot be read.
+    pub fn load_fixture(&mut self, name: &str) -> io::Result<()> {
+        self.document = None;
+        let directory = crate::scenes::scene_dir()?;
+        let replica = directory.try_clone()?;
         let loader = SceneLoader::new(Arc::new(DirSceneSource::new(
             directory,
             crate::scenes::SCENES,
@@ -72,10 +71,11 @@ impl LoaderSession {
         let path = Utf8PathBuf::from(format!("{name}.scene.json"));
         let outcome = loader.load(&path);
         if let Ok(loaded) = outcome.as_ref() {
+            self.adopt_resources(loaded, &replica)?;
             self.document = Some(loaded.scene.to_document());
-            self.adopt_resources(loaded, &replica);
         }
         self.fixtures.push((name.to_owned(), outcome));
+        Ok(())
     }
 
     /// Copies a loaded fixture's knowledge resources into the in-memory source.
@@ -85,13 +85,12 @@ impl LoaderSession {
     /// re-encoded document fails the resource check and the scenario reports a
     /// missing TriG file when what it was testing was the encoding. Copying
     /// them keeps the round-trip scenario about the round trip.
-    fn adopt_resources(&mut self, loaded: &LoadedScene, directory: &Dir) {
+    fn adopt_resources(&mut self, loaded: &LoadedScene, directory: &Dir) -> io::Result<()> {
         for source in loaded.scene.knowledge().sources() {
-            let Ok(bytes) = directory.read(source) else {
-                panic!("a loaded fixture's resources must still be readable: {source}");
-            };
+            let bytes = directory.read(source)?;
             self.source.insert(source, bytes);
         }
+        Ok(())
     }
 
     /// The document a `Given` step selected.
@@ -100,6 +99,7 @@ impl LoaderSession {
     ///
     /// Panics when no `Given` step ran, which is a malformed scenario rather
     /// than a runtime condition.
+    #[must_use]
     pub fn document(&self) -> &SceneDocument {
         // `expect` rather than a `let ... else` would be shorter, but the
         // workspace allows it only inside `#[test]` functions, and a
@@ -145,6 +145,7 @@ impl LoaderSession {
     /// # Panics
     ///
     /// Panics when the last load failed or no load ran.
+    #[must_use]
     pub fn loaded(&self) -> &LoadedScene {
         match self.outcome.as_ref() {
             Some(Ok(loaded)) => loaded,
@@ -158,6 +159,7 @@ impl LoaderSession {
     /// # Panics
     ///
     /// Panics when the last load succeeded or no load ran.
+    #[must_use]
     pub fn diagnostics(&self) -> &[thysalion_world::scene::validation::SceneDiagnostic] {
         match self.outcome.as_ref() {
             Some(Err(SceneLoadError::Invalid { diagnostics, .. })) => diagnostics,
@@ -180,5 +182,75 @@ impl HarnessAdapter for LoaderHarness {
 
     fn run<T>(&self, request: ScenarioRunRequest<'_, Self::Context, T>) -> HarnessResult<T> {
         Ok(request.run(LoaderSession::new()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Regression coverage for the session's own state transitions, as
+    //! distinct from the loading behaviour the behavioural suite in
+    //! `crates/world/tests/loading/` covers. What is tested here is what a
+    //! *scenario* would otherwise observe only indirectly: that a failed
+    //! fixture load leaves no stale selection behind for the next step to
+    //! assert against.
+
+    use std::sync::Arc;
+
+    use camino::Utf8PathBuf;
+    use cap_std::{ambient_authority, fs_utf8::Dir};
+    use thysalion_world::{loader::SceneLoader, source::DirSceneSource};
+
+    use super::LoaderSession;
+
+    #[test]
+    fn a_failed_fixture_load_clears_the_previously_selected_document() {
+        // The scenario this guards: two fixture loads in one session, the
+        // second failing. Without the clear, `document()` would hand back the
+        // first fixture's document and every later assertion would quietly
+        // test the wrong scene.
+        let mut session = LoaderSession::new();
+        session
+            .load_fixture("bare-cell")
+            .expect("load the shipped fixture");
+        assert!(
+            session.document.is_some(),
+            "a shipped fixture must select a document"
+        );
+
+        session
+            .load_fixture("no-such-fixture")
+            .expect("record the missing fixture outcome");
+        assert!(
+            session.document.is_none(),
+            "a failed load must leave no document selected"
+        );
+        assert_eq!(
+            session.fixtures.len(),
+            2,
+            "both attempts must be recorded, successful or not"
+        );
+    }
+
+    #[test]
+    fn a_fixture_resource_copy_failure_is_returned() {
+        let directory = crate::scenes::scene_dir().expect("open the fixture directory");
+        let loader = SceneLoader::new(Arc::new(DirSceneSource::new(
+            directory,
+            crate::scenes::SCENES,
+        )));
+        let loaded_scene = loader
+            .load(&Utf8PathBuf::from("keep-interior.scene.json"))
+            .expect("load the fixture before copying its resources");
+        let crate_directory =
+            Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())
+                .expect("open the crate root, which does not contain the fixture resource");
+        let mut session = LoaderSession::new();
+
+        assert!(
+            session
+                .adopt_resources(&loaded_scene, &crate_directory)
+                .is_err(),
+            "resource-copy I/O failures must be returned to the caller"
+        );
     }
 }

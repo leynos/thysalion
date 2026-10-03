@@ -102,14 +102,30 @@ This step answers whether the invariant-based verification strategy can run
 without a GPU or a window from day one, which decides how much of the design's
 verification programme is continuously enforced. See thysalion-design.md §14.
 
-- [ ] 1.3.1. Wire headless Bevy test scaffolding into CI.
+- [x] 1.3.1. Wire headless Bevy test scaffolding into CI.
   - MinimalPlugins app construction, fixture-scene loading, and the
     diagnostics counters exposed for assertions.
+  - The scaffolding existed in duplicate before this step: one
+    `rstest-bdd` harness adapter per consuming crate's `tests/` tree, and
+    no test that combined an app with a loaded scene. Both adapters are now
+    promoted into `thysalion-test-support` (`crates/test-support/`), and a
+    behavioural scenario there builds a `MinimalPlugins` harness app, loads
+    the `bare-cell` fixture into it, and asserts against the harness's
+    registered diagnostics — the task's three clauses in one test.
+  - `ci.yml` gained a push trigger covering every branch, alongside the
+    retained pull-request trigger for fork contributions; a concurrency
+    group and a same-repository guard keep it to one run per event.
+    `tests/workflow_shape.rs` asserts that shape.
   - Success: a trivial headless behavioural test loads a fixture scene in
     CI on every push.
-- [ ] 1.3.2. Build the deterministic replay harness skeleton.
+- [x] 1.3.2. Build the deterministic replay harness skeleton.
   - Record and replay input-record sequences against whatever simulation
     exists; storage format versioned from the start.
+  - The envelope only, deliberately: `thysalion_test_support::replay`
+    defines a versioned session header and a stream of tick-stamped
+    records whose payload enum is uninhabited, so no speculative input
+    vocabulary reaches the wire before roadmap 4.1.2 defines the circuit
+    boundary. See adr-007-replay-record-format.md.
   - See thysalion-design.md §14 (I1).
   - Success: recording and replaying an empty session is byte-identical;
     the harness is invoked from CI.
