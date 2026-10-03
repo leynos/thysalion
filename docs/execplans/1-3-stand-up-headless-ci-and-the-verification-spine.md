@@ -201,7 +201,7 @@ quality criteria.
   keep both triggers and run `build-test` for both event types, with no
   same-repository PR skip. Keep the workflow/ref concurrency group to cancel
   superseded runs on the same ref; push and pull-request refs remain separate.
-  The workflow-shape test asserts the trigger and job behavior, including that
+  The workflow-shape test asserts the trigger and job behaviour, including that
   same-repository pull requests retain merge-result coverage.
 - Risk: the shared `generate-coverage` action (invoked with
   `with-ratchet: 'true'`) may assume pull-request context — a base ref to diff
@@ -641,8 +641,8 @@ through the pinned `leynos/shared-actions` `generate-coverage` action),
 `coverage-main.yml` (push-to-main coverage upload), and `release.yml` (tag
 builds). Root-level `tests/workflow_shape.rs` asserts release-build scoping and
 40-hex SHA pinning for the three workflows. The former `act-validation.yml` was
-removed from `main` in `e60bb75`; its `WITH_ACT=1` behavior above is historical
-context. The Makefile's `test` target runs
+removed from `main` in `e60bb75`; its `WITH_ACT=1` behaviour above is
+historical context. The Makefile's `test` target runs
 `cargo nextest run --workspace --all-targets --all-features` with warnings
 denied, then doctests.
 
