@@ -7,6 +7,8 @@
 //! there is one statement of where the fixtures live and one place that takes
 //! ambient filesystem authority.
 
+use std::io;
+
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::fs_utf8::Dir;
 
@@ -62,25 +64,20 @@ pub fn repository_root() -> Utf8PathBuf {
 /// point of `cap_std` is that a reader can see the whole filesystem surface a
 /// module touches by reading one function (AGENTS.md).
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics when `assets/scenes` is missing, which is a broken checkout or a
-/// tree nobody has run `make scenes` in. See the crate-level documentation for
-/// why that is a panic rather than a `Result`.
+/// Returns the directory-open error when `assets/scenes` cannot be opened.
 ///
 /// # Examples
 ///
 /// ```
 /// use thysalion_test_support::scenes;
 ///
-/// let fixtures = scenes::scene_dir();
-/// assert!(fixtures.read("bare-cell.scene.json").is_ok());
+/// let fixtures = scenes::scene_dir()?;
+/// let _scene = fixtures.read("bare-cell.scene.json")?;
+/// # Ok::<(), std::io::Error>(())
 /// ```
-#[must_use]
-pub fn scene_dir() -> Dir {
+pub fn scene_dir() -> io::Result<Dir> {
     let root = repository_root().join(SCENES);
-    match Dir::open_ambient_dir(&root, cap_std::ambient_authority()) {
-        Ok(directory) => directory,
-        Err(error) => panic!("the fixture scenes must exist at {root}: {error}"),
-    }
+    Dir::open_ambient_dir(&root, cap_std::ambient_authority())
 }

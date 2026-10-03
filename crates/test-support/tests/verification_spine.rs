@@ -47,8 +47,12 @@ fn given_headless_app(#[from(rstest_bdd_harness_context)] app: &mut App) {
 
 #[when("the bare-cell fixture scene is loaded into the app")]
 fn when_fixture_loaded(#[from(rstest_bdd_harness_context)] app: &mut App) {
+    let fixture_directory = match scenes::scene_dir() {
+        Ok(directory) => directory,
+        Err(error) => panic!("failed to open the fixture scenes for bare-cell: {error}"),
+    };
     let loader = SceneLoader::new(Arc::new(DirSceneSource::new(
-        scenes::scene_dir(),
+        fixture_directory,
         scenes::SCENES,
     )));
     let path = Utf8PathBuf::from("bare-cell.scene.json");

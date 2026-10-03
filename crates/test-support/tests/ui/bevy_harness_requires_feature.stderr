@@ -1,0 +1,13 @@
+error[E0432]: unresolved import `thysalion_test_support::BevyHarness`
+ --> tests/ui/bevy_harness_requires_feature.rs:1:5
+  |
+1 | use thysalion_test_support::BevyHarness;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `BevyHarness` in the root
+  |
+note: found an item that was configured out
+ --> src/lib.rs
+  |
+  | #[cfg(feature = "bevy")]
+  |       ---------------- the item is gated behind the `bevy` feature
+  | pub use bevy_harness::BevyHarness;
+  |                       ^^^^^^^^^^^

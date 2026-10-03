@@ -57,11 +57,11 @@ pub enum ReplayEncodeError {
         /// The offending tick.
         found: u64,
     },
-    /// The header declares a version this build cannot read back.
+    /// The header declares a version other than [`SUPPORTED_VERSION`].
     ///
-    /// A recorder that writes a version its own decoder refuses produces a
-    /// corpus entry nothing can read — the worst outcome available to a format
-    /// whose whole purpose is that recordings outlive the build that made them.
+    /// The writer serializes the current schema and has no version-specific
+    /// down-converter, so claiming another version would mislabel the fields
+    /// and variants in the recording.
     #[error("cannot record a session declaring version {found}; this build writes {supported}")]
     UnsupportedVersion {
         /// The version the header declares.
@@ -120,11 +120,11 @@ fn first_non_increasing(ticks: &[TickRecord]) -> Option<(u64, u64)> {
 ///
 /// Both of the format's rules are checked here rather than at the call sites,
 /// so the recorder and the re-encoder cannot drift about what they enforce.
-/// The version check is the same range test the decoder applies, not an
-/// equality test: recording at an older minor is a legitimate compatibility
-/// choice, while recording at a version this build could not read back is not.
+/// The header must name the schema this build serializes. Without a
+/// version-specific down-converter, an older version number would mislabel
+/// fields or input variants written by the current schema.
 fn encode(document: &SessionDocument) -> Result<Vec<u8>, ReplayEncodeError> {
-    if !SUPPORTED_VERSION.accepts(document.header.version) {
+    if document.header.version != SUPPORTED_VERSION {
         return Err(ReplayEncodeError::UnsupportedVersion {
             found: document.header.version,
             supported: SUPPORTED_VERSION,
@@ -166,10 +166,12 @@ fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, ReplayDecod
 
 /// Accumulates a session's ticks and encodes them.
 ///
-/// Ticks must be recorded in strictly increasing order. [`Self::record_tick`]
-/// stays infallible so a recording loop reads as a loop; the ordering rule is
-/// checked once, at [`Self::finish`], where a violation can be reported
-/// without the caller having to handle a `Result` on every tick.
+/// The header must declare [`SUPPORTED_VERSION`], because the writer serializes
+/// this build's schema and has no version-specific down-converter. Ticks must
+/// be recorded in strictly increasing order. [`Self::record_tick`] stays
+/// infallible so a recording loop reads as a loop; the ordering rule is checked
+/// once, at [`Self::finish`], where a violation can be reported without the
+/// caller having to handle a `Result` on every tick.
 ///
 /// # Examples
 ///
@@ -255,7 +257,7 @@ impl SessionRecorder {
     /// # Errors
     ///
     /// Returns [`ReplayEncodeError::UnsupportedVersion`] when the header
-    /// declares a version this build could not read back,
+    /// declares a version other than [`SUPPORTED_VERSION`],
     /// [`ReplayEncodeError::NonMonotonicTick`] when the recorded ticks do not
     /// strictly increase, and [`ReplayEncodeError::Encode`] when the underlying
     /// encoder fails.

@@ -26,22 +26,17 @@
 //!   targets need it and it drives public crate surface. A helper that a single suite uses stays in
 //!   that suite's `tests/` tree.
 //!
-//! # Failures panic, and that is the contract
+//! # Failure boundaries
 //!
-//! Outwith the [`replay`] module, this crate panics on failure rather than
-//! returning a `Result`: a missing `assets/scenes`, an unreadable fixture, a
-//! document that will not encode. Each such function documents the condition
-//! under a `# Panics` heading.
+//! Fixture directory and resource I/O failures propagate from the public
+//! helpers as `io::Result`. At `rstest-bdd` step boundaries, whose functions
+//! return `()`, callers handle those errors with context so a failed operation
+//! still reports which fixture or resource could not be loaded.
 //!
-//! That is deliberate, and it is a statement about who the caller is. Every
-//! caller here is a test, and each of these conditions is a broken checkout or
-//! a malformed scenario rather than a runtime state a test could sensibly
-//! handle. A `Result` would reach a step function that has no recovery
-//! available and no way to report one — `rstest-bdd` step functions return
-//! `()` — so it would be unwrapped at the call site, one line further from the
-//! cause, and the workspace lint table denies `unwrap` and `expect` outwith
-//! `#[test]` functions anyway. The panic message is the failure report, and it
-//! names the fixture, the path, or the encoder error that caused it.
+//! Other failures can still panic: malformed scenario misuse and failed
+//! encoding or semantic assertions indicate invalid test setup or a violated
+//! test contract. The relevant functions document those conditions under a
+//! `# Panics` heading.
 //!
 //! [`replay`] is the exception, and the boundary is meaningful: a recording is
 //! *data*, frequently written by a different build, so a decode failure is an

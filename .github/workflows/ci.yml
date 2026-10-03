@@ -20,16 +20,6 @@ concurrency:
 
 jobs:
   build-test:
-    # Same-repository pull requests already ran on their head push, so the
-    # pull_request event carries no new information and is skipped. Fork pull
-    # requests generate no push event here and must run.
-    #
-    # Note for reviewers: required status checks match on job name regardless
-    # of the triggering event, so the push-triggered run on the same head
-    # commit satisfies the check. Do not "fix" this skip.
-    if: >-
-      github.event_name != 'pull_request'
-      || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
