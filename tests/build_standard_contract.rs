@@ -296,4 +296,10 @@ fn the_ci_doctest_step_restates_both_flags() {
         names(&flags, MOLD_FLAG),
         "the doctest step drops {MOLD_FLAG}: {flags:?}"
     );
+    let denies_warnings =
+        names(&flags, "-Dwarnings") || flags.windows(2).any(|pair| pair == ["-D", "warnings"]);
+    assert!(
+        denies_warnings,
+        "the doctest step stops denying warnings: {flags:?}"
+    );
 }
