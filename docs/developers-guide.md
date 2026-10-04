@@ -73,6 +73,14 @@ falls back to the `ld.lld` every rustup toolchain ships. Set
 `COVERAGE_CODEGEN_BACKEND` or `COVERAGE_LLD_DIR` to opt out on a host whose own
 toolchain already works.
 
+CI runs the doctests outside the Makefile, in a standalone `Run doctests` step
+of `ci.yml` that calls `cargo test --doc` directly, so the Makefile's
+`STANDARD_RUSTFLAGS` cannot reach it. The step therefore assigns its own
+`RUSTFLAGS` with the frontend flag, the Linux linker flag and `-D warnings`,
+because an assigned `RUSTFLAGS` replaces every `rustflags` source in
+`.cargo/config.toml`. `tests/build_standard_contract.rs` reads that step,
+scoped to the step itself, and fails if any of the three is dropped.
+
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
 
