@@ -17,6 +17,8 @@ repository = "https://github.com/leynos/thysalion"
 [workspace.dependencies]
 thysalion-presentation = { path = "crates/presentation" }
 thysalion-harness = { path = "crates/harness" }
+thysalion-world = { path = "crates/world" }
+thysalion-test-support = { path = "crates/test-support" }
 bevy = { version = "0.19", default-features = false, features = [
   "default_app",
   "std",

@@ -1,4 +1,4 @@
-//! Contract test that each pull request runs the test suite once.
+//! Contract tests for the CI build-test job's required steps.
 //!
 //! `make test` runs the suite with `--all-targets --all-features` and then
 //! the doctests. The coverage step in `ci.yml`'s `build-test` job runs the
@@ -13,7 +13,8 @@
 //! - no workflow line runs the suite, in any spelling of `make test`, `make all`, a bare `make`,
 //!   `cargo test`, `cargo nextest` or `cargo llvm-cov`, whatever the options or separators around
 //!   it, except the one doctest step;
-//! - that doctest step is in `build-test`, and neither the job nor the step carries an `if:`;
+//! - that doctest step is in `build-test` and carries no step-level `if:`; the unguarded job runs
+//!   on pushes and pull requests, so it checks branch heads and pull-request merge commits;
 //! - `build-test` runs the coverage action in one unguarded step, and no workflow turns on its
 //!   doctests;
 //! - the coverage steps in `ci.yml` and `coverage-main.yml` pass every declared feature, so `make
@@ -121,48 +122,34 @@ fn only_the_doctest_step_runs_the_suite_outside_coverage() {
     );
 }
 
-#[test]
-fn build_test_runs_the_doctests_unconditionally() {
-    let found = workflows().expect("failed to read the workflows");
-    let job = suite_job(&found).expect("ci.yml must define build-test");
-    assert!(
-        !job.is_conditional(),
-        "{SUITE_JOB} must run on every pull request"
-    );
-    let doctest = Command::from_line(DOCTEST_COMMAND);
-    let steps: Vec<_> = job
-        .steps()
-        .into_iter()
-        .filter(|step| step.runs(doctest))
-        .collect();
-    assert_eq!(
-        steps.len(),
-        1,
-        "{SUITE_JOB} must run the doctests in one step"
-    );
-    assert!(
-        !steps.iter().any(reading::Step::is_conditional),
-        "the doctest step must always run"
-    );
+#[derive(Clone, Copy, Debug)]
+enum RequiredSuiteStep {
+    Doctests,
+    Coverage,
 }
 
-#[test]
-fn build_test_runs_coverage_unconditionally() {
+#[rstest]
+#[case::doctests(RequiredSuiteStep::Doctests)]
+#[case::coverage(RequiredSuiteStep::Coverage)]
+fn build_test_runs_required_step_unconditionally(#[case] required_step: RequiredSuiteStep) {
     let found = workflows().expect("failed to read the workflows");
     let job = suite_job(&found).expect("ci.yml must define build-test");
     let steps: Vec<_> = job
         .steps()
         .into_iter()
-        .filter(|step| step.uses(COVERAGE_ACTION))
+        .filter(|step| match required_step {
+            RequiredSuiteStep::Doctests => step.runs(Command::from_line(DOCTEST_COMMAND)),
+            RequiredSuiteStep::Coverage => step.uses(COVERAGE_ACTION),
+        })
         .collect();
     assert_eq!(
         steps.len(),
         1,
-        "{SUITE_JOB} must run the coverage action once"
+        "{required_step:?} must match exactly one step in {SUITE_JOB}"
     );
     assert!(
-        !steps.iter().any(reading::Step::is_conditional),
-        "coverage must always run"
+        steps.first().is_some_and(|step| !step.is_conditional()),
+        "{required_step:?} step must carry no step-level `if:`"
     );
 }
 
@@ -198,7 +185,7 @@ fn manifest_features_are_read(#[case] text: &str, #[case] expected: &[&str]) {
 }
 
 /// The features the coverage steps pass, which must be every declared one.
-const COVERAGE_FEATURES: &str = "thysalion-demos/demo-empty";
+const COVERAGE_FEATURES: &str = "thysalion-demos/demo-empty,thysalion-test-support/bevy";
 
 /// The workflows whose coverage step must pass the features.
 const COVERAGE_WORKFLOWS: [&str; 2] = ["ci.yml", "coverage-main.yml"];
@@ -228,10 +215,7 @@ fn workspace_features() -> std::io::Result<Vec<String>> {
 
 #[test]
 fn coverage_enables_every_declared_feature() {
-    let mut passed: Vec<String> = COVERAGE_FEATURES
-        .split_whitespace()
-        .map(str::to_owned)
-        .collect();
+    let mut passed: Vec<String> = COVERAGE_FEATURES.split(',').map(str::to_owned).collect();
     passed.sort();
     assert_eq!(
         workspace_features().expect("failed to read the workspace manifests"),

@@ -1,9 +1,10 @@
 //! Behavioural specification for scene loading (roadmap task 1.2.2).
 //!
 //! Scenarios live in `tests/features/scene_loading.feature`. Steps receive a
-//! [`support::LoaderSession`] through the reserved `rstest_bdd_harness_context`
-//! fixture; the adapter builds one per scenario, so a failed load in one
-//! scenario cannot reach another.
+//! [`LoaderSession`] — promoted into `thysalion-test-support` at roadmap step
+//! 1.3.1 — through the reserved `rstest_bdd_harness_context` fixture; the
+//! adapter builds one per scenario, so a failed load in one scenario cannot
+//! reach another.
 //!
 //! Corrupt documents are derived here by mutating the minimal document rather
 //! than being read from disk. That guarantees the corruption is the *only*
@@ -12,19 +13,13 @@
 //! `tests/fixtures/corrupt/` serve a different purpose: they pin the rendered
 //! diagnostic report, one file per corruption class.
 
-mod support;
-
 #[path = "../support/mod.rs"]
 mod fixtures;
 
-#[path = "../support/scenes.rs"]
-mod scenes;
-
 use fixtures::minimal_document;
 use rstest_bdd_macros::{given, scenario, then, when};
-use scenes::FIXTURE_NAMES;
 use smol_str::SmolStr;
-use support::{LoaderHarness, LoaderSession};
+use thysalion_test_support::{LoaderHarness, LoaderSession, scenes::FIXTURE_NAMES};
 use thysalion_world::{
     codec::Encoding,
     scene::{
@@ -178,12 +173,15 @@ fn when_minimal_loaded_after(#[from(rstest_bdd_harness_context)] session: &mut L
 
 #[then("loading succeeds")]
 fn then_succeeds(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    let _ = session.loaded();
+    // Named rather than a wildcard binding: `loaded` is `#[must_use]`, and the
+    // value is genuinely unused here — the assertion is that the accessor did
+    // not panic, which is where the diagnostic report comes from.
+    let _loaded = session.loaded();
 }
 
 #[then("loading fails")]
 fn then_fails(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    let _ = session.diagnostics();
+    let _diagnostics = session.diagnostics();
 }
 
 #[then("the scene reports 3 palette entries")]
@@ -329,13 +327,17 @@ fn given_named_fixture(#[from(rstest_bdd_harness_context)] session: &mut LoaderS
 #[when("each fixture scene is loaded from disk")]
 fn when_each_fixture_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
     for name in FIXTURE_NAMES {
-        session.load_fixture(name);
+        if let Err(error) = session.load_fixture(name) {
+            panic!("failed to load fixture {name} from disk: {error}");
+        }
     }
 }
 
 #[when("the fixture is loaded from disk")]
 fn when_fixture_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    session.load_fixture("keep-interior");
+    if let Err(error) = session.load_fixture("keep-interior") {
+        panic!("failed to load keep-interior from disk: {error}");
+    }
 }
 
 #[then("every fixture scene loads")]
