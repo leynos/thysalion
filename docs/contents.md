@@ -24,6 +24,9 @@ documentation set.
 - [ADR 006: the scene document model](adr-006-scene-document-model.md)
   records the two-stage document/domain scene model, the canonical byte form,
   and the compatibility policy for scene documents.
+- [ADR 007: adopt the shared CV-005 contract library](adr-007-adopt-the-shared-cv005-contract-library.md)
+  records the move from a local copy of the CV-005 contract to the pinned
+  shared check.
 - [World plane architecture](world-plane-architecture.md) documents the
   `thysalion-world` crate's module tree, the `SceneSource` port, reading a
   diagnostic report, the scene format reference, and the version-history table.
