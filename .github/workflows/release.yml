@@ -110,7 +110,7 @@ jobs:
       - uses: actions/download-artifact@484a0b528fb4d7bd804637ccb632e47a0e638317
         with:
           path: artifacts
-      - uses: softprops/action-gh-release@403a5240f3837fa857f642062e05aad6bb3391ca
+      - uses: softprops/action-gh-release@b5a645e6d7f681d09866ab86ba7918b222989555
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
