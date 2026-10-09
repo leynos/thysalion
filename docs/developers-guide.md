@@ -41,7 +41,18 @@ publisher is never cancelled, and a newer trigger replaces an older pending
 run, so the newest trigger's run is the one that publishes. A merge made by the
 Dependabot automerge workflow's `GITHUB_TOKEN` fires no push event, so it
 publishes nothing until a dispatch from `main` or the next push.
-`tests/codescene_publisher.rs` holds the shape over the committed workflows.
+`make test-workflow-contracts` holds this shape by running
+`cv005-contracts check`, the shared contract library in `leynos/shared-actions`
+(`packages/cv005-contracts`), from the full commit named by
+`CV005_CONTRACTS_REF` in the Makefile; CI runs it in a "Check the CV-005
+contracts" step and `make all` includes it. A fix to a rule reaches this
+repository as a pin bump. The target needs `uv`, which fetches the Python 3.13
+the library runs under, and `.github/cv005.toml` holds the repository's only
+parameter. [`tests/cv005_wiring.rs`](../tests/cv005_wiring.rs) fails if the pin
+is not a full commit, the target stops running the pinned checker, the
+repository parameter is wrong, `make all` drops the target or CI stops running
+it. The decision is recorded in
+[ADR 007](adr-007-adopt-the-shared-cv005-contract-library.md).
 
 ## Tooling
 
