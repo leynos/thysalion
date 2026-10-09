@@ -44,7 +44,7 @@ jobs:
         with:
           globs: '**/*.md'
       - name: Setup uv
-        uses: astral-sh/setup-uv@c6081965dd0577ae48820cb8c288e12509571f0c
+        uses: astral-sh/setup-uv@b06acff4b6a41bdd9cdac56507ead0bd7734e757
       - name: Check the CV-005 contracts
         run: make test-workflow-contracts
       - name: Check spelling
