@@ -115,8 +115,11 @@ fn json_re_encoding_reproduces_the_same_messagepack_bytes() {
     let indirect = encode_document(&via_json, Encoding::MessagePack).expect("re-encode");
     assert_eq!(
         direct, indirect,
-        "a document round-tripped through JSON must re-encode to identical MessagePack bytes, or \
-         the phase-8 content hash is not well defined"
+        concat!(
+            "a document round-tripped through JSON must re-encode to identical MessagePack bytes, \
+             or ",
+            "the phase-8 content hash is not well defined"
+        )
     );
 }
 

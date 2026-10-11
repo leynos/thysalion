@@ -511,6 +511,15 @@ the index-to-face mapping and offers no way to notice when one does not;
 lille's equivalent used a dictionary keyed by unit-normal strings with no
 completeness guarantee, and was never implemented.
 
+In the Rust scene-document API, each field is a `FacePassability`: a domain
+marker owned by `thysalion-world::scene::document` for voxel-face passage. Its
+scope is those six fields; it is not a general wrapper for unrelated boolean
+properties. `Passability` composes exactly one value for each named face, with
+`open` and `closed` constructors for uniform values. Rust callers convert
+booleans to the marker when constructing scene-document values and inspect them
+with `is_passable`. Serde converts transparently at the wire boundary,
+preserving the six flat boolean fields in JSON and the scene schema.
+
 `slope` is a closed set of four compass directions plus `Flat`, rather than an
 `IVec2`. A vector admits meaningless values such as `(7, -3)` that validation
 would then have to reject, and the set of meaningful ones is small and fixed.

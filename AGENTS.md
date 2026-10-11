@@ -317,3 +317,83 @@ project:
 ## Markdown guidance
 
 - Validate Markdown files using `make markdownlint`.
+- Run `make fmt` after any documentation changes to format all Markdown
+  files and fix table markup.
+- Validate Mermaid diagrams in Markdown files by running `make nixie`.
+- Markdown paragraphs and bullet points must be wrapped at 80 columns.
+- Code blocks must be wrapped at 120 columns.
+- Tables and headings must not be wrapped.
+- Use dashes (`-`) for list bullets.
+- Use GitHub-flavoured Markdown footnotes (`[^1]`) for references and
+  footnotes.
+
+<!-- typos-config-builder:agents-md:start -->
+
+## Spelling
+
+- `make spelling` runs the pinned `typos-config-builder gate`, which
+  regenerates `typos.toml` from the shared en-GB-oxendict dictionary and
+  `typos.local.toml`, then checks spelling and the shared phrase corrections.
+- `typos.toml` is generated: never edit it by hand. Put narrow
+  repository-specific exceptions in `typos.local.toml`, as exact or full-line
+  patterns rather than bare accepted words.
+- When `make spelling` changes `typos.toml`, commit the regenerated file. If
+  the change is unrelated to your work, commit it in a separate base pull
+  request and stack your branch on it, so each review diff stays focused.
+
+<!-- typos-config-builder:agents-md:end -->
+
+## Project documentation
+
+Record design decisions in the design document. Where a decision is
+substantive, record it in an ADR document following the documentation style
+guide, then reference that ADR from the design document.
+
+Update `docs/users-guide.md` for any change to application behaviour or user
+interface that a user should know about. Document internally facing interfaces
+or practices in the relevant component architecture document. Document
+internally facing conventions or practices in `docs/developers-guide.md`.
+
+## Additional tooling
+
+The following tooling is available in this environment:
+
+- `mbake` — A Makefile validator. Run using `mbake validate Makefile`.
+- `strace` — Traces system calls and signals made by a process; useful for
+  debugging runtime behaviour and syscalls.
+- `gdb` — The GNU Debugger, for inspecting and controlling programs as they
+  execute (or post-mortem via core dumps).
+- `ripgrep` — Fast, recursive text search tool (`grep` alternative) that
+  respects `.gitignore` files.
+- `ltrace` — Traces calls to dynamic library functions made by a process.
+- `valgrind` — Suite for detecting memory leaks, profiling, and debugging
+  low-level memory errors.
+- `bpftrace` — High-level tracing tool for eBPF, using a custom scripting
+  language for kernel and application tracing.
+- `lsof` — Lists open files and the processes using them.
+- `htop` — Interactive process viewer (visual upgrade to `top`).
+- `iotop` — Displays and monitors I/O usage by processes.
+- `ncdu` — NCurses-based disk usage viewer for finding large files/folders.
+- `tree` — Displays directory structure as a tree.
+- `bat` — `cat` clone with syntax highlighting, Git integration, and paging.
+- `delta` — Syntax-highlighted pager for Git and diff output.
+- `tcpdump` — Captures and analyses network traffic at the packet level.
+- `nmap` — Network scanner for host discovery, port scanning, and service
+  identification.
+- `lldb` — LLVM debugger, alternative to `gdb`.
+- `eza` — Modern `ls` replacement with more features and better defaults.
+- `fzf` — Interactive fuzzy finder for selecting files, commands, etc.
+- `hyperfine` — Command-line benchmarking tool with statistical output.
+- `shellcheck` — Linter for shell scripts, identifying errors and bad practices.
+- `fd` — Fast, user-friendly `find` alternative with sensible defaults.
+- `checkmake` — Linter for `Makefile`s, ensuring they follow best practices and
+  conventions.
+- `srgn` — [Structural grep](https://github.com/alexpovel/srgn), searches code
+  and enables editing by syntax tree patterns.
+- `difft` **(Difftastic)** — Semantic diff tool that compares code structure
+  rather than just text differences.
+
+## Key takeaway
+
+These practices help maintain a high-quality codebase and facilitate
+collaboration.

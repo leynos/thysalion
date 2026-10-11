@@ -82,6 +82,7 @@ categories = ["game"]
 [dev-dependencies]
 cap-std = { workspace = true }
 camino = { workspace = true }
+proptest = { workspace = true }
 rstest = { workspace = true }
 yaml-rust2 = "0.11.1"
 toml = "1.1.3"

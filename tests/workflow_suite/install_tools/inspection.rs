@@ -112,7 +112,7 @@ fn classify_step(
     match (run, uses) {
         (Some(_), Some(_)) => Err(format!("{location} has both run and uses")),
         (Some(command), None) => classify_run_step(step, job, WorkflowCommand(command), location),
-        (None, Some(action)) if action.starts_with("./") => {
+        (None, Some(action)) if action.starts_with("./") || action.starts_with("$/") => {
             Err(format!("{location} local action unresolved"))
         }
         (None, Some(action)) => Ok(StepRoute {

@@ -4,6 +4,8 @@ use std::{collections::BTreeSet, fmt};
 
 use yaml_rust2::{Yaml, YamlLoader};
 
+#[path = "install_tools/properties.rs"]
+mod properties;
 #[path = "install_tools/runner.rs"]
 mod runner;
 #[path = "install_tools/tests.rs"]

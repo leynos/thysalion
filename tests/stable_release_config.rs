@@ -86,8 +86,11 @@ fn configuration_names_no_codegen_backend_while_releases_build_on_stable() {
     let workflow = read(".github/workflows/release.yml").expect("read release.yml");
     assert!(
         release_builds_on_stable(&workflow),
-        "release.yml's cross build no longer runs on +stable; revisit the Cranelift exception and \
-         this test"
+        concat!(
+            "release.yml's cross build no longer runs on +stable; revisit the Cranelift exception \
+             and ",
+            "this test"
+        )
     );
     let text = read(".cargo/config.toml").expect("read .cargo/config.toml");
     let config: toml::Value = toml::from_str(&text).expect("parse .cargo/config.toml");

@@ -19,12 +19,17 @@ fn bounds() -> ZoomBounds {
     clippy::float_arithmetic,
     reason = "epsilon comparison is inherently floating point"
 )]
+#[track_caller]
 fn assert_close(actual: f32, expected: f32) {
     assert!(
         (actual - expected).abs() < f32::EPSILON,
         "{actual} should equal {expected}"
     );
 }
+
+#[test]
+#[should_panic(expected = "1 should equal 2")]
+fn close_assertion_reports_both_values() { assert_close(1.0, 2.0); }
 
 #[rstest]
 #[case(Quadrant::NorthEast, Quadrant::SouthEast)]

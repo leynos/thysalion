@@ -60,12 +60,17 @@ fn a_json_error_entry_carries_its_class_and_section() {
 
 #[test]
 fn stats_are_null_rather_than_absent_when_not_asked_for() {
-    // Present and null, so a consumer never has to ask whether the key exists.
-    // Deserializing into a typed shape is what makes this an assertion at all:
-    // a renamed field fails to parse, whereas a `Value` lookup would read as
-    // absent and pass.
+    // An Option field deserializes both a missing member and JSON null as None,
+    // so inspect the wire shape before checking the typed consumer view.
     let source = source_with(&minimal_document()).expect("minimal fixture must encode");
     let outcome = check(source, options(|o| o.format = OutputFormat::Json));
+    let json: serde_json::Value =
+        serde_json::from_str(&outcome.output).expect("report must be valid JSON");
+    assert_eq!(
+        json.get("stats"),
+        Some(&serde_json::Value::Null),
+        "stats must be present and null when not requested"
+    );
     let report = parse_report(&outcome.output).expect("report must parse as JSON");
     assert_eq!(
         report.stats, None,

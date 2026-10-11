@@ -1,7 +1,8 @@
 //! CI doctest flags cannot borrow another workflow step's environment.
 
 use cap_std::{ambient_authority, fs::Dir};
-use super::helpers::{normalized, names, THREADS_FLAG, MOLD_FLAG};
+
+use super::helpers::{MOLD_FLAG, THREADS_FLAG, names, normalized};
 
 /// Returns the `RUSTFLAGS` a named workflow step assigns.
 ///
@@ -26,12 +27,20 @@ fn step_rustflags(workflow: &str, name: &str) -> Option<String> {
 /// A later step assigning `RUSTFLAGS` must not be read as the named step's.
 #[test]
 fn a_step_does_not_borrow_a_later_steps_rustflags() {
-    let workflow = "  steps:\n    - name: First\n      run: true\n    - name: Second\n      \
-                    env:\n        RUSTFLAGS: -Zthreads=8\n";
-    assert_eq!(step_rustflags(workflow, "First"), None);
+    let workflow = concat!(
+        "  steps:\n",
+        "    - name: First\n      run: true\n",
+        "    - name: Second\n      env:\n        RUSTFLAGS: -Zthreads=8\n",
+    );
+    assert_eq!(
+        step_rustflags(workflow, "First"),
+        None,
+        "the first step cannot borrow later flags"
+    );
     assert_eq!(
         step_rustflags(workflow, "Second").as_deref(),
-        Some("-Zthreads=8")
+        Some("-Zthreads=8"),
+        "the second step retains its own flags"
     );
 }
 

@@ -75,12 +75,12 @@ development flags and warnings policy. The build-routing contracts cover direct
 Cargo defaults and the evaluated Make recipes.
 
 On Linux, run `make install-build-tools` to install the pinned `mold` 2.41.0
-binary and the required components for `nightly-2026-05-28`, including
-`rustfmt`, `clippy`, `llvm-tools-preview`, and `rust-analyzer`. Install clang
-separately, then run `make check-build-tools` to verify the prerequisites.
-Build, test, lint, coverage, typecheck, and demo targets run the preflight
-before compiling. The installer skips Linux-specific linker setup on other
-platforms.
+binary and the components listed for the pinned toolchain in
+`rust-toolchain.toml`, including `rustfmt`, `clippy`, `llvm-tools-preview`, and
+`rust-analyzer`. Install clang separately, then run `make check-build-tools` to
+verify the prerequisites. Build, test, lint, coverage, typecheck, and demo
+targets run the preflight before compiling. The installer skips Linux-specific
+linker setup on other platforms.
 
 Coverage and Whitaker use explicit LLVM routing. Coverage replaces the
 development linker flags with `lld` and sets LLVM for dev, test, and build
@@ -130,9 +130,10 @@ Caused by:
 ```
 
 Accordingly, `.cargo/config.toml` names no backend and development builds use
-LLVM on the pinned `nightly-2026-05-28`. `tests/stable_release_config.rs` fails
-if a `codegen-backend` key returns while releases build on stable. Revisit the
-exception if releases move to the pinned nightly.
+LLVM on the nightly toolchain pinned in `rust-toolchain.toml`.
+`tests/stable_release_config.rs` fails if a `codegen-backend` key returns while
+releases build on stable. Revisit the exception if releases move to the pinned
+nightly.
 
 ## Lint baseline
 
@@ -160,6 +161,22 @@ Fix findings at source. Never add `#[allow]`. Use `#[expect]` only for
 macro-expansion artefacts or floating-point arithmetic, with a reason. The
 `allow-expect-in-tests` setting applies to recognized ordinary `#[test]` and
 `#[rstest]` bodies; fixtures, BDD steps and helpers remain fallible.
+
+## Scene document API
+
+`FacePassability` marks a boolean as the passability of one named voxel face.
+It is part of `thysalion-world::scene::document` and is used only by the six
+fields of `Passability`; do not reuse it for unrelated boolean values.
+Construct face values from booleans at the scene-document boundary with
+`FacePassability::from` (or `FacePassability::new`) and read them with
+`is_passable`. `Passability::open` and `Passability::closed` provide uniform
+values for all six faces.
+
+Rust consumers that previously assigned boolean literals directly to
+`Passability` fields must convert each value to `FacePassability`. This changes
+the Rust source API only: the transparent representation keeps `pos_x`, `neg_x`,
+`pos_y`, `neg_y`, `pos_z`, and `neg_z` as six flat booleans in JSON and the
+scene schema. The scene format version does not change.
 
 ## Demo harness
 

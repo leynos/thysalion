@@ -119,9 +119,15 @@ fn a_malformed_document_still_renders_parseable_json() {
 fn a_valid_scene_reports_no_failure() {
     let source = source_with(&minimal_document()).expect("minimal fixture must encode");
     let outcome = check(source, options(|o| o.format = OutputFormat::Json));
-    // Present and null rather than absent, for the reason `stats` is: a
-    // consumer that must test for a key's existence reads `undefined` as a
-    // value one refactor later.
+    // An Option field deserializes both a missing member and JSON null as None,
+    // so inspect the wire shape before checking the typed consumer view.
+    let json: serde_json::Value =
+        serde_json::from_str(&outcome.output).expect("report must be valid JSON");
+    assert_eq!(
+        json.get("failure"),
+        Some(&serde_json::Value::Null),
+        "failure must be present and null for a valid scene"
+    );
     let report = parse_report(&outcome.output).expect("valid report must parse as JSON");
     assert!(
         report.failure.is_none(),

@@ -68,3 +68,19 @@ fn unprovable_suite_routes_fail_closed(#[case] route: &str) {
     let error = inspect_routing(&source).expect_err("unprovable suite route must fail");
     assert!(error.contains("suite command is unresolved"), "{error}");
 }
+
+#[rstest]
+#[case::relative("./.github/actions/local")]
+#[case::dollar_slash("$/.github/actions/local")]
+fn local_action_routes_fail_closed(#[case] action: &str) {
+    let source = MINIMAL_INSTALL_ROUTING.replace(
+        "        run: make test\n",
+        &format!("        uses: {action}\n"),
+    );
+    assert_ne!(
+        source, MINIMAL_INSTALL_ROUTING,
+        "local action mutation must change the fixture"
+    );
+    let error = inspect_routing(&source).expect_err("local action route must fail closed");
+    assert!(error.contains("local action unresolved"), "{error}");
+}
