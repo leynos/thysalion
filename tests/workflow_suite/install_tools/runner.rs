@@ -1,4 +1,5 @@
 //! Resolve static and matrix workflow runner labels to supported operating systems.
+//! Matrix lookup keeps its validated axis and mapping together in a parser-local context.
 
 use yaml_rust2::{Yaml, yaml::Hash};
 
@@ -11,6 +12,84 @@ struct RunnerLabel<'a>(&'a str);
 /// The name of a matrix axis used by a runner expression.
 #[derive(Clone, Copy)]
 struct MatrixAxis<'a>(&'a str);
+
+/// A parser-local context for one validated matrix and runner axis.
+struct MatrixRunners<'matrix, 'axis> {
+    /// The validated workflow matrix mapping.
+    matrix: &'matrix Hash,
+    /// The axis whose values select runner labels.
+    axis: MatrixAxis<'axis>,
+}
+
+impl<'matrix, 'axis> MatrixRunners<'matrix, 'axis> {
+    /// Validates a job's matrix mapping and retains the requested axis.
+    fn new(job: &'matrix Yaml, axis: MatrixAxis<'axis>) -> Result<Self, String> {
+        let matrix = field(job, WorkflowField::Strategy)
+            .and_then(|strategy| field(strategy, WorkflowField::Matrix))
+            .and_then(Yaml::as_hash)
+            .ok_or_else(|| format!("matrix.{} has no matrix mapping", axis.0))?;
+        if matrix.contains_key(&Yaml::String(WorkflowField::Exclude.as_str().to_owned())) {
+            return Err(format!("matrix.{} uses unsupported exclusions", axis.0));
+        }
+        Ok(Self { matrix, axis })
+    }
+
+    /// Reads axis values followed by matching included values, preserving order.
+    fn values(&self) -> Result<Vec<String>, String> {
+        let mut found = self.axis_values()?;
+        found.extend(self.included_axis_values()?);
+        if found.is_empty() {
+            return Err(format!(
+                "matrix.{} has no literal or include values",
+                self.axis.0
+            ));
+        }
+        Ok(found)
+    }
+
+    /// Reads the literal values declared for the selected matrix axis.
+    fn axis_values(&self) -> Result<Vec<String>, String> {
+        let Some(values) = self.matrix.get(&Yaml::String(self.axis.0.to_owned())) else {
+            return Ok(Vec::new());
+        };
+        values
+            .as_vec()
+            .ok_or_else(|| format!("matrix.{} is not a sequence", self.axis.0))?
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("matrix.{} has a non-string runner", self.axis.0))
+            })
+            .collect()
+    }
+
+    /// Reads matching runner values from matrix include rows.
+    fn included_axis_values(&self) -> Result<Vec<String>, String> {
+        let Some(include) = self
+            .matrix
+            .get(&Yaml::String(WorkflowField::Include.as_str().to_owned()))
+        else {
+            return Ok(Vec::new());
+        };
+        let rows = include
+            .as_vec()
+            .ok_or_else(|| "matrix.include is not a sequence".to_owned())?;
+        let mut found = Vec::new();
+        for row in rows {
+            if let Some(value) = field(row, WorkflowField::Axis(self.axis.0)) {
+                found.push(
+                    value
+                        .as_str()
+                        .ok_or_else(|| format!("matrix.include {} is not a string", self.axis.0))?
+                        .to_owned(),
+                );
+            }
+        }
+        Ok(found)
+    }
+}
 
 /// The YAML sequence that supplied a list of runner labels.
 #[derive(Clone, Copy)]
@@ -129,74 +208,8 @@ fn resolve_runner_label(job: &Yaml, label: RunnerLabel<'_>) -> Result<ResolvedRu
             !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
         })
         .ok_or_else(|| format!("unsupported runner expression {:?}", label.0))?;
-    Ok(ResolvedRunnerLabel::Matrix(matrix_values(
-        job,
-        MatrixAxis(axis),
-    )?))
-}
-
-/// Reads literal matrix-axis and include values; excludes are rejected as ambiguous.
-fn matrix_values(job: &Yaml, axis: MatrixAxis<'_>) -> Result<Vec<String>, String> {
-    let matrix = matrix_mapping(job, axis)?;
-    let mut found = axis_values(matrix, axis)?;
-    found.extend(included_axis_values(matrix, axis)?);
-    if found.is_empty() {
-        return Err(format!(
-            "matrix.{} has no literal or include values",
-            axis.0
-        ));
-    }
-    Ok(found)
-}
-
-fn matrix_mapping<'a>(job: &'a Yaml, axis: MatrixAxis<'_>) -> Result<&'a Hash, String> {
-    let matrix = field(job, WorkflowField::Strategy)
-        .and_then(|strategy| field(strategy, WorkflowField::Matrix))
-        .and_then(Yaml::as_hash)
-        .ok_or_else(|| format!("matrix.{} has no matrix mapping", axis.0))?;
-    if matrix.contains_key(&Yaml::String(WorkflowField::Exclude.as_str().to_owned())) {
-        return Err(format!("matrix.{} uses unsupported exclusions", axis.0));
-    }
-    Ok(matrix)
-}
-
-fn axis_values(matrix: &Hash, axis: MatrixAxis<'_>) -> Result<Vec<String>, String> {
-    let Some(values) = matrix.get(&Yaml::String(axis.0.to_owned())) else {
-        return Ok(Vec::new());
-    };
-    values
-        .as_vec()
-        .ok_or_else(|| format!("matrix.{} is not a sequence", axis.0))?
-        .iter()
-        .map(|value| {
-            value
-                .as_str()
-                .map(str::to_owned)
-                .ok_or_else(|| format!("matrix.{} has a non-string runner", axis.0))
-        })
-        .collect()
-}
-
-fn included_axis_values(matrix: &Hash, axis: MatrixAxis<'_>) -> Result<Vec<String>, String> {
-    let Some(include) = matrix.get(&Yaml::String(WorkflowField::Include.as_str().to_owned()))
-    else {
-        return Ok(Vec::new());
-    };
-    let rows = include
-        .as_vec()
-        .ok_or_else(|| "matrix.include is not a sequence".to_owned())?;
-    let mut found = Vec::new();
-    for row in rows {
-        if let Some(value) = field(row, WorkflowField::Axis(axis.0)) {
-            found.push(
-                value
-                    .as_str()
-                    .ok_or_else(|| format!("matrix.include {} is not a string", axis.0))?
-                    .to_owned(),
-            );
-        }
-    }
-    Ok(found)
+    let runners = MatrixRunners::new(job, MatrixAxis(axis))?;
+    Ok(ResolvedRunnerLabel::Matrix(runners.values()?))
 }
 
 /// Classifies one runner label set, rejecting sets without a known OS label.

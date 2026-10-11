@@ -1,6 +1,5 @@
 //! Workflow-shape contracts for pinned CI and release routes.
-//! Release builds must stay scoped to thysalion or the Bevy demos break
-//! cross-compilation for the six tag targets (ADR-005).
+//! Scope root releases to thysalion or Bevy's six tag targets fail to cross-compile (ADR-005).
 
 use std::io;
 
@@ -16,17 +15,20 @@ fn read_workflow(name: &str) -> io::Result<String> {
     dir.read_to_string(format!(".github/workflows/{name}"))
 }
 
-/// Returns a named step's lines through its environment, before the next step.
-/// For example, coverage includes its `env:` but excludes `Run doctests`.
-fn named_step_lines<'workflow>(
+/// Identifies one named step in borrowed workflow text.
+struct WorkflowStep<'workflow, 'name> {
+    /// Complete workflow source searched for this step.
     workflow: &'workflow str,
-    step_name: &str,
-) -> Option<Vec<&'workflow str>> {
-    let marker = format!("      - name: {step_name}\n");
+    /// Exact YAML step name used to find the step boundary.
+    step_name: &'name str,
+}
+
+/// Returns the named step's lines through its environment, before the next step.
+fn named_step_lines<'workflow>(step: &WorkflowStep<'workflow, '_>) -> Option<Vec<&'workflow str>> {
+    let marker = format!("      - name: {}\n", step.step_name);
+    let lines = step.workflow.split_once(&marker)?.1;
     Some(
-        workflow
-            .split_once(&marker)?
-            .1
+        lines
             .lines()
             .take_while(|line| !line.starts_with("      - "))
             .collect(),
@@ -39,80 +41,110 @@ fn step_and_run_lines<'workflow>(
     workflow: &'workflow str,
     step_name: &str,
 ) -> Option<(Vec<&'workflow str>, Vec<&'workflow str>)> {
-    let step = named_step_lines(workflow, step_name)?;
+    let step = named_step_lines(&WorkflowStep {
+        workflow,
+        step_name,
+    })?;
     let run_start = step.iter().position(|line| line.trim() == "run: |")?;
-    let run = step
-        .iter()
-        .skip(run_start + 1)
-        .map(|line| line.trim())
-        .collect();
+    let shell_lines = step.iter().skip(run_start + 1);
+    let run = shell_lines.map(|line| line.trim()).collect();
     Some((step, run))
 }
 
-/// Requires an immediate guard that exits when encoded flags are inherited.
-/// For example, a conditional guard fails this check even if its shell exits.
-fn coverage_guard_is_binding(workflow: &str) -> bool {
-    let Some((step, run)) = step_and_run_lines(workflow, "Check coverage flag isolation") else {
-        return false;
-    };
-    let Some(coverage_step) = named_step_lines(workflow, "Test and Measure Coverage") else {
-        return false;
-    };
-    let step_starts: Vec<_> = workflow
-        .lines()
-        .filter(|line| line.starts_with("      - "))
-        .collect();
-    let guard = step_starts
-        .iter()
-        .position(|line| *line == "      - name: Check coverage flag isolation");
-    let coverage = step_starts
-        .iter()
-        .position(|line| *line == "      - name: Test and Measure Coverage");
-    let directly_before_coverage = guard
-        .zip(coverage)
-        .is_some_and(|(guard_index, coverage_index)| coverage_index == guard_index + 1);
-    let uses_coverage_action = workflow.contains(concat!(
-        "      - name: Test and Measure Coverage\n",
-        "        uses: leynos/shared-actions/.github/actions/generate-coverage@"
-    ));
-    let is_unconditional = step.iter().all(|line| {
-        let key = line.trim();
-        !key.starts_with("if:") && !key.starts_with("continue-on-error:")
-    });
-    let propagates_failure = !run.iter().any(|line| line.contains("|| true"))
-        && [
+/// Stores a borrowed workflow and selected lines for composed coverage checks.
+struct CoverageGuard<'workflow> {
+    /// Workflow text used for step order and the pinned action check.
+    workflow: &'workflow str,
+    /// Selected YAML lines for the shell guard step.
+    guard_step: Vec<&'workflow str>,
+    /// Trimmed shell lines checked for failure propagation and guard order.
+    run: Vec<&'workflow str>,
+    /// Selected YAML lines for the coverage action environment.
+    coverage_step: Vec<&'workflow str>,
+}
+
+impl CoverageGuard<'_> {
+    /// Evaluates all five coverage guard requirements in their contract order.
+    fn is_binding(&self) -> bool {
+        let step_starts: Vec<_> = self
+            .workflow
+            .lines()
+            .filter(|line| line.starts_with("      - "))
+            .collect();
+        let guard = step_starts
+            .iter()
+            .position(|line| *line == "      - name: Check coverage flag isolation");
+        let coverage = step_starts
+            .iter()
+            .position(|line| *line == "      - name: Test and Measure Coverage");
+        [
+            guard
+                .zip(coverage)
+                .is_some_and(|(guard_index, coverage_index)| coverage_index == guard_index + 1),
+            self.workflow.contains(concat!(
+                "      - name: Test and Measure Coverage\n",
+                "        uses: leynos/shared-actions/.github/actions/generate-coverage@"
+            )),
+            self.guard_step.iter().all(|line| {
+                let key = line.trim();
+                !key.starts_with("if:") && !key.starts_with("continue-on-error:")
+            }),
+            self.shell_guard_is_hard_failing(),
+            self.coverage_action_excludes_encoded_flags(),
+        ]
+        .into_iter()
+        .all(|condition| condition)
+    }
+
+    /// Requires ordered shell checks and an unmasked failing status.
+    fn shell_guard_is_hard_failing(&self) -> bool {
+        let required = [
             "if [ \"${CARGO_ENCODED_RUSTFLAGS+x}\" = x ]; then",
             "echo 'CARGO_ENCODED_RUSTFLAGS must be unset for coverage' >&2",
             "exit 1",
             "fi",
-        ]
-        .iter()
-        .map(|expected| run.iter().position(|line| line == expected))
-        .collect::<Option<Vec<_>>>()
-        .is_some_and(|positions| {
-            positions.windows(2).all(|pair| {
-                pair.first()
-                    .zip(pair.get(1))
-                    .is_some_and(|(left, right)| left < right)
+        ];
+        let positions = required
+            .iter()
+            .map(|expected| self.run.iter().position(|line| line == expected))
+            .collect::<Option<Vec<_>>>();
+        !self.run.iter().any(|line| line.contains("|| true"))
+            && positions.is_some_and(|ordered_positions| {
+                ordered_positions
+                    .windows(2)
+                    .all(|pair| matches!(pair, [left, right] if left < right))
             })
-        });
-    let action_does_not_set_encoded_flags = coverage_step.iter().all(|line| {
-        line.split(['{', '}', ',']).all(|entry| {
-            entry.trim().split_once(':').is_none_or(|(key, _)| {
-                key.trim().trim_matches(['"', '\'']) != "CARGO_ENCODED_RUSTFLAGS"
-            })
-        })
-    });
+    }
 
-    [
-        directly_before_coverage,
-        uses_coverage_action,
-        is_unconditional,
-        propagates_failure,
-        action_does_not_set_encoded_flags,
-    ]
-    .into_iter()
-    .all(|condition| condition)
+    /// Rejects the encoded-flags key in block-style or flow-style action env maps.
+    fn coverage_action_excludes_encoded_flags(&self) -> bool {
+        self.coverage_step
+            .iter()
+            .flat_map(|line| line.split(['{', '}', ',']))
+            .filter_map(|entry| entry.trim().split_once(':'))
+            .all(|(key, _)| key.trim().trim_matches(['"', '\'']) != "CARGO_ENCODED_RUSTFLAGS")
+    }
+}
+
+/// Requires an immediate hard-failing guard before coverage measurement.
+fn coverage_guard_is_binding(workflow: &str) -> bool {
+    let Some((guard_step, run)) = step_and_run_lines(workflow, "Check coverage flag isolation")
+    else {
+        return false;
+    };
+    let Some(coverage_step) = named_step_lines(&WorkflowStep {
+        workflow,
+        step_name: "Test and Measure Coverage",
+    }) else {
+        return false;
+    };
+    let guard = CoverageGuard {
+        workflow,
+        guard_step,
+        run,
+        coverage_step,
+    };
+    guard.is_binding()
 }
 
 /// For example, it retains linker and LLVM settings while adding an empty encoded-flags key.
