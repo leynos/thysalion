@@ -26,6 +26,8 @@ class InstallerHarness:
 
     environment: dict[str, str]
     checksum_file: Path
+    curl_arguments: Path
+    staging_evidence: Path
     event_log: Path
     github_path: Path
     installed_prefix: Path
@@ -39,6 +41,18 @@ class InstallerHarness:
             env=environment,
             text=True,
         )
+
+    def staging_directory_existed(self) -> bool:
+        """Check curl observed the staging directory for its output archive."""
+        arguments = self.curl_arguments.read_text(encoding="utf-8").splitlines()
+        archive_directory = Path(arguments[-2]).parent
+        return self.staging_evidence.read_text(encoding="utf-8") == (
+            f"{archive_directory}\n"
+        )
+
+    def work_directories(self) -> list[Path]:
+        """List installer staging directories remaining in the isolated temporary root."""
+        return list(Path(self.environment["TMPDIR"]).glob("thysalion-build-tools.*"))
 
     def events(self) -> list[str]:
         return self.event_log.read_text(encoding="utf-8").splitlines()
@@ -62,6 +76,8 @@ def installer(tmp_path: Path) -> InstallerHarness:
         f'[toolchain]\nchannel = "{TOOLCHAIN_PIN}"\n', encoding="utf-8"
     )
 
+    curl_arguments = tmp_path / "curl-arguments"
+    staging_evidence = tmp_path / "staging-evidence"
     event_log = tmp_path / "events.log"
     event_log.touch()
     github_path = tmp_path / "github-path"
@@ -73,6 +89,8 @@ def installer(tmp_path: Path) -> InstallerHarness:
     assert real_tar is not None, "the host tar command is needed to make the fixture archive"
     environment = {
         "BUILD_TOOLS_PREFIX": str(installed_prefix),
+        "CURL_ARGUMENT_LOG": str(curl_arguments),
+        "STAGING_EVIDENCE_LOG": str(staging_evidence),
         "EVENT_LOG": str(event_log),
         "FAKE_ARCHIVE": str(archive),
         "GITHUB_PATH": str(github_path),
@@ -89,6 +107,8 @@ def installer(tmp_path: Path) -> InstallerHarness:
     return InstallerHarness(
         environment=environment,
         checksum_file=checksum_file,
+        curl_arguments=curl_arguments,
+        staging_evidence=staging_evidence,
         event_log=event_log,
         github_path=github_path,
         installed_prefix=installed_prefix,
@@ -101,6 +121,28 @@ def test_installer_downloads_verifies_extracts_and_provisions_the_pinned_tools(
     result = installer.run()
 
     assert result.returncode == 0, result.stderr
+    arguments = installer.curl_arguments.read_text(encoding="utf-8").splitlines()
+    archive_path = Path(arguments[-2])
+    assert archive_path.name == ARCHIVE_NAME
+    assert archive_path.parent.parent == Path(installer.environment["TMPDIR"])
+    assert archive_path.parent.name.startswith("thysalion-build-tools.")
+    assert arguments == [
+        "--fail",
+        "--silent",
+        "--show-error",
+        "--location",
+        "--connect-timeout",
+        "15",
+        "--speed-limit",
+        "1024",
+        "--speed-time",
+        "60",
+        "--output",
+        str(archive_path),
+        f"https://offline.invalid/releases/v{MOLD_VERSION}/{ARCHIVE_NAME}",
+    ]
+    assert installer.staging_directory_existed()
+    assert not installer.work_directories()
     assert (installer.installed_prefix / "bin/mold").read_bytes() == MOLD_CONTENT
     assert installer.github_path.read_text(encoding="utf-8") == (
         f"{installer.installed_prefix / 'bin'}\n"
@@ -120,6 +162,8 @@ def test_installer_reports_download_failure_before_unpacking(
     result = installer.run(FAKE_CURL_FAIL="1")
 
     assert result.returncode == 1
+    assert installer.staging_directory_existed()
+    assert not installer.work_directories()
     assert "failed to download " in result.stderr
     assert installer.events() == ["curl"]
     assert installer.github_path.read_text(encoding="utf-8") == ""
@@ -133,6 +177,8 @@ def test_installer_rejects_a_checksum_mismatch_before_unpacking(
     result = installer.run()
 
     assert result.returncode == 1
+    assert installer.staging_directory_existed()
+    assert not installer.work_directories()
     assert f"checksum mismatch for {ARCHIVE_NAME}" in result.stderr
     assert installer.events() == ["curl"]
     assert installer.github_path.read_text(encoding="utf-8") == ""
@@ -144,6 +190,8 @@ def test_installer_reports_extraction_failure_before_rustup(
     result = installer.run(FAKE_TAR_FAIL="1")
 
     assert result.returncode == 1
+    assert installer.staging_directory_existed()
+    assert not installer.work_directories()
     assert "failed to unpack " in result.stderr
     assert installer.events() == ["curl", "tar"]
     assert installer.github_path.read_text(encoding="utf-8") == ""
@@ -155,6 +203,8 @@ def test_installer_stops_when_the_pinned_toolchain_install_fails(
     result = installer.run(FAKE_RUSTUP_FAIL="toolchain")
 
     assert result.returncode == 1
+    assert installer.staging_directory_existed()
+    assert not installer.work_directories()
     assert f"failed to install toolchain {TOOLCHAIN_PIN}" in result.stderr
     assert installer.events() == [
         "curl",
@@ -170,6 +220,8 @@ def test_installer_stops_when_a_required_component_cannot_be_added(
     result = installer.run(FAKE_RUSTUP_FAIL="component")
 
     assert result.returncode == 1
+    assert installer.staging_directory_existed()
+    assert not installer.work_directories()
     assert f"failed to install required components for {TOOLCHAIN_PIN}" in result.stderr
     assert installer.events() == [
         "curl",
@@ -190,6 +242,8 @@ def test_installer_propagates_a_github_path_append_failure(
     result = installer.run(GITHUB_PATH=str(github_path_directory))
 
     assert result.returncode == 1
+    assert installer.staging_directory_existed()
+    assert not installer.work_directories()
     assert "could not append the mold installation directory to GITHUB_PATH" in result.stderr
     assert installer.events() == [
         "curl",
@@ -219,6 +273,7 @@ esac
         """#!/usr/bin/env bash
 set -euo pipefail
 printf 'curl\\n' >> "$EVENT_LOG"
+printf '%s\\n' "$@" > "$CURL_ARGUMENT_LOG"
 output=
 while (($#)); do
   if [[ $1 == --output ]]; then
@@ -229,6 +284,9 @@ while (($#)); do
   fi
 done
 [[ -n $output ]]
+if [[ -d ${output%/*} ]]; then
+  printf '%s\\n' "${output%/*}" > "$STAGING_EVIDENCE_LOG"
+fi
 if [[ ${FAKE_CURL_FAIL:-0} == 1 ]]; then exit 22; fi
 cp -- "$FAKE_ARCHIVE" "$output"
 """,
