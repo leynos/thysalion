@@ -89,3 +89,13 @@ Pass `--json` for structured output, `--strict` to treat warnings as failures,
 full option list. The developer guide's "Scene fixtures" section and
 [World plane architecture](world-plane-architecture.md) cover the format itself
 and how to read a diagnostic report.
+
+### Rust consumers
+
+The Rust API uses `FacePassability` for each `Passability` face instead of a
+bare boolean. Convert values with `FacePassability::from(true)` (or `false`)
+and read them with `is_passable`. This source API change leaves scene files
+unchanged: JSON still contains six flat boolean fields, and the scene format
+version does not change. See the developer guide's
+[scene document API](developers-guide.md#scene-document-api) for construction
+details.
