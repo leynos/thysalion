@@ -161,12 +161,9 @@ def test_installer_reports_download_failure_before_unpacking(
 ) -> None:
     result = installer.run(FAKE_CURL_FAIL="1")
 
-    assert result.returncode == 1
-    assert installer.staging_directory_existed()
-    assert not installer.work_directories()
+    _assert_failed_installation_was_cleaned_up(installer, result)
     assert "failed to download " in result.stderr
     assert installer.events() == ["curl"]
-    assert installer.github_path.read_text(encoding="utf-8") == ""
 
 
 def test_installer_rejects_a_checksum_mismatch_before_unpacking(
@@ -176,12 +173,9 @@ def test_installer_rejects_a_checksum_mismatch_before_unpacking(
 
     result = installer.run()
 
-    assert result.returncode == 1
-    assert installer.staging_directory_existed()
-    assert not installer.work_directories()
+    _assert_failed_installation_was_cleaned_up(installer, result)
     assert f"checksum mismatch for {ARCHIVE_NAME}" in result.stderr
     assert installer.events() == ["curl"]
-    assert installer.github_path.read_text(encoding="utf-8") == ""
 
 
 def test_installer_reports_extraction_failure_before_rustup(
@@ -189,12 +183,9 @@ def test_installer_reports_extraction_failure_before_rustup(
 ) -> None:
     result = installer.run(FAKE_TAR_FAIL="1")
 
-    assert result.returncode == 1
-    assert installer.staging_directory_existed()
-    assert not installer.work_directories()
+    _assert_failed_installation_was_cleaned_up(installer, result)
     assert "failed to unpack " in result.stderr
     assert installer.events() == ["curl", "tar"]
-    assert installer.github_path.read_text(encoding="utf-8") == ""
 
 
 def test_installer_stops_when_the_pinned_toolchain_install_fails(
@@ -202,16 +193,13 @@ def test_installer_stops_when_the_pinned_toolchain_install_fails(
 ) -> None:
     result = installer.run(FAKE_RUSTUP_FAIL="toolchain")
 
-    assert result.returncode == 1
-    assert installer.staging_directory_existed()
-    assert not installer.work_directories()
+    _assert_failed_installation_was_cleaned_up(installer, result)
     assert f"failed to install toolchain {TOOLCHAIN_PIN}" in result.stderr
     assert installer.events() == [
         "curl",
         "tar",
         f"rustup toolchain install {TOOLCHAIN_PIN} --profile minimal --no-self-update",
     ]
-    assert installer.github_path.read_text(encoding="utf-8") == ""
 
 
 def test_installer_stops_when_a_required_component_cannot_be_added(
@@ -219,9 +207,7 @@ def test_installer_stops_when_a_required_component_cannot_be_added(
 ) -> None:
     result = installer.run(FAKE_RUSTUP_FAIL="component")
 
-    assert result.returncode == 1
-    assert installer.staging_directory_existed()
-    assert not installer.work_directories()
+    _assert_failed_installation_was_cleaned_up(installer, result)
     assert f"failed to install required components for {TOOLCHAIN_PIN}" in result.stderr
     assert installer.events() == [
         "curl",
@@ -230,7 +216,6 @@ def test_installer_stops_when_a_required_component_cannot_be_added(
         "rustup component add --toolchain "
         f"{TOOLCHAIN_PIN} clippy llvm-tools-preview rustfmt rust-analyzer",
     ]
-    assert installer.github_path.read_text(encoding="utf-8") == ""
 
 
 def test_installer_propagates_a_github_path_append_failure(
@@ -241,9 +226,7 @@ def test_installer_propagates_a_github_path_append_failure(
 
     result = installer.run(GITHUB_PATH=str(github_path_directory))
 
-    assert result.returncode == 1
-    assert installer.staging_directory_existed()
-    assert not installer.work_directories()
+    _assert_failed_installation_was_cleaned_up(installer, result)
     assert "could not append the mold installation directory to GITHUB_PATH" in result.stderr
     assert installer.events() == [
         "curl",
@@ -252,7 +235,16 @@ def test_installer_propagates_a_github_path_append_failure(
         "rustup component add --toolchain "
         f"{TOOLCHAIN_PIN} clippy llvm-tools-preview rustfmt rust-analyzer",
     ]
-    assert not installer.github_path.read_text(encoding="utf-8")
+
+
+def _assert_failed_installation_was_cleaned_up(
+    installer: InstallerHarness, result: subprocess.CompletedProcess[str]
+) -> None:
+    """Assert failure preserves staging evidence, cleans up, and leaves PATH untouched."""
+    assert result.returncode == 1
+    assert installer.staging_directory_existed()
+    assert not installer.work_directories()
+    assert installer.github_path.read_text(encoding="utf-8") == ""
 
 
 def _install_fake_commands(fake_bin: Path) -> None:
