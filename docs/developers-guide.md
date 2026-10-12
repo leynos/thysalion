@@ -150,12 +150,11 @@ reads to use an injected reader and tests to use a stub environment instead of
 mutating process-global variables. It requires an injected base-directory seam
 instead of changing the process directory; subprocesses may use
 `Command::current_dir`. The seven methods come from the maintainer-approved
-[Netsuke policy revision](https://github.com/leynos/netsuke/blob/924cb215d3841048dbf6649767a510d2a5dfb1b7/clippy.toml),
-tracked for Concordat publication in
-[concordat #157](https://github.com/leynos/concordat/issues/157). The frozen
-Concordat revision does not yet contain that list. The required components in
-`rust-toolchain.toml` include `clippy`, `rustfmt`, and `rust-analyzer`;
-coverage also uses `llvm-tools-preview`.
+[Netsuke policy revision][netsuke-policy], tracked for Concordat publication in
+[concordat #157](https://github.com/leynos/concordat/issues/157).
+The frozen Concordat revision does not yet contain that list. The required
+components in `rust-toolchain.toml` include `clippy`, `rustfmt`, and
+`rust-analyzer`; coverage also uses `llvm-tools-preview`.
 
 Fix findings at source. Never add `#[allow]`. Use `#[expect]` only for
 macro-expansion artefacts or floating-point arithmetic, with a reason. The
@@ -438,3 +437,5 @@ def test_uses_pinned_full_sha(caller_step):
 If a workflow's behaviour genuinely depends on a feature only present from a
 particular commit onwards, express that as a comment or a changelog note, not
 as a test assertion on the SHA string.
+
+[netsuke-policy]: https://github.com/leynos/netsuke/blob/924cb215d3841048dbf6649767a510d2a5dfb1b7/clippy.toml

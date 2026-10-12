@@ -338,4 +338,9 @@ fn whitaker_route_propagates_failure() {
         .output()
         .expect("run failing Whitaker probe");
     assert!(!failing.status.success(), "Whitaker's failure was ignored");
+    let stdout = String::from_utf8_lossy(&failing.stdout);
+    assert!(
+        stdout.contains("Whitaker binary: false"),
+        "Make failed before reaching the Whitaker recipe; stdout: {stdout}"
+    );
 }
