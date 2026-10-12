@@ -12,7 +12,7 @@
 //!
 //! Refresh the golden bytes deliberately. A change there is a wire-format
 //! change and must arrive with a `FormatVersion` bump and an entry in ADR
-//! 007's version history. Regenerate with:
+//! 008's version history. Regenerate with:
 //!
 //! ```text
 //! cargo test -p thysalion-test-support --test replay_round_trip -- --ignored regenerate
