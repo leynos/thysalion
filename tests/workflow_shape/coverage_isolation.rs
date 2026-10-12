@@ -4,6 +4,24 @@ use rstest::rstest;
 
 use super::{WorkflowStep, named_step_lines, read_workflow, step_and_run_lines};
 
+/// Selects the two coverage routes exercised only by this module's contract cases.
+enum CoverageWorkflow {
+    /// Pull-request coverage measurement.
+    PullRequest,
+    /// Persistent default-branch coverage publication.
+    MainPublisher,
+}
+
+impl CoverageWorkflow {
+    /// Resolves the selected coverage route to its checked-in workflow file.
+    const fn filename(self) -> &'static str {
+        match self {
+            Self::PullRequest => "ci.yml",
+            Self::MainPublisher => "coverage-main.yml",
+        }
+    }
+}
+
 /// Explicit action overrides keep measurement independent of development settings.
 const COVERAGE_ENVIRONMENT: [(&str, &str); 8] = [
     ("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", "clang"),
@@ -153,9 +171,10 @@ fn flow_style_coverage_mutation(workflow: &str) -> Option<String> {
 
 /// Checks that each measurement route rejects encoded flags and selects LLVM/lld.
 #[rstest]
-#[case::pull_request("ci.yml")]
-#[case::main_publisher("coverage-main.yml")]
-fn coverage_flag_guard_is_binding_before_measurement(#[case] name: &str) {
+#[case::pull_request(CoverageWorkflow::PullRequest)]
+#[case::main_publisher(CoverageWorkflow::MainPublisher)]
+fn coverage_flag_guard_is_binding_before_measurement(#[case] route: CoverageWorkflow) {
+    let name = route.filename();
     let workflow = read_workflow(name).expect("read coverage workflow");
     assert!(
         coverage_guard_is_binding(&workflow),
@@ -165,9 +184,10 @@ fn coverage_flag_guard_is_binding_before_measurement(#[case] name: &str) {
 
 /// Checks that removing or reordering the coverage guard breaks its contract.
 #[rstest]
-#[case::pull_request("ci.yml")]
-#[case::main_publisher("coverage-main.yml")]
-fn coverage_guard_rejects_removal_and_reordering(#[case] name: &str) {
+#[case::pull_request(CoverageWorkflow::PullRequest)]
+#[case::main_publisher(CoverageWorkflow::MainPublisher)]
+fn coverage_guard_rejects_removal_and_reordering(#[case] route: CoverageWorkflow) {
+    let name = route.filename();
     let workflow = read_workflow(name).expect("read coverage workflow");
     let guard_marker = "      - name: Check coverage flag isolation\n";
     let coverage_marker = "      - name: Test and Measure Coverage\n";
@@ -215,9 +235,10 @@ fn coverage_guard_rejects_removal_and_reordering(#[case] name: &str) {
 
 /// Checks that conditional or masked failures do not satisfy the coverage guard.
 #[rstest]
-#[case::pull_request("ci.yml")]
-#[case::main_publisher("coverage-main.yml")]
-fn coverage_guard_rejects_conditional_and_soft_failure(#[case] name: &str) {
+#[case::pull_request(CoverageWorkflow::PullRequest)]
+#[case::main_publisher(CoverageWorkflow::MainPublisher)]
+fn coverage_guard_rejects_conditional_and_soft_failure(#[case] route: CoverageWorkflow) {
+    let name = route.filename();
     let workflow = read_workflow(name).expect("read coverage workflow");
     let guard_marker = "      - name: Check coverage flag isolation\n";
 
@@ -258,9 +279,10 @@ fn coverage_guard_rejects_conditional_and_soft_failure(#[case] name: &str) {
 
 /// Checks that the action cannot reintroduce encoded flags after the guard.
 #[rstest]
-#[case::pull_request("ci.yml")]
-#[case::main_publisher("coverage-main.yml")]
-fn coverage_action_rejects_empty_encoded_flags(#[case] name: &str) {
+#[case::pull_request(CoverageWorkflow::PullRequest)]
+#[case::main_publisher(CoverageWorkflow::MainPublisher)]
+fn coverage_action_rejects_empty_encoded_flags(#[case] route: CoverageWorkflow) {
+    let name = route.filename();
     let workflow = read_workflow(name).expect("read coverage workflow");
     let action_with_empty_encoded_flags = workflow.replacen(
         concat!(
@@ -297,9 +319,10 @@ fn coverage_action_rejects_empty_encoded_flags(#[case] name: &str) {
 
 /// Checks every required backend and linker override against removal and replacement.
 #[rstest]
-#[case::pull_request("ci.yml")]
-#[case::main_publisher("coverage-main.yml")]
-fn coverage_action_rejects_missing_or_changed_llvm_overrides(#[case] name: &str) {
+#[case::pull_request(CoverageWorkflow::PullRequest)]
+#[case::main_publisher(CoverageWorkflow::MainPublisher)]
+fn coverage_action_rejects_missing_or_changed_llvm_overrides(#[case] route: CoverageWorkflow) {
+    let name = route.filename();
     let workflow = read_workflow(name).expect("read coverage workflow");
     for (key, required) in COVERAGE_ENVIRONMENT {
         let configured = if key == "CARGO_UNSTABLE_CODEGEN_BACKEND" {
@@ -323,9 +346,10 @@ fn coverage_action_rejects_missing_or_changed_llvm_overrides(#[case] name: &str)
 
 /// Checks that an extra step cannot separate the guard from measurement.
 #[rstest]
-#[case::pull_request("ci.yml")]
-#[case::main_publisher("coverage-main.yml")]
-fn coverage_guard_rejects_intervening_steps(#[case] name: &str) {
+#[case::pull_request(CoverageWorkflow::PullRequest)]
+#[case::main_publisher(CoverageWorkflow::MainPublisher)]
+fn coverage_guard_rejects_intervening_steps(#[case] route: CoverageWorkflow) {
+    let name = route.filename();
     let workflow = read_workflow(name).expect("read coverage workflow");
     let marker = "      - name: Test and Measure Coverage\n";
     let mutated = workflow.replacen(
@@ -351,8 +375,10 @@ fn coverage_guard_rejects_intervening_steps(#[case] name: &str) {
 fn coverage_guard_rejects_shell_bypasses(
     #[case] configured: &str,
     #[case] invalid: &str,
-    #[values("ci.yml", "coverage-main.yml")] name: &str,
+    #[values(CoverageWorkflow::PullRequest, CoverageWorkflow::MainPublisher)]
+    route: CoverageWorkflow,
 ) {
+    let name = route.filename();
     let workflow = read_workflow(name).expect("read coverage workflow");
     let mutated = workflow.replacen(configured, invalid, 1);
     assert_ne!(
