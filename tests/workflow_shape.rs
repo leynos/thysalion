@@ -198,6 +198,25 @@ fn ci_keeps_one_run_per_ref() {
 }
 
 #[test]
+fn ci_runs_the_headless_suite_on_every_push() {
+    // Coverage is pull-request-only because main owns the push baseline, but
+    // each branch push must still run the fixture-loading behavioural suite.
+    let workflow = ci_workflow();
+    let jobs = top_level_block(&workflow, "jobs").expect("ci.yml must declare jobs");
+    let job =
+        child_block(&jobs, 2, "headless-test").expect("ci.yml must declare a headless-test job");
+    assert_eq!(
+        entry(&job, 4, "if"),
+        Some("github.event_name == 'push'"),
+        "headless-test must run only for branch pushes"
+    );
+    assert!(
+        job.contains("run: make test"),
+        "the push job must run the behavioural suite: {job}"
+    );
+}
+
+#[test]
 fn ci_runs_build_test_for_pull_request_merge_results() {
     // A push checks the branch head, while the pull_request event checks the
     // synthetic merge commit. Skipping the latter can let an unchecked merge
@@ -205,8 +224,9 @@ fn ci_runs_build_test_for_pull_request_merge_results() {
     let workflow = ci_workflow();
     let jobs = top_level_block(&workflow, "jobs").expect("ci.yml must declare jobs");
     let job = child_block(&jobs, 2, "build-test").expect("ci.yml must declare a build-test job");
-    assert!(
-        child_block(&job, 4, "if").is_none(),
-        "build-test must run on pull_request merge commits as well as pushes"
+    assert_eq!(
+        entry(&job, 4, "if"),
+        Some("github.event_name == 'pull_request'"),
+        "build-test must run on every pull_request, without a same-repository skip"
     );
 }

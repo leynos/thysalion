@@ -12,9 +12,9 @@ available. `make audit` derives the Rust workspace root with `cargo metadata`,
 logs workspace member manifests, and runs `cargo audit` once from the workspace
 root. `make coverage` uses `cargo llvm-cov` with `lld`.
 
-`ci.yml` runs its coverage step on every branch push and each pull-request
-merge result. That step runs the same tests `make test` runs except the
-doctests, which `build-test` runs in a step of its own with
+`ci.yml` runs the push-only `headless-test` job with `make test` on every
+branch push. Its `pull_request`-only `build-test` job runs coverage on each
+merge result and runs doctests in a step of its own with
 `cargo test --doc --workspace --all-features`. The repository used to carry an
 `act-validation.yml` workflow that ran `make test WITH_ACT=1`, but nothing reads
 `WITH_ACT` and no test is gated on Act, so that workflow ran the whole suite a
@@ -26,11 +26,11 @@ same tests as `make test`. `tests/workflow_suite_contract.rs` holds the split,
 including that coverage enables every declared feature.
 
 `coverage-main.yml` measures coverage on pushes to `main` and on dispatch from
-`main`, and is the only CodeScene caller; `ci.yml` measures branch pushes and
-pull-request merge results for its own ratchet, at the same `generate-coverage`
-revision with `publish-artefact: 'false'`, and names no CodeScene token, host,
-or command. The publisher job runs in the `codescene` environment, which admits
-`main` alone and holds `CS_ACCESS_TOKEN` as an environment secret. A
+`main`, and is the only CodeScene caller; `ci.yml` measures pull-request merge
+results for its own ratchet, at the same `generate-coverage` revision with
+`publish-artefact: 'false'`, and names no CodeScene token, host, or command.
+The publisher job runs in the `codescene` environment, which admits `main`
+alone and holds `CS_ACCESS_TOKEN` as an environment secret. A
 `Check CodeScene token availability` step (id `codescene_token`) runs exactly
 `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
 with no `if:` and no `env`. The upload runs only when that output is `true` and
@@ -57,19 +57,21 @@ it. The decision is recorded in
 
 ### Continuous integration triggers
 
-`ci.yml` runs `build-test` on every branch push and every `pull_request` merge
-result. Both triggers are needed: branch pushes are checked before a pull
-request exists, while pull-request runs cover fork contributions and test
-GitHub's synthetic merge commit. Same-repository pull requests can run both
-events on distinct refs: `refs/heads/…` for the branch push and
-`refs/pull/N/merge` for the pull-request merge result. There is no job-level
-same-repository guard, so both runs execute.
+`ci.yml` runs its `headless-test` job on every branch push and its `build-test`
+job for each `pull_request` merge result. The push job runs `make test` without
+starting a coverage lane. The pull-request job covers fork contributions and
+tests GitHub's synthetic merge commit. Same-repository pull requests can run
+both jobs on distinct refs: `refs/heads/…` for the branch push and
+`refs/pull/N/merge` for the merge result. `build-test` is scoped to
+`pull_request`, with no same-repository skip; its direct coverage step has no
+step-level `if:`.
 
 The workflow-level `concurrency` group is keyed on workflow and ref, with
 `cancel-in-progress: true`. It cancels a superseded run only when its workflow
 and ref match; the branch-push and pull-request merge-result refs therefore do
-not cancel one another. `tests/workflow_shape.rs` asserts that the guard is
-absent and that pull-request merge-result runs are retained.
+not cancel one another. `tests/workflow_shape.rs` asserts the push-only
+headless job and that `build-test` has no same-repository skip and retains the
+pull-request merge-result run.
 
 `tests/workflow_shape.rs` asserts the trigger, concurrency, and merge-result
 shape without depending on literal action SHA values; see "Workflow pins and
@@ -105,13 +107,14 @@ falls back to the `ld.lld` every rustup toolchain ships. Set
 `COVERAGE_CODEGEN_BACKEND` or `COVERAGE_LLD_DIR` to opt out on a host whose own
 toolchain already works.
 
-CI runs the doctests outside the Makefile, in a standalone `Run doctests` step
-of `ci.yml` that calls `cargo test --doc` directly, so the Makefile's
-`STANDARD_RUSTFLAGS` cannot reach it. The step therefore assigns its own
-`RUSTFLAGS` with the frontend flag, the Linux linker flag and `-D warnings`,
-because an assigned `RUSTFLAGS` replaces every `rustflags` source in
-`.cargo/config.toml`. `tests/build_standard_contract.rs` reads that step,
-scoped to the step itself, and fails if any of the three is dropped.
+The pull-request-only `build-test` job runs doctests outside the Makefile, in a
+standalone `Run doctests` step of `ci.yml` that calls `cargo test --doc`
+directly, so the Makefile's `STANDARD_RUSTFLAGS` cannot reach it. The step
+therefore assigns its own `RUSTFLAGS` with the frontend flag, the Linux linker
+flag and `-D warnings`, because an assigned `RUSTFLAGS` replaces every
+`rustflags` source in `.cargo/config.toml`. `tests/build_standard_contract.rs`
+reads that step, scoped to the step itself, and fails if any of the three is
+dropped.
 
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.

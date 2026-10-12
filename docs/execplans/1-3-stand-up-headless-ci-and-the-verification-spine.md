@@ -55,8 +55,9 @@ Concretely, after this change:
    `bare-cell` fixture scene inside it, and asserts against the harness's
    registered diagnostics — the roadmap task's three clauses in one test (task
    1.3.1).
-3. Every push to any branch runs the full test suite in GitHub Actions, and
-   `tests/workflow_shape.rs` fails if that trigger is ever removed (task 1.3.1).
+3. Every branch push runs `make test` in the push-only `headless-test` job;
+   `build-test` checks pull-request merge results and retains coverage and
+   doctests. `tests/workflow_shape.rs` guards both job conditions (task 1.3.1).
 4. Recording an empty replay session and replaying it is byte-identical,
    asserted by a test that runs in CI, over a storage format whose version
    field, probe, and golden bytes follow the pattern ADR 006 established for
@@ -167,9 +168,10 @@ quality criteria.
 - Interface: if promoting the adapters forces a change to `thysalion-world`
   or `thysalion-harness` *library* surface (not test code), stop and escalate;
   the promotion is meant to move test code, not to reshape crates.
-- CI: if the push trigger cannot be added without either double-running the
-  suite on pull-request synchronize events or skipping fork PRs, stop and
-  present the trade-offs rather than shipping either silently.
+- CI: if every branch push cannot run the headless suite while every
+  pull-request merge result retains its coverage check, including fork and
+  same-repository PRs, stop and present the trade-offs rather than silently
+  dropping either result.
 - Iterations: if the same test still fails after five attempts, stop and
   escalate with the failure output.
 - Ambiguity: if design §14's wording and this plan's reading of "input
@@ -192,28 +194,28 @@ quality criteria.
   crate with the loop in place and runs `make test`, `make lint`, and
   `make coverage` before any code moves; if a tool misbehaves, escalate before
   investing in the promotion.
-- Risk: retaining `push` alongside `pull_request` runs the suite twice for a
-  same-repository PR branch: the push run checks the branch head, while the
-  pull-request run checks GitHub's synthetic merge commit. Those commits can
-  differ when the base branch advances, so the runs provide distinct coverage;
-  removing either can leave one result unchecked. Fork PRs also have no push
-  event in this repository. Severity: medium. Likelihood: certain. Mitigation:
-  keep both triggers and run `build-test` for both event types, with no
-  same-repository PR skip. Keep the workflow/ref concurrency group to cancel
-  superseded runs on the same ref; push and pull-request refs remain separate.
-  The workflow-shape test asserts the trigger and job behaviour, including that
-  same-repository pull requests retain merge-result coverage.
+- Risk: same-repository PR branches produce both a branch-push run and a
+  pull-request merge-result run. The push job tests the branch head, while the
+  PR job tests GitHub's synthetic merge commit, which can differ after the base
+  advances; both results matter. Fork PRs have no push event in this
+  repository, so their merge-result run must remain. Severity: medium.
+  Likelihood: certain. Mitigation: `headless-test` runs `make test` only on
+  pushes; `build-test` runs only on `pull_request`, with the coverage step
+  unconditionally reachable inside the job. The workflow/ref concurrency group
+  cancels superseded runs only when their workflow and ref match, so these two
+  refs remain separate. The workflow-shape tests pin both job conditions.
 - Risk: the shared `generate-coverage` action (invoked with
-  `with-ratchet: 'true'`) may assume pull-request context — a base ref to diff
-  against, a ratchet baseline to fetch — and misbehave on plain push events,
-  turning every branch push red. The likely human response would be reverting
-  the push trigger, silently unmeeting the roadmap criterion. Severity: high.
-  Likelihood: medium. Mitigation: Stage A reads the pinned action's source (it
-  is a `leynos/shared-actions` action, locally auditable) and, if push-event
-  behaviour is unsupported or unclear, Stage C3 falls back to a separate
-  lightweight job in `ci.yml` that runs `make test` on push events only,
-  leaving the coverage job PR-scoped. Either shape satisfies "the behavioural
-  test runs on every push"; the decision log records which was taken and why.
+  `with-ratchet: 'true'`) rejects push-reachable coverage steps. Hosted CI runs
+  [38262379505](https://github.com/leynos/thysalion/actions/runs/38262379505)
+  and
+  [38262370532](https://github.com/leynos/thysalion/actions/runs/38262370532)
+  failed `coverage.second-writer`. The pinned
+  [lane source](https://raw.githubusercontent.com/leynos/shared-actions/88977798a5c3bae1549afb99642529488c665276/packages/cv005-contracts/cv005_contracts/lanes.py)
+  requires every `generate-coverage` step reachable from `push` to be guarded
+  to pull requests at the step or job level. Severity: high. Likelihood:
+  confirmed. Mitigation: keep `build-test` pull-request-only and its coverage
+  step free of a step-level `if:`; add `headless-test` for pushes and run
+  `make test` there so every branch push still exercises the fixture suite.
 - Risk: the coverage ratchet (the shared `generate-coverage` action with
   `with-ratchet: 'true'`) shifts when test code moves between crates or new
   measured code lands in `thysalion-test-support`, failing CI for reasons
@@ -271,9 +273,9 @@ quality criteria.
   re-point both suites; delete the duplicates.
 - [x] Stage C2: the combined fixture-in-harness behavioural scenario goes
   green.
-- [x] Stage C3: CI triggers and concurrency; workflow-shape tests
-  green; the workflow-shape contract covers the three workflows present after
-  rebase.
+- [x] Stage C3: the `headless-test` job runs `make test` on branch pushes;
+  `build-test` runs coverage and doctests on pull-request merge results. The
+  workflow-shape contract covers the three workflows present after rebase.
 - [x] Stage C4: replay envelope, recorder/replayer, golden bytes, CI test;
   ADR 008.
 - [x] Stage D: documentation, roadmap checkboxes, refactor pass,
@@ -370,14 +372,15 @@ quality criteria.
   no current scenario loads a second fixture and then reads the document — but
   fixed with a unit test, because the next scenario to do so would have had a
   silently wrong assertion rather than a failure.
-- Observation (pre-work verification of the Stage A question): the pinned
-  `generate-coverage` action's ratchet stores and restores its baseline through
-  the GitHub Actions cache (`ratchet-baseline-…` restore keys) and references
-  no pull-request event context anywhere in `action.yml`, so it functions on
-  plain `push` events. Evidence: the action source in the local
-  `shared-actions` checkout. Impact: Stage C3's single-job form is viable; the
-  split-job fallback stays in the plan only as the contingency if the live run
-  contradicts this reading.
+- Observation (rebase verification of the Stage A question): an initial source
+  review found the ratchet baseline in the GitHub Actions cache and no explicit
+  pull-request context in `action.yml`, suggesting push compatibility. Hosted
+  CI disproved that reading: runs 38262379505 and 38262370532 failed
+  `coverage.second-writer`, and the pinned `lanes.py` requires every coverage
+  step reachable from push to be pull-request guarded. Impact: the original
+  all-event `build-test` plan changed to the documented split: push-only
+  `headless-test` runs `make test`, while pull-request-only `build-test`
+  retains coverage and doctests.
 
 ## Decision log
 
@@ -405,13 +408,17 @@ quality criteria.
   the promotion removes. Date/Author: 2026-08-04, plan author.
 - Decision: `ci.yml` gains `push` on all branches while retaining
   `pull_request`, with a workflow-level `concurrency` group
-  (`${{ github.workflow }}-${{ github.ref }}`, `cancel-in-progress: true`) and
-  `build-test` running for both event types. Rationale: push runs check the
-  branch head; pull-request runs check GitHub's synthetic merge commit, which
-  can differ when the base branch advances. Both results are needed, and
-  push-only would also drop fork PR coverage because fork branches do not
-  generate push events in this repository. Same-repository pull requests must
-  not be skipped. Date/Author: 2026-08-04, plan author; clarified after review.
+  (`${{ github.workflow }}-${{ github.ref }}`, `cancel-in-progress: true`).
+  `headless-test` runs `make test` only for pushes; `build-test` runs only for
+  pull requests, including same-repository and fork merge results, with its
+  coverage step carrying no step-level `if:`. Rationale: the branch-head push
+  and synthetic pull-request merge commit are distinct checks, and fork
+  branches generate no push event in this repository. The original plan ran
+  `build-test` for both events, but hosted runs 38262379505 and 38262370532
+  failed `coverage.second-writer`; the pinned `generate-coverage` lane requires
+  push-reachable coverage steps to be pull-request guarded. The split keeps
+  coverage PR-only while running `make test` on every branch push. Date/Author:
+  2026-08-04, plan author; revised after rebase verification.
 - Decision: the replay skeleton lives in `thysalion-test-support` behind the
   default feature set (`replay` module, no `bevy` requirement), and its wire
   types copy ADR 006's discipline with a `{major, minor}` version and a
@@ -666,11 +673,10 @@ and sharing by `#[path]` include) is a materially different plan requiring
 escalation. Delete nothing yet; the spike commit lands with Stage C1 or not at
 all.
 
-Second verification, per `Risks`: read the pinned `leynos/shared-actions`
-`generate-coverage` action's source and determine whether it behaves correctly
-on `push` events (ratchet baseline lookup, any pull-request-context
-assumptions). Record the finding in `Surprises & discoveries`; it decides Stage
-C3's shape between the single-job and split-job forms.
+Second verification, per `Risks`, established that the pinned
+`leynos/shared-actions` `generate-coverage` lane rejects push-reachable
+coverage steps; hosted CI and its source confirm the PR-only coverage rule.
+This evidence determines the split Stage C3 shape recorded above.
 
 ### Stage B — red tests
 
@@ -679,10 +685,11 @@ change:
 
 1. Extend `tests/workflow_shape.rs` with trigger-shape assertions:
    `ci.yml` must declare a `push` trigger covering all branches, retain its
-   `pull_request` trigger, use a `concurrency` group, and run `build-test` for
-   same-repository pull requests so the synthetic merge commit is checked. The
-   SHA-pinning contract covers the workflows present in the tree. These trigger
-   assertions fail before the triggers are added.
+   `pull_request` trigger, use a `concurrency` group, run `headless-test` only
+   on pushes, and run `build-test` for pull-request merge results without a
+   same-repository skip. The SHA-pinning contract covers the workflows present
+   in the tree. These assertions fail before the triggers and split jobs are
+   added.
 2. The combined scenario's feature file,
    `crates/test-support/tests/features/verification_spine.feature`:
 
@@ -727,15 +734,18 @@ any library crate); `Then` asserts palette arity and that
 `thysalion_harness::diagnostics::FRAME_TIME` resolves in the app's
 `DiagnosticsStore` after one `app.update()`. Green; `make all`; commit.
 
-### Stage C3 — CI on every push
+### Stage C3 — CI on every push and pull-request merge result
 
-Edit `ci.yml`: add the `push` trigger and `concurrency` block from the decision
-log, and ensure `build-test` runs for pull requests from both this repository
-and forks. The pull-request run checks the synthetic merge commit; the push run
-checks the branch head. The Stage B workflow-shape assertions go green. The
-former `act-validation.yml` was removed by rebase and is not part of this stage.
-`make all`; commit; after push, confirm Actions runs appear for both the
-branch push and pull-request merge result.
+Edit `ci.yml`: add the `push` trigger, workflow/ref `concurrency` group,
+push-only `headless-test` job running `make test`, and pull-request-only
+`build-test` job. Keep the coverage and doctest steps directly in `build-test`,
+without step-level `if:` conditions. The PR job checks the synthetic merge
+result for both same-repository and fork pull requests; the headless job checks
+the branch head. This split follows the hosted `coverage.second-writer`
+failures and the pinned lane's PR-guard requirement. The Stage B workflow-shape
+assertions go green. The former `act-validation.yml` was removed by rebase and
+is not part of this stage. `make all`; commit; after push, confirm Actions runs
+appear for both jobs.
 
 ### Stage C4 — the replay envelope and ADR 008
 
@@ -816,9 +826,10 @@ Red-Green-Refactor evidence, as observed:
 
 Acceptance, as verified:
 
-1. Pending the first push: `ci.yml` declares `push: branches: ['**']`, and
-   `tests/workflow_shape.rs` fails if that is removed. Confirm the Actions run
-   appears for the branch push itself once pushed.
+1. `ci.yml` declares `push: branches: ['**']`; `headless-test` runs `make test`
+   only on pushes, while `build-test` runs coverage and doctests only for
+   pull-request merge results. `tests/workflow_shape.rs` fails if either job's
+   event condition or the retained merge-result run is removed.
 2. `grep -rEn "struct BevyHarness|struct LoaderHarness" crates/` matches
    exactly two lines, both under `crates/test-support/src/`. The `-E` is
    load-bearing: without it `grep` reads the alternation literally and matches
@@ -835,9 +846,9 @@ matches `bevy` zero times, and `cargo tree -p thysalion -e normal` matches
 
 Acceptance, phrased as behaviour:
 
-1. Pushing any branch to GitHub triggers the CI workflow; its test step
-   runs the behavioural suites, including the fixture-loading scenario (roadmap
-   1.3.1's criterion, now literally true).
+1. Pushing any branch to GitHub runs `make test` in `headless-test`, including
+   the fixture-loading scenario. Pull requests run `build-test` on GitHub's
+   merge result with coverage and doctests (roadmap 1.3.1's criterion).
 2. `rg "struct BevyHarness|struct LoaderHarness" crates/` matches only
    under `crates/test-support/src/`.
 3. Running the replay round-trip test twice in a row passes both times,

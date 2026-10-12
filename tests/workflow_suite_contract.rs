@@ -1,22 +1,22 @@
-//! Contract tests for the CI build-test job's required steps.
+//! Contract tests for the CI workflow's suite and coverage steps.
 //!
 //! `make test` runs the suite with `--all-targets --all-features` and then
-//! the doctests. The coverage step in `ci.yml`'s `build-test` job runs the
-//! same tests, but not the doctests, which `build-test` runs in a step of its
-//! own. The repository used to carry an `act-validation.yml` workflow running
+//! the doctests. `ci.yml`'s push-only `headless-test` job runs that command;
+//! its pull-request-only `build-test` job measures the same suite with
+//! coverage and runs the doctests in a step of its own. The repository used
+//! to carry an `act-validation.yml` workflow running
 //! `make test WITH_ACT=1`; nothing reads `WITH_ACT` and no test is gated on
 //! Act, so it ran the whole suite a second time and was removed.
 //!
 //! These tests read the workflows textually and the manifest as TOML, and
 //! hold the split:
 //!
-//! - no workflow line runs the suite, in any spelling of `make test`, `make all`, a bare `make`,
-//!   `cargo test`, `cargo nextest` or `cargo llvm-cov`, whatever the options or separators around
-//!   it, except the one doctest step;
-//! - that doctest step is in `build-test` and carries no step-level `if:`; the unguarded job runs
-//!   on pushes and pull requests, so it checks branch heads and pull-request merge commits;
-//! - `build-test` runs the coverage action in one unguarded step, and no workflow turns on its
-//!   doctests;
+//! - suite commands run only once in each lane: `make test` in the push-only `headless-test` job
+//!   and the doctest step in the pull-request-only `build-test` job;
+//! - the doctest and coverage steps in `build-test` carry no step-level `if:`; its job-level
+//!   pull-request guard keeps the coverage lane off pushes while still checking same-repository and
+//!   fork merge results;
+//! - no workflow turns on coverage doctests;
 //! - the coverage steps in `ci.yml` and `coverage-main.yml` pass every declared feature, so `make
 //!   test`'s `--all-features` and the coverage run select the same tests.
 //!
@@ -29,7 +29,7 @@ mod reading;
 
 use reading::{Command, Job, Manifest, Workflow, manifest_dir, workflows};
 
-/// The one suite command a workflow may run outside the coverage step.
+/// The doctest command the pull-request coverage step does not run.
 const DOCTEST_COMMAND: &str = "cargo test --doc --workspace --all-features";
 
 /// The coverage action every pull request's suite run goes through.
@@ -37,6 +37,9 @@ const COVERAGE_ACTION: &str = "leynos/shared-actions/.github/actions/generate-co
 
 /// The job that must run both the coverage step and the doctest step.
 const SUITE_JOB: &str = "build-test";
+
+/// The push-only job that runs the headless test suite without coverage.
+const HEADLESS_TEST_JOB: &str = "headless-test";
 
 /// Returns the `build-test` job of `ci.yml`, if it exists.
 fn suite_job(found: &[(String, String)]) -> Option<Job<'_>> {
@@ -103,21 +106,31 @@ fn suite_spellings_are_recognized(#[case] line: &str, #[case] expected: bool) {
 }
 
 #[test]
-fn only_the_doctest_step_runs_the_suite_outside_coverage() {
+fn suite_commands_are_confined_to_the_push_and_pull_request_jobs() {
     let found = workflows().expect("failed to read the workflows");
-    let (doctests, repeated): (Vec<_>, Vec<_>) =
-        suite_runs(&found)
-            .into_iter()
-            .partition(|(name, job, command)| {
-                *command == DOCTEST_COMMAND && *name == "ci.yml" && *job == SUITE_JOB
-            });
+    let runs = suite_runs(&found);
+    let doctests = runs
+        .iter()
+        .filter(|(name, job, command)| {
+            *command == DOCTEST_COMMAND && *name == "ci.yml" && *job == SUITE_JOB
+        })
+        .count();
+    let push_suite = runs
+        .iter()
+        .filter(|(name, job, command)| {
+            *command == "make test" && *name == "ci.yml" && *job == HEADLESS_TEST_JOB
+        })
+        .count();
     assert!(
-        repeated.is_empty(),
-        "the suite runs outside coverage in {repeated:?}"
+        runs.len() == 2,
+        "only the doctest and push-only suite commands may run: {runs:?}"
     );
     assert_eq!(
-        doctests.len(),
-        1,
+        push_suite, 1,
+        "`make test` must run once in the push-only {HEADLESS_TEST_JOB} job"
+    );
+    assert_eq!(
+        doctests, 1,
         "`{DOCTEST_COMMAND}` must run once, in {SUITE_JOB}"
     );
 }
