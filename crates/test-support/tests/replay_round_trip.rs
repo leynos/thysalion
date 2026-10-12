@@ -124,7 +124,7 @@ fn the_checked_in_golden_bytes_match_a_fresh_recording() {
     assert_eq!(
         actual, expected,
         "the replay encoding has drifted from the committed golden bytes. This is a wire-format \
-         change: it needs a FormatVersion bump and an ADR 007 version-history entry, not a \
+         change: it needs a FormatVersion bump and an ADR 008 version-history entry, not a \
          regenerated fixture"
     );
 }

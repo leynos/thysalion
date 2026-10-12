@@ -12,9 +12,9 @@ available. `make audit` derives the Rust workspace root with `cargo metadata`,
 logs workspace member manifests, and runs `cargo audit` once from the workspace
 root. `make coverage` uses `cargo llvm-cov` with `lld`.
 
-`ci.yml` runs the push-only `headless-test` job with `make test` on every
-branch push. Its `pull_request`-only `build-test` job runs coverage on each
-merge result and runs doctests in a step of its own with
+`ci.yml` runs `headless-test` with `make test` on every branch push and manual
+`workflow_dispatch`. Its `pull_request`-only `build-test` job runs coverage on
+each merge result and runs doctests in a step of its own with
 `cargo test --doc --workspace --all-features`. The repository used to carry an
 `act-validation.yml` workflow that ran `make test WITH_ACT=1`, but nothing reads
 `WITH_ACT` and no test is gated on Act, so that workflow ran the whole suite a
@@ -64,14 +64,15 @@ tests GitHub's synthetic merge commit. Same-repository pull requests can run
 both jobs on distinct refs: `refs/heads/…` for the branch push and
 `refs/pull/N/merge` for the merge result. `build-test` is scoped to
 `pull_request`, with no same-repository skip; its direct coverage step has no
-step-level `if:`.
+step-level `if:`. Manual dispatches select `headless-test`; `build-test`
+remains pull-request-only.
 
 The workflow-level `concurrency` group is keyed on workflow and ref, with
-`cancel-in-progress: true`. It cancels a superseded run only when its workflow
-and ref match; the branch-push and pull-request merge-result refs therefore do
-not cancel one another. `tests/workflow_shape.rs` asserts the push-only
-headless job and that `build-test` has no same-repository skip and retains the
-pull-request merge-result run.
+`cancel-in-progress: true`. A manual dispatch and a push to the same branch
+share a ref, so a newer run can cancel the older one; the pull-request merge
+ref is distinct and does not cancel the branch run. `tests/workflow_shape.rs`
+asserts the headless job's push and manual-dispatch scope and that `build-test`
+has no same-repository skip and retains the pull-request merge-result run.
 
 `tests/workflow_shape.rs` asserts the trigger, concurrency, and merge-result
 shape without depending on literal action SHA values; see "Workflow pins and

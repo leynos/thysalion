@@ -55,9 +55,9 @@ Concretely, after this change:
    `bare-cell` fixture scene inside it, and asserts against the harness's
    registered diagnostics — the roadmap task's three clauses in one test (task
    1.3.1).
-3. Every branch push runs `make test` in the push-only `headless-test` job;
-   `build-test` checks pull-request merge results and retains coverage and
-   doctests. `tests/workflow_shape.rs` guards both job conditions (task 1.3.1).
+3. Every branch push and manual `workflow_dispatch` runs `make test` in
+   `headless-test`; `build-test` checks pull-request merge results and retains
+   coverage and doctests. `build-test` remains pull-request-only (task 1.3.1).
 4. Recording an empty replay session and replaying it is byte-identical,
    asserted by a test that runs in CI, over a storage format whose version
    field, probe, and golden bytes follow the pattern ADR 006 established for
@@ -273,15 +273,16 @@ quality criteria.
   re-point both suites; delete the duplicates.
 - [x] Stage C2: the combined fixture-in-harness behavioural scenario goes
   green.
-- [x] Stage C3: the `headless-test` job runs `make test` on branch pushes;
-  `build-test` runs coverage and doctests on pull-request merge results. The
-  workflow-shape contract covers the three workflows present after rebase.
+- [x] Stage C3: the `headless-test` job runs `make test` on branch pushes and
+  manual dispatches; `build-test` runs coverage and doctests on pull-request
+  merge results. The workflow-shape contract covers the three workflows present
+  after rebase.
 - [x] Stage C4: replay envelope, recorder/replayer, golden bytes, CI test;
   ADR 008.
 - [x] Stage D: documentation, roadmap checkboxes, refactor pass,
-  retrospective. The refactor pass found nothing to act on: the largest new
-  file is 241 lines against the 400-line limit, and no duplication, long
-  function, or excessive parameter list survived review.
+  retrospective. The refactor pass found nothing to act on: `session.rs` is 343
+  lines against the 400-line limit, and no duplication, long function, or
+  excessive parameter list survived review.
 
 ## Surprises & discoveries
 
@@ -378,9 +379,9 @@ quality criteria.
   CI disproved that reading: runs 38262379505 and 38262370532 failed
   `coverage.second-writer`, and the pinned `lanes.py` requires every coverage
   step reachable from push to be pull-request guarded. Impact: the original
-  all-event `build-test` plan changed to the documented split: push-only
-  `headless-test` runs `make test`, while pull-request-only `build-test`
-  retains coverage and doctests.
+  all-event `build-test` plan changed to the documented split: push/manual-
+  dispatch `headless-test` runs `make test`, while pull-request-only
+  `build-test` retains coverage and doctests.
 
 ## Decision log
 
@@ -409,15 +410,16 @@ quality criteria.
 - Decision: `ci.yml` gains `push` on all branches while retaining
   `pull_request`, with a workflow-level `concurrency` group
   (`${{ github.workflow }}-${{ github.ref }}`, `cancel-in-progress: true`).
-  `headless-test` runs `make test` only for pushes; `build-test` runs only for
-  pull requests, including same-repository and fork merge results, with its
-  coverage step carrying no step-level `if:`. Rationale: the branch-head push
-  and synthetic pull-request merge commit are distinct checks, and fork
-  branches generate no push event in this repository. The original plan ran
-  `build-test` for both events, but hosted runs 38262379505 and 38262370532
-  failed `coverage.second-writer`; the pinned `generate-coverage` lane requires
-  push-reachable coverage steps to be pull-request guarded. The split keeps
-  coverage PR-only while running `make test` on every branch push. Date/Author:
+  `headless-test` runs `make test` for pushes and manual dispatch; `build-test`
+  runs only for pull requests, including same-repository and fork merge
+  results, with its coverage step carrying no step-level `if:`. Rationale: the
+  branch-head push and synthetic pull-request merge commit are distinct checks,
+  and fork branches generate no push event in this repository. The original
+  plan ran `build-test` for both events, but hosted runs 38262379505 and
+  38262370532 failed `coverage.second-writer`; the pinned `generate-coverage`
+  lane requires push-reachable coverage steps to be pull-request guarded. The
+  split keeps coverage PR-only while running `make test` on every branch push
+  and manual dispatch. `build-test` remains pull-request-only. Date/Author:
   2026-08-04, plan author; revised after rebase verification.
 - Decision: the replay skeleton lives in `thysalion-test-support` behind the
   default feature set (`replay` module, no `bevy` requirement), and its wire
@@ -512,18 +514,14 @@ quality criteria.
   newtype expresses and which is checked at both boundaries instead. The hex
   digest is the strongest candidate and still has no consumer until roadmap
   4.1.2. Date/Author: 2026-09-15, implementor.
-- Decision (review response): the crate's panic-on-failure behaviour outwith
-  `replay` is kept and documented as a contract at the crate level, rather than
-  converted to `Result`. Rationale: every caller is a test, and each condition
-  is a broken checkout or a malformed scenario rather than a state a test could
-  handle; `rstest-bdd` step functions return `()`, so a `Result` would be
-  unwrapped one line further from the cause, and the lint table denies `unwrap`
-  and `expect` outwith `#[test]` functions anyway. `replay` is the documented
-  exception because a recording is data, frequently written by another build,
-  so a decode failure is an expected outcome. Converting the promoted code's
-  error handling would also exceed the promotion's remit, which the Tolerances
-  section scopes to moving test code rather than reshaping it. Date/Author:
-  2026-09-15, implementor.
+- Decision (review response): replay failures are returned as typed errors, and
+  fixture-directory, resource-copy, and scene-source I/O failures propagate as
+  `io::Result` from the public loader helpers. Scene-load failures remain
+  recorded in `LoaderSession::fixtures`, since they are scenario outcomes
+  rather than filesystem failures. This supersedes the earlier implementation
+  note that non-replay failures remained panic-based; malformed scenario misuse
+  can still panic at the `rstest-bdd` boundary. Date/Author: 2026-09-15,
+  implementor; updated after review.
 
 - Decision (third review round): ADR 008's versioning section gains the rule
   that an added field must carry `#[serde(default)]`, and names both directions
@@ -685,11 +683,11 @@ change:
 
 1. Extend `tests/workflow_shape.rs` with trigger-shape assertions:
    `ci.yml` must declare a `push` trigger covering all branches, retain its
-   `pull_request` trigger, use a `concurrency` group, run `headless-test` only
-   on pushes, and run `build-test` for pull-request merge results without a
-   same-repository skip. The SHA-pinning contract covers the workflows present
-   in the tree. These assertions fail before the triggers and split jobs are
-   added.
+   `pull_request` trigger, use a `concurrency` group, run `headless-test` on
+   pushes and manual dispatch, and run `build-test` for pull-request merge
+   results without a same-repository skip. The SHA-pinning contract covers the
+   workflows present in the tree. These assertions fail before the triggers and
+   split jobs are added.
 2. The combined scenario's feature file,
    `crates/test-support/tests/features/verification_spine.feature`:
 
@@ -734,18 +732,18 @@ any library crate); `Then` asserts palette arity and that
 `thysalion_harness::diagnostics::FRAME_TIME` resolves in the app's
 `DiagnosticsStore` after one `app.update()`. Green; `make all`; commit.
 
-### Stage C3 — CI on every push and pull-request merge result
+### Stage C3 — CI on pushes, manual dispatch, and pull-request merge results
 
 Edit `ci.yml`: add the `push` trigger, workflow/ref `concurrency` group,
-push-only `headless-test` job running `make test`, and pull-request-only
-`build-test` job. Keep the coverage and doctest steps directly in `build-test`,
-without step-level `if:` conditions. The PR job checks the synthetic merge
-result for both same-repository and fork pull requests; the headless job checks
-the branch head. This split follows the hosted `coverage.second-writer`
-failures and the pinned lane's PR-guard requirement. The Stage B workflow-shape
-assertions go green. The former `act-validation.yml` was removed by rebase and
-is not part of this stage. `make all`; commit; after push, confirm Actions runs
-appear for both jobs.
+`headless-test` running `make test` on pushes and manual dispatch, and
+pull-request-only `build-test` job. Keep the coverage and doctest steps
+directly in `build-test`, without step-level `if:` conditions. The PR job
+checks the synthetic merge result for both same-repository and fork pull
+requests; the headless job checks the branch head. This split follows the hosted
+`coverage.second-writer` failures and the pinned lane's PR-guard requirement.
+The Stage B workflow-shape assertions go green. The former `act-validation.yml`
+was removed by rebase and is not part of this stage. `make all`; commit; after
+push, confirm Actions runs appear for both jobs.
 
 ### Stage C4 — the replay envelope and ADR 008
 
@@ -807,7 +805,7 @@ Red-Green-Refactor evidence, as observed:
   which does not fire on test-binary items but does fire once they are library
   items, and `clippy::let_underscore_must_use` on the two step functions that
   discard those accessors' results once `#[must_use]` was added.
-- Green: `make test` reports `228 tests run: 228 passed, 2 skipped`, against
+- Green: `make test` reports `292 passed, 2 skipped`, against
   214 before the change. The fourteen new tests are the combined headless
   scenario (1), the replay suite (8 active, plus one `#[ignore]`d regeneration
   helper), the workflow-shape additions (4, beside the two that already
@@ -827,9 +825,9 @@ Red-Green-Refactor evidence, as observed:
 Acceptance, as verified:
 
 1. `ci.yml` declares `push: branches: ['**']`; `headless-test` runs `make test`
-   only on pushes, while `build-test` runs coverage and doctests only for
-   pull-request merge results. `tests/workflow_shape.rs` fails if either job's
-   event condition or the retained merge-result run is removed.
+   on pushes and manual dispatch, while `build-test` runs coverage and doctests
+   only for pull-request merge results. `tests/workflow_shape.rs` fails if
+   either job's event condition or the retained merge-result run is removed.
 2. `grep -rEn "struct BevyHarness|struct LoaderHarness" crates/` matches
    exactly two lines, both under `crates/test-support/src/`. The `-E` is
    load-bearing: without it `grep` reads the alternation literally and matches
@@ -846,9 +844,10 @@ matches `bevy` zero times, and `cargo tree -p thysalion -e normal` matches
 
 Acceptance, phrased as behaviour:
 
-1. Pushing any branch to GitHub runs `make test` in `headless-test`, including
-   the fixture-loading scenario. Pull requests run `build-test` on GitHub's
-   merge result with coverage and doctests (roadmap 1.3.1's criterion).
+1. Pushing any branch to GitHub, or manually dispatching `ci.yml`, runs
+   `make test` in `headless-test`, including the fixture-loading scenario. Pull
+   requests run `build-test` on GitHub's merge result with coverage and
+   doctests (roadmap 1.3.1's criterion).
 2. `rg "struct BevyHarness|struct LoaderHarness" crates/` matches only
    under `crates/test-support/src/`.
 3. Running the replay round-trip test twice in a row passes both times,

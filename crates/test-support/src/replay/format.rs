@@ -157,7 +157,7 @@ pub struct TickRecord {
 /// When they do, they record *domain-level* inputs — commands, intents,
 /// waypoints — and never raw window or key events. Design §14's I1 is stated
 /// over input records at the circuit boundary, and recording operating-system
-/// events instead would pin the invariant to a seam it is not about; ADR 007
+/// events instead would pin the invariant to a seam it is not about; ADR 008
 /// records that rejection and its grounds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

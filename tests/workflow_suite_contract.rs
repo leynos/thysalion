@@ -1,7 +1,8 @@
 //! Contract tests for the CI workflow's suite and coverage steps.
 //!
 //! `make test` runs the suite with `--all-targets --all-features` and then
-//! the doctests. `ci.yml`'s push-only `headless-test` job runs that command;
+//! the doctests. `ci.yml`'s push and manual-dispatch `headless-test` job runs
+//! that command;
 //! its pull-request-only `build-test` job measures the same suite with
 //! coverage and runs the doctests in a step of its own. The repository used
 //! to carry an `act-validation.yml` workflow running
@@ -11,8 +12,8 @@
 //! These tests read the workflows textually and the manifest as TOML, and
 //! hold the split:
 //!
-//! - suite commands run only once in each lane: `make test` in the push-only `headless-test` job
-//!   and the doctest step in the pull-request-only `build-test` job;
+//! - suite commands run only once in each lane: `make test` in the push and manual-dispatch
+//!   `headless-test` job and the doctest step in the pull-request-only `build-test` job;
 //! - the doctest and coverage steps in `build-test` carry no step-level `if:`; its job-level
 //!   pull-request guard keeps the coverage lane off pushes while still checking same-repository and
 //!   fork merge results;
@@ -38,7 +39,7 @@ const COVERAGE_ACTION: &str = "leynos/shared-actions/.github/actions/generate-co
 /// The job that must run both the coverage step and the doctest step.
 const SUITE_JOB: &str = "build-test";
 
-/// The push-only job that runs the headless test suite without coverage.
+/// The push and manual-dispatch job that runs the headless suite without coverage.
 const HEADLESS_TEST_JOB: &str = "headless-test";
 
 /// Returns the `build-test` job of `ci.yml`, if it exists.
@@ -106,7 +107,7 @@ fn suite_spellings_are_recognized(#[case] line: &str, #[case] expected: bool) {
 }
 
 #[test]
-fn suite_commands_are_confined_to_the_push_and_pull_request_jobs() {
+fn suite_commands_are_confined_to_the_headless_and_pull_request_jobs() {
     let found = workflows().expect("failed to read the workflows");
     let runs = suite_runs(&found);
     let doctests = runs
@@ -115,7 +116,7 @@ fn suite_commands_are_confined_to_the_push_and_pull_request_jobs() {
             *command == DOCTEST_COMMAND && *name == "ci.yml" && *job == SUITE_JOB
         })
         .count();
-    let push_suite = runs
+    let headless_suite = runs
         .iter()
         .filter(|(name, job, command)| {
             *command == "make test" && *name == "ci.yml" && *job == HEADLESS_TEST_JOB
@@ -123,11 +124,11 @@ fn suite_commands_are_confined_to_the_push_and_pull_request_jobs() {
         .count();
     assert!(
         runs.len() == 2,
-        "only the doctest and push-only suite commands may run: {runs:?}"
+        "only the doctest and headless suite commands may run: {runs:?}"
     );
     assert_eq!(
-        push_suite, 1,
-        "`make test` must run once in the push-only {HEADLESS_TEST_JOB} job"
+        headless_suite, 1,
+        "`make test` must run once in the push and manual-dispatch {HEADLESS_TEST_JOB} job"
     );
     assert_eq!(
         doctests, 1,

@@ -123,8 +123,8 @@ jobs:
         run: cargo test --doc --workspace --all-features
 
   headless-test:
-    # Pushes still exercise the fixture suite without starting a coverage lane.
-    if: github.event_name == 'push'
+    # Pushes and manual dispatch exercise the suite without starting coverage.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read

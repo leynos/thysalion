@@ -198,21 +198,26 @@ fn ci_keeps_one_run_per_ref() {
 }
 
 #[test]
-fn ci_runs_the_headless_suite_on_every_push() {
+fn ci_runs_the_headless_suite_on_push_and_manual_dispatch() {
     // Coverage is pull-request-only because main owns the push baseline, but
-    // each branch push must still run the fixture-loading behavioural suite.
+    // pushes and manual dispatches must run the fixture-loading suite.
+    let triggers = ci_triggers();
+    assert!(
+        entry(&triggers, 2, "workflow_dispatch").is_some(),
+        "ci.yml must retain its manual-dispatch trigger; found triggers:\n{triggers}"
+    );
     let workflow = ci_workflow();
     let jobs = top_level_block(&workflow, "jobs").expect("ci.yml must declare jobs");
     let job =
         child_block(&jobs, 2, "headless-test").expect("ci.yml must declare a headless-test job");
     assert_eq!(
         entry(&job, 4, "if"),
-        Some("github.event_name == 'push'"),
-        "headless-test must run only for branch pushes"
+        Some("github.event_name == 'push' || github.event_name == 'workflow_dispatch'"),
+        "headless-test must run for branch pushes and manual dispatches"
     );
     assert!(
         job.contains("run: make test"),
-        "the push job must run the behavioural suite: {job}"
+        "the headless job must run the behavioural suite: {job}"
     );
 }
 

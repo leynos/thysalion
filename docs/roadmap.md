@@ -118,7 +118,13 @@ verification programme is continuously enforced. See thysalion-design.md §14.
     pull requests, with no same-repository skip; its coverage step has no
     step-level `if:`. The workflow/ref concurrency group cancels only
     superseded runs with the same workflow and ref. `tests/workflow_shape.rs`
-    asserts the push-only job and retained merge-result run.
+    asserts the push and manual-dispatch headless job and retained
+    merge-result run.
+  - `ci.yml` also runs `headless-test` on `workflow_dispatch`; `build-test`
+    remains limited to pull requests. `tests/workflow_shape.rs` asserts the
+    manual-dispatch trigger and headless job condition. Concurrency is keyed on
+    workflow and ref, so dispatch and push runs on the same branch can supersede
+    one another while a PR merge-result run uses a distinct ref.
   - Success: a trivial headless behavioural test loads a fixture scene in
     CI on every push.
 - [x] 1.3.2. Build the deterministic replay harness skeleton.
