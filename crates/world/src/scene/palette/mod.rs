@@ -19,7 +19,6 @@ use crate::{
         document::{
             EmissionDocument,
             MaterialClass,
-            Passability,
             SimProperties,
             SlopeDirection,
             VoxelTypeDocument,
@@ -33,6 +32,9 @@ use crate::{
         },
     },
 };
+
+mod passability;
+pub use passability::{FacePassability, Passability};
 
 /// The largest palette a 16-bit index can address.
 pub const MAX_PALETTE_ENTRIES: usize = u16::MAX as usize + 1;
@@ -275,7 +277,7 @@ fn convert_entry(
         (Ok(checked), true) => Ok(VoxelType {
             name: entry.name.clone(),
             material: entry.material,
-            passable: entry.passable,
+            passable: entry.passable.into(),
             slope: entry.slope,
             emission: checked,
             sim: entry.sim,

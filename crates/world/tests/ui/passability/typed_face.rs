@@ -1,6 +1,6 @@
 //! A typed face can be constructed, assigned, and read through the public API.
 
-use thysalion_world::scene::document::{FacePassability, Passability};
+use thysalion_world::scene::palette::{FacePassability, Passability};
 
 fn main() {
     let mut passability = Passability::closed();

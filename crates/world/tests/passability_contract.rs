@@ -4,38 +4,63 @@
 //! behind a successful round trip of a value that uses the same mapping twice.
 
 use rstest::rstest;
-use thysalion_world::scene::document::{Face, Passability};
+use thysalion_world::scene::{
+    document::{Face, PassabilityDocument, PassabilityFaceDocument, VoxelTypeDocument},
+    palette::Passability,
+};
 
 const FACE_NAMES: [&str; 6] = ["pos_x", "neg_x", "pos_y", "neg_y", "pos_z", "neg_z"];
 
 /// Builds a value with just the selected face passable for wire-contract cases.
-fn passability_with_only_face_open(face: Face) -> Passability {
+fn passability_with_only_face_open(face: Face) -> PassabilityDocument {
     match face {
-        Face::PosX => Passability {
+        Face::PosX => PassabilityDocument {
             pos_x: true.into(),
-            ..Passability::closed()
+            ..PassabilityDocument::closed()
         },
-        Face::NegX => Passability {
+        Face::NegX => PassabilityDocument {
             neg_x: true.into(),
-            ..Passability::closed()
+            ..PassabilityDocument::closed()
         },
-        Face::PosY => Passability {
+        Face::PosY => PassabilityDocument {
             pos_y: true.into(),
-            ..Passability::closed()
+            ..PassabilityDocument::closed()
         },
-        Face::NegY => Passability {
+        Face::NegY => PassabilityDocument {
             neg_y: true.into(),
-            ..Passability::closed()
+            ..PassabilityDocument::closed()
         },
-        Face::PosZ => Passability {
+        Face::PosZ => PassabilityDocument {
             pos_z: true.into(),
-            ..Passability::closed()
+            ..PassabilityDocument::closed()
         },
-        Face::NegZ => Passability {
+        Face::NegZ => PassabilityDocument {
             neg_z: true.into(),
-            ..Passability::closed()
+            ..PassabilityDocument::closed()
         },
     }
+}
+
+/// Palette conversion preserves face identity in both directions.
+#[test]
+fn document_and_domain_conversion_preserve_each_face() {
+    let document = PassabilityDocument {
+        pos_x: PassabilityFaceDocument::from(true),
+        neg_x: PassabilityFaceDocument::from(false),
+        pos_y: PassabilityFaceDocument::from(true),
+        neg_y: PassabilityFaceDocument::from(false),
+        pos_z: PassabilityFaceDocument::from(false),
+        neg_z: PassabilityFaceDocument::from(true),
+    };
+
+    let domain = Passability::from(document);
+    assert!(domain.pos_x.is_passable());
+    assert!(!domain.neg_x.is_passable());
+    assert!(domain.pos_y.is_passable());
+    assert!(!domain.neg_y.is_passable());
+    assert!(!domain.pos_z.is_passable());
+    assert!(domain.neg_z.is_passable());
+    assert_eq!(PassabilityDocument::from(domain), document);
 }
 
 /// Builds the expected MessagePack map in the published face-field order.
@@ -102,7 +127,7 @@ fn each_face_keeps_its_flat_wire_mapping(
         expected_json.as_bytes(),
         "JSON bytes should set only the {face_key} face",
     );
-    let from_json: Passability =
+    let from_json: PassabilityDocument =
         serde_json::from_slice(&json).expect("Passability should deserialize from JSON");
     assert_eq!(
         from_json, passability,
@@ -122,7 +147,7 @@ fn each_face_keeps_its_flat_wire_mapping(
         expected_named_map(expected_values),
         "MessagePack should contain the six flat faces, with only {face_key} true",
     );
-    let from_messagepack: Passability = rmp_serde::from_slice(&messagepack)
+    let from_messagepack: PassabilityDocument = rmp_serde::from_slice(&messagepack)
         .expect("Passability should deserialize from named MessagePack");
     assert_eq!(
         from_messagepack, passability,
@@ -133,8 +158,9 @@ fn each_face_keeps_its_flat_wire_mapping(
 /// The generated schema keeps all six named face properties flat booleans.
 #[test]
 fn schema_has_six_flat_boolean_face_properties() {
-    let schema: serde_json::Value = serde_json::to_value(schemars::schema_for!(Passability))
-        .expect("Passability schema should serialize as JSON");
+    let schema: serde_json::Value =
+        serde_json::to_value(schemars::schema_for!(PassabilityDocument))
+            .expect("Passability schema should serialize as JSON");
     let properties = schema
         .get("properties")
         .and_then(serde_json::Value::as_object)
@@ -164,8 +190,9 @@ fn schema_has_six_flat_boolean_face_properties() {
 /// Every face remains required in the published field order.
 #[test]
 fn schema_requires_faces_in_declared_order() {
-    let schema: serde_json::Value = serde_json::to_value(schemars::schema_for!(Passability))
-        .expect("Passability schema should serialize as JSON");
+    let schema: serde_json::Value =
+        serde_json::to_value(schemars::schema_for!(PassabilityDocument))
+            .expect("Passability schema should serialize as JSON");
     let required: Vec<&str> = schema
         .get("required")
         .and_then(serde_json::Value::as_array)
@@ -187,8 +214,9 @@ fn schema_requires_faces_in_declared_order() {
 /// The generated schema rejects unknown fields and omits nested face schemas.
 #[test]
 fn schema_rejects_unknown_fields_without_nested_face_definitions() {
-    let schema: serde_json::Value = serde_json::to_value(schemars::schema_for!(Passability))
-        .expect("Passability schema should serialize as JSON");
+    let schema: serde_json::Value =
+        serde_json::to_value(schemars::schema_for!(PassabilityDocument))
+            .expect("Passability schema should serialize as JSON");
     assert_eq!(
         schema.get("additionalProperties"),
         Some(&serde_json::Value::Bool(false)),
@@ -201,11 +229,32 @@ fn schema_rejects_unknown_fields_without_nested_face_definitions() {
             .and_then(serde_json::Value::as_object)
         {
             assert!(
-                !definitions.contains_key("FacePassability"),
-                "transparent faces should not add a FacePassability definition",
+                !definitions.contains_key("PassabilityFaceDocument"),
+                "transparent faces should not add a nested schema definition",
             );
         }
     }
+}
+
+/// Renaming the Rust wire type does not rename its existing schema definition.
+#[test]
+fn voxel_type_schema_keeps_the_passability_definition_name() {
+    let schema: serde_json::Value = serde_json::to_value(schemars::schema_for!(VoxelTypeDocument))
+        .expect("VoxelTypeDocument schema should serialize as JSON");
+    let definitions = schema
+        .get("$defs")
+        .or_else(|| schema.get("definitions"))
+        .and_then(serde_json::Value::as_object)
+        .expect("VoxelTypeDocument schema should expose its definitions");
+
+    assert!(
+        definitions.contains_key("Passability"),
+        "schema should retain the established Passability definition name",
+    );
+    assert!(
+        !definitions.contains_key("PassabilityDocument"),
+        "the Rust wire type name should not change the published schema",
+    );
 }
 
 /// Unknown face names remain invalid even when all known fields are present.
@@ -215,7 +264,7 @@ fn json_rejects_an_unknown_face_field() {
         r#"{"pos_x":false,"neg_x":false,"pos_y":false,"neg_y":false,"#,
         r#""pos_z":false,"neg_z":false,"diagonal":true}"#,
     );
-    let error = serde_json::from_slice::<Passability>(json.as_bytes())
+    let error = serde_json::from_slice::<PassabilityDocument>(json.as_bytes())
         .expect_err("an unknown face field must be rejected");
 
     assert!(

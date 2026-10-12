@@ -40,9 +40,9 @@ use smol_str::SmolStr;
 pub use voxel_type::{
     EmissionDocument,
     Face,
-    FacePassability,
     MaterialClass,
-    Passability,
+    PassabilityDocument,
+    PassabilityFaceDocument,
     SimProperties,
     SlopeDirection,
     VoxelTypeDocument,

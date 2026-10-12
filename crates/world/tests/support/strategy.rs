@@ -26,11 +26,11 @@ use thysalion_world::scene::document::{
     EntitiesDocument,
     ExtentDocument,
     Face,
-    FacePassability,
     KnowledgeDocument,
     Lighting,
     MaterialClass,
-    Passability,
+    PassabilityDocument,
+    PassabilityFaceDocument,
     PrototypeDocument,
     SUPPORTED_VERSION,
     SceneDocument,
@@ -90,7 +90,7 @@ fn face() -> impl Strategy<Value = Face> {
     ]
 }
 
-fn passability() -> impl Strategy<Value = Passability> {
+fn passability() -> impl Strategy<Value = PassabilityDocument> {
     (
         any::<bool>(),
         any::<bool>(),
@@ -99,14 +99,16 @@ fn passability() -> impl Strategy<Value = Passability> {
         any::<bool>(),
         any::<bool>(),
     )
-        .prop_map(|(pos_x, neg_x, pos_y, neg_y, pos_z, neg_z)| Passability {
-            pos_x: FacePassability::new(pos_x),
-            neg_x: FacePassability::new(neg_x),
-            pos_y: FacePassability::new(pos_y),
-            neg_y: FacePassability::new(neg_y),
-            pos_z: FacePassability::new(pos_z),
-            neg_z: FacePassability::new(neg_z),
-        })
+        .prop_map(
+            |(pos_x, neg_x, pos_y, neg_y, pos_z, neg_z)| PassabilityDocument {
+                pos_x: PassabilityFaceDocument::from(pos_x),
+                neg_x: PassabilityFaceDocument::from(neg_x),
+                pos_y: PassabilityFaceDocument::from(pos_y),
+                neg_y: PassabilityFaceDocument::from(neg_y),
+                pos_z: PassabilityFaceDocument::from(pos_z),
+                neg_z: PassabilityFaceDocument::from(neg_z),
+            },
+        )
 }
 
 fn voxel_type() -> impl Strategy<Value = VoxelTypeDocument> {

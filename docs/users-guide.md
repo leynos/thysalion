@@ -92,10 +92,12 @@ and how to read a diagnostic report.
 
 ### Rust consumers
 
-The Rust API uses `FacePassability` for each `Passability` face instead of a
-bare boolean. Convert values with `FacePassability::from(true)` (or `false`)
-and read them with `is_passable`. This source API change leaves scene files
-unchanged: JSON still contains six flat boolean fields, and the scene format
-version does not change. See the developer guide's
-[scene document API](developers-guide.md#scene-document-api) for construction
-details.
+The validated Rust API uses `scene::palette::FacePassability` for each face of
+`scene::palette::Passability` instead of a bare boolean. Convert values with
+`FacePassability::from(true)` (or `false`) and read them with `is_passable`.
+The document API still encodes six flat booleans, so scene files and their
+schema are unchanged and the scene format version does not change. See the
+[scene document API](developers-guide.md#scene-document-api) for the
+distinction between document and validated palette values. The
+[0.1.0 to 0.2.0 migration note](migrations/0.2.0.md) lists both Rust API
+changes.

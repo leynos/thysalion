@@ -232,7 +232,7 @@ fn voxel_type_to_document(kind: &crate::scene::palette::VoxelType) -> VoxelTypeD
     VoxelTypeDocument {
         name: kind.name.clone(),
         material: kind.material,
-        passable: kind.passable,
+        passable: kind.passable.into(),
         slope: kind.slope,
         emission: emission_to_document(kind.emission),
         sim: kind.sim,

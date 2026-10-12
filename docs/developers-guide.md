@@ -163,19 +163,31 @@ macro-expansion artefacts or floating-point arithmetic, with a reason. The
 
 ## Scene document API
 
-`FacePassability` marks a boolean as the passability of one named voxel face.
-It is part of `thysalion-world::scene::document` and is used only by the six
-fields of `Passability`; do not reuse it for unrelated boolean values.
-Construct face values from booleans at the scene-document boundary with
-`FacePassability::from` (or `FacePassability::new`) and read them with
-`is_passable`. `Passability::open` and `Passability::closed` provide uniform
-values for all six faces.
+The document and validated palette APIs use separate passability types.
+`scene::document::PassabilityDocument` is the wire representation. Its six
+named fields use `PassabilityFaceDocument`, a transparent wrapper around a
+boolean; the document type and wrapper carry the serde and schema derives used
+for parsing and encoding. The wrapper keeps the JSON and schema values as six
+flat booleans. Construct document fields with `PassabilityFaceDocument::new` or
+convert a boolean with `.into()`, and read the value with `is_passable`.
 
-Rust consumers that previously assigned boolean literals directly to
-`Passability` fields must convert each value to `FacePassability`. This changes
-the Rust source API only: the transparent representation keeps `pos_x`, `neg_x`,
-`pos_y`, `neg_y`, `pos_z`, and `neg_z` as six flat booleans in JSON and the
-scene schema. The scene format version does not change.
+`scene::palette::FacePassability` marks a boolean as the passability of one
+named voxel face, and `scene::palette::Passability` groups the six values for
+validated palette and pathfinding use. The domain marker's scope is those six
+faces; do not reuse it for unrelated booleans. The domain types have no serde
+or schema derives. `Palette::from_document` converts the wire marker to the
+domain marker while building the validated palette.
+
+When constructing domain values, convert booleans with `FacePassability::from`
+(or `FacePassability::new`) and read them with `is_passable`.
+`Passability::open` and `Passability::closed` provide uniform values for all
+six faces. Rust consumers that previously assigned boolean literals directly to
+domain `Passability` fields must convert each value to `FacePassability`.
+Consumers constructing `PassabilityDocument` convert each boolean to
+`PassabilityFaceDocument` instead. The Rust domain API changes, while JSON
+remains six flat booleans and the scene format version does not change. The
+[0.1.0 to 0.2.0 migration note](migrations/0.2.0.md) records the source
+migration for both document and domain callers.
 
 ## Demo harness
 
