@@ -36,22 +36,12 @@ class CheckerHarness:
         )
 
 
-@pytest.fixture
-def check_build_tools(tmp_path: Path) -> CheckerHarness:
-    """Provide the checker's utility commands without ambient clang or mold."""
-    fake_bin = tmp_path / "bin"
-    fake_bin.mkdir()
+def _provision_fake_tools(fake_bin: Path) -> None:
+    """Install only the utility commands and fake tools for this checker harness."""
     for command in ("bash", "dirname", "awk", "grep"):
         resolved = shutil.which(command)
         assert resolved is not None, f"the fixture needs the host {command} utility"
         (fake_bin / command).symlink_to(resolved)
-
-    toolchain_file = tmp_path / "rust-toolchain.toml"
-    toolchain_file.write_text(
-        f'[toolchain]\nchannel = "{TOOLCHAIN_PIN}"\n', encoding="utf-8"
-    )
-    mold_pin = tmp_path / "mold-version"
-    mold_pin.write_text("2.41.0\n", encoding="utf-8")
 
     commands = {
         "rustup": """#!/usr/bin/env bash
@@ -88,6 +78,11 @@ esac
         executable.write_text(contents, encoding="utf-8")
         executable.chmod(0o755)
 
+
+def _checker_environment(
+    fake_bin: Path, mold_pin: Path, toolchain_file: Path
+) -> dict[str, str]:
+    """Build the checker-only environment with successful prerequisite output."""
     environment = os.environ.copy()
     environment.update(
         {
@@ -110,6 +105,23 @@ esac
             "MOLD_VERSION_FILE": str(mold_pin),
         }
     )
+    return environment
+
+
+@pytest.fixture
+def check_build_tools(tmp_path: Path) -> CheckerHarness:
+    """Provide the checker's utility commands without ambient clang or mold."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    _provision_fake_tools(fake_bin)
+
+    toolchain_file = tmp_path / "rust-toolchain.toml"
+    toolchain_file.write_text(
+        f'[toolchain]\nchannel = "{TOOLCHAIN_PIN}"\n', encoding="utf-8"
+    )
+    mold_pin = tmp_path / "mold-version"
+    mold_pin.write_text("2.41.0\n", encoding="utf-8")
+    environment = _checker_environment(fake_bin, mold_pin, toolchain_file)
     return CheckerHarness(environment, fake_bin, mold_pin, toolchain_file)
 
 
@@ -319,60 +331,53 @@ def test_checker_rejects_invalid_component_listing(
 
 
 @pytest.mark.parametrize(
-    ("contents", "diagnostic"),
+    ("pin", "contents", "diagnostic"),
     [
-        pytest.param(None, "missing version pin", id="missing-file"),
-        pytest.param("", "expected one version line", id="no-lines"),
-        pytest.param("\n", "empty version pin", id="empty-line"),
-        pytest.param("2.41.0\n2.40.0\n", "expected one version line", id="multiple-lines"),
-        pytest.param("2.41.0 extra\n", "version pin contains whitespace", id="whitespace"),
+        pytest.param("mold", None, "missing version pin", id="mold-missing-file"),
+        pytest.param("mold", "", "expected one version line", id="mold-no-lines"),
+        pytest.param("mold", "\n", "empty version pin", id="mold-empty-line"),
+        pytest.param(
+            "mold", "2.41.0\n2.40.0\n", "expected one version line",
+            id="mold-multiple-lines",
+        ),
+        pytest.param(
+            "mold", "2.41.0 extra\n", "version pin contains whitespace",
+            id="mold-whitespace",
+        ),
+        pytest.param("toolchain", None, "missing toolchain pin", id="toolchain-missing-file"),
+        pytest.param(
+            "toolchain", "[toolchain]\n", "expected one channel",
+            id="toolchain-missing-channel",
+        ),
+        pytest.param(
+            "toolchain", 'channel = ""\n', "expected one channel",
+            id="toolchain-empty-channel",
+        ),
+        pytest.param(
+            "toolchain", 'channel = "stable"\nchannel = "nightly"\n',
+            "expected one channel", id="toolchain-multiple-channels",
+        ),
+        pytest.param(
+            "toolchain", 'channel = "invalid channel!"\n',
+            "invalid toolchain channel", id="toolchain-invalid-channel",
+        ),
     ],
 )
-def test_checker_rejects_missing_or_malformed_mold_pin(
-    check_build_tools: CheckerHarness, contents: str | None, diagnostic: str
+def test_checker_rejects_missing_or_malformed_pins(
+    check_build_tools: CheckerHarness, pin: str, contents: str | None, diagnostic: str
 ) -> None:
-    """Reject unusable mold pins and identify the offending pin file."""
+    """Reject each unusable mold or toolchain pin and identify its file."""
+    pin_file = {
+        "mold": check_build_tools.mold_pin,
+        "toolchain": check_build_tools.toolchain_pin,
+    }[pin]
     if contents is None:
-        check_build_tools.mold_pin.unlink()
+        pin_file.unlink()
     else:
-        check_build_tools.mold_pin.write_text(contents, encoding="utf-8")
+        pin_file.write_text(contents, encoding="utf-8")
 
     result = check_build_tools.run()
 
     assert result.returncode == 1
     assert diagnostic in result.stderr
-    assert str(check_build_tools.mold_pin) in result.stderr
-
-
-@pytest.mark.parametrize(
-    ("contents", "diagnostic"),
-    [
-        pytest.param(None, "missing toolchain pin", id="missing-file"),
-        pytest.param("[toolchain]\n", "expected one channel", id="missing-channel"),
-        pytest.param('channel = ""\n', "expected one channel", id="empty-channel"),
-        pytest.param(
-            'channel = "stable"\nchannel = "nightly"\n',
-            "expected one channel",
-            id="multiple-channels",
-        ),
-        pytest.param(
-            'channel = "invalid channel!"\n',
-            "invalid toolchain channel",
-            id="invalid-channel",
-        ),
-    ],
-)
-def test_checker_rejects_missing_or_malformed_toolchain_pin(
-    check_build_tools: CheckerHarness, contents: str | None, diagnostic: str
-) -> None:
-    """Reject unusable toolchain pins and identify the offending pin file."""
-    if contents is None:
-        check_build_tools.toolchain_pin.unlink()
-    else:
-        check_build_tools.toolchain_pin.write_text(contents, encoding="utf-8")
-
-    result = check_build_tools.run()
-
-    assert result.returncode == 1
-    assert diagnostic in result.stderr
-    assert str(check_build_tools.toolchain_pin) in result.stderr
+    assert str(pin_file) in result.stderr
