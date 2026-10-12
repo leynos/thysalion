@@ -114,13 +114,21 @@ written by a machine, read by a machine, and never hand-edited. A second
 encoding would buy a review surface nobody reviews and a second writer to drift
 against.
 
-### The version is a range, probed before the full decode
+### Reads accept a version range; writes use the current schema
 
-`FormatVersion` is a `{major, minor}` pair with an accepted range, exactly as
-ADR 006's `DocumentVersion` is, and for exactly the same reason: a whitelist
-would make every additive change breaking, and the collision is immediate — the
-first `InputRecord` variant would otherwise invalidate every recording made
-before it.
+`FormatVersion` is a `{major, minor}` pair. Readers accept versions with the
+current major and a minor no greater than the supported minor, exactly as ADR
+006's `DocumentVersion` does. A whitelist would make every additive change
+breaking, and the collision is immediate — the first `InputRecord` variant
+would otherwise invalidate every recording made before it. The reader probes
+this range before the full decode.
+
+Writers use a stricter rule: `SessionRecorder` and the encoder require exactly
+`SUPPORTED_VERSION`. They serialize the current `SessionDocument` schema, so
+declaring an older version would mislabel its fields or variants. Writing an
+older version requires a version-specific down-converter; without one, the
+encoder refuses the claim. This preserves older-minor read compatibility
+without promising that the current schema can be written as an older one.
 
 Adding a field, or adding an `InputRecord` variant, bumps the minor; removing,
 retyping, or re-meaning a field bumps the major. Decoding probes the version

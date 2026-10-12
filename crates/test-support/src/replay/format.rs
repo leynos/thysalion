@@ -59,6 +59,31 @@ impl core::fmt::Display for FormatVersion {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    //! Property checks for replay version compatibility.
+
+    use proptest::prelude::*;
+
+    use super::FormatVersion;
+
+    proptest! {
+        #[test]
+        fn accepts_only_matching_majors_with_supported_minors(
+            reader_major in any::<u16>(),
+            reader_minor in any::<u16>(),
+            session_major in any::<u16>(),
+            session_minor in any::<u16>(),
+        ) {
+            let reader = FormatVersion { major: reader_major, minor: reader_minor };
+            let session = FormatVersion { major: session_major, minor: session_minor };
+            let expected = reader_major == session_major && session_minor <= reader_minor;
+
+            prop_assert_eq!(reader.accepts(session), expected);
+        }
+    }
+}
+
 /// Names the scene a session ran against.
 ///
 /// Both halves are needed and neither is sufficient. The name locates the

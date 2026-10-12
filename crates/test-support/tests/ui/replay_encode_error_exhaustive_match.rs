@@ -1,3 +1,5 @@
+//! Compile-time contract: external callers can match every encode error variant.
+
 use thysalion_test_support::replay::ReplayEncodeError;
 
 fn error_name(error: ReplayEncodeError) -> &'static str {

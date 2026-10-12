@@ -8,6 +8,11 @@ fn replay_errors_require_non_exhaustive_matches() {
 }
 
 #[test]
+fn replay_error_variants_remain_constructible() {
+    trybuild::TestCases::new().pass("tests/ui/replay_errors_constructible.rs");
+}
+
+#[test]
 fn input_record_remains_uninhabited() {
     trybuild::TestCases::new().pass("tests/ui/input_record_is_uninhabited.rs");
 }

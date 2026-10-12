@@ -141,10 +141,10 @@ escalation, not workarounds.
 - Dependencies use caret requirements declared once in
   `[workspace.dependencies]`; member manifests use `{ workspace = true }`.
 - All documentation follows the
-  [documentation style guide](../documentation-style-guide.md):
-  en-GB-oxendict spelling, sentence-case headings, 80-column prose wrap, and
-  a language identifier on every fenced block. The new ADR follows the ADR
-  template and numbering (`adr-008-…`).
+  [documentation style guide](../documentation-style-guide.md): en-GB-oxendict
+  spelling, sentence-case headings, 80-column prose wrap, and a language
+  identifier on every fenced block. The new ADR follows the ADR template and
+  numbering (`adr-008-…`).
 
 ## Tolerances (exception triggers)
 
@@ -230,8 +230,8 @@ quality criteria.
   *uninhabited*: `TickRecord.inputs` can only ever be empty until roadmap 4.1.2
   adds the first real variants with a minor version bump, so nothing
   meaningless ever reaches the wire and no placeholder variant becomes
-  permanent compatibility baggage. ADR 008 states this staging explicitly,
-  and the tolerance on ambiguity guards the boundary.
+  permanent compatibility baggage. ADR 008 states this staging explicitly, and
+  the tolerance on ambiguity guards the boundary.
 - Risk: byte-identity fails intermittently because something nondeterministic
   reaches the wire — a `HashMap` iteration order, a timestamp, a platform
   integer width. Severity: medium. Likelihood: low given the constraints.
@@ -417,26 +417,24 @@ quality criteria.
   types copy ADR 006's discipline with a `{major, minor}` version and a
   permissive probe. Rationale: the harness that re-executes sessions is
   verification tooling (design §14 names it beside the property tests);
-  `thysalion-sim` is empty until phase 4, so parking format types there
-  would put wire code in a plane crate for no consumer; ADR 006's pattern
-  is battle-tested locally and the style guide's ADR template gives it a
-  home as ADR 008. Roadmap 4.1.2 may re-home the *driver* when the circuit
-  boundary exists; the format types stay put. Date/Author: 2026-08-04, plan
-  author.
-- Decision: the record payload enum starts *uninhabited* (`enum
-  InputRecord {}`), and Arrow/Parquet are deferred exactly as ADR 006's
-  forward note anticipated. Rationale: inventing a record vocabulary
-  before any simulation exists is speculation that hardens into wire
-  burden (see `Risks`), and even a `Placeholder` variant would be
-  permanent compatibility baggage in a corpus format — an uninhabited
-  enum lets the envelope, the version rule, and the byte-identity test
-  all exist while making a non-empty payload unrepresentable until
-  roadmap 4.1.2 defines the first real variants with a minor bump.
-  MessagePack via the existing discipline costs no new dependency, and
-  the Arrow question re-opens when the corpus acquires analytical
-  consumers. ADR 008 records both deferrals with their re-opening
-  criteria. Date/Author: 2026-08-04, plan author; revised after the
-  design-review panel, same day.
+  `thysalion-sim` is empty until phase 4, so parking format types there would
+  put wire code in a plane crate for no consumer; ADR 006's pattern is
+  battle-tested locally and the style guide's ADR template gives it a home as
+  ADR 008. Roadmap 4.1.2 may re-home the *driver* when the circuit boundary
+  exists; the format types stay put. Date/Author: 2026-08-04, plan author.
+- Decision: the record payload enum starts *uninhabited*
+  (`enum InputRecord {}`), and Arrow/Parquet are deferred exactly as ADR 006's
+  forward note anticipated. Rationale: inventing a record vocabulary before any
+  simulation exists is speculation that hardens into wire burden (see `Risks`),
+  and even a `Placeholder` variant would be permanent compatibility baggage in
+  a corpus format — an uninhabited enum lets the envelope, the version rule,
+  and the byte-identity test all exist while making a non-empty payload
+  unrepresentable until roadmap 4.1.2 defines the first real variants with a
+  minor bump. MessagePack via the existing discipline costs no new dependency,
+  and the Arrow question re-opens when the corpus acquires analytical
+  consumers. ADR 008 records both deferrals with their re-opening criteria.
+  Date/Author: 2026-08-04, plan author; revised after the design-review panel,
+  same day.
 
 - Decision (Stage C1): the fixture-location helpers
   (`SCENES`, `FIXTURE_NAMES`, `repository_root`, `scene_dir`) are promoted into
@@ -462,33 +460,32 @@ quality criteria.
 - Decision (Stage C4): a session's ticks must strictly increase, and the rule
   is checked when encoding *and* when decoding. Rationale: the encode-side
   check catches a recorder bug before it writes an uninterpretable corpus
-  entry; the decode-side check is about untrusted bytes, and a replay corpus
-  is precisely where a build meets bytes an older build wrote. The rule also
-  gives the envelope one real invariant to test while the payload is
-  uninhabited. ADR 008 records it. Date/Author: 2026-09-14, implementor.
+  entry; the decode-side check is about untrusted bytes, and a replay corpus is
+  precisely where a build meets bytes an older build wrote. The rule also gives
+  the envelope one real invariant to test while the payload is uninhabited. ADR
+  008 records it. Date/Author: 2026-09-14, implementor.
 - Decision (Stage C4): the replay format ships one encoding, MessagePack,
   where ADR 006's scene format ships two. Rationale: JSON earns its place for
   scenes because a human authors and diffs them; a recording is written by a
-  machine, read by a machine, and never hand-edited, so a second encoding
-  would buy a review surface nobody reviews and a second writer to drift
-  against. ADR 008 records the reasoning and names a dumping tool as the
-  answer if human-readable recordings are ever wanted. Date/Author:
-  2026-09-14, implementor.
+  machine, read by a machine, and never hand-edited, so a second encoding would
+  buy a review surface nobody reviews and a second writer to drift against. ADR
+  008 records the reasoning and names a dumping tool as the answer if
+  human-readable recordings are ever wanted. Date/Author: 2026-09-14,
+  implementor.
 - Decision (Stage C3): `ci.yml`'s push trigger is `branches: ['**']` rather
   than a bare `push:`. Rationale: a bare `push:` covers tags as well as
   branches, which would run the full gate on every release tag alongside
   `release.yml` for no added information. Date/Author: 2026-09-14, implementor.
 
-- Decision (review response): the recorder validates the header version
-  before encoding, using the same range test the decoder applies rather than an
-  equality test. Rationale: a recorder that writes a version its own decoder
-  refuses produces a corpus entry nothing can read, which is the worst outcome
-  available to a format whose recordings are meant to outlive the build that
-  made them. A range test rather than equality because recording at an older
-  minor is a legitimate compatibility choice, while recording at a version this
-  build could not read back is not. Both encode paths share the check, so the
-  recorder and the re-encoder cannot drift. Date/Author: 2026-09-15,
-  implementor, after the CodeRabbit review.
+- Decision (review response): the writer requires the header to declare
+  exactly `SUPPORTED_VERSION`; only the decoder accepts older minor versions
+  within the same major. Rationale: the encoder always serializes this build's
+  schema, so declaring an older version would mislabel its fields or variants.
+  Recording an older schema requires a version-specific down-converter; without
+  one, the write is refused. The range check remains a read-compatibility rule,
+  and both encode paths share the exact-version check so the recorder and
+  re-encoder cannot drift. Date/Author: 2026-09-15, implementor, after the
+  CodeRabbit review.
 - Decision (review response): the decoder-side tick-ordering and version
   refusals are tested against bytes built from `rmpv` values rather than from
   the recorder. Rationale: the recorder now refuses exactly the sessions those
@@ -500,7 +497,7 @@ quality criteria.
   wire shape to the recorder's output so the helper cannot silently stop
   imitating the real format. Date/Author: 2026-09-15, implementor.
 - Decision (review response): validated domain newtypes over the envelope's
-  fields are declined for now, with a re-opening trigger recorded in ADR 007.
+  fields are declined for now, with a re-opening trigger recorded in ADR 008.
   Rationale: ADR 006 introduces a domain form only where there is a private
   field to protect and an invariant to enforce, and states that a second form
   for a type without one is "two names for one set of values". The envelope's
@@ -521,7 +518,7 @@ quality criteria.
   section scopes to moving test code rather than reshaping it. Date/Author:
   2026-09-15, implementor.
 
-- Decision (third review round): ADR 007's versioning section gains the rule
+- Decision (third review round): ADR 008's versioning section gains the rule
   that an added field must carry `#[serde(default)]`, and names both directions
   of compatibility explicitly. Rationale: the record said a minor bump is
   additive without saying what makes it so. Without the default, `serde`
@@ -742,16 +739,16 @@ branch push and pull-request merge result.
 
 ### Stage C4 — the replay envelope and ADR 008
 
-In `crates/test-support/src/replay/`, define the wire types
-(`format.rs`), the version probe (`probe.rs`), and the
-recorder/replayer pair (`session.rs`) per `Interfaces and dependencies`
-below. Write `docs/adr-008-replay-record-format.md` covering: the envelope
-shape; the `{major, minor}` rule and probe copied from ADR 006; the
-same-build byte-identity promise and its explicit non-promise of
-cross-version byte-determinism; the placeholder payload staging toward
-roadmap 4.1.2; and the recorded rejections (raw input capture à la
-`leafwing_input_playback`; Arrow now, per ADR 006's deferral note). Golden
-bytes land beside the test. Stage B's replay test goes green. `make all`
+In `crates/test-support/src/replay/`, define the wire types (`format.rs`), the
+version probe (`probe.rs`), and the recorder/replayer pair (`session.rs`) per
+`Interfaces and dependencies` below. Write
+`docs/adr-008-replay-record-format.md` covering: the envelope shape; the
+`{major, minor}` rule and probe copied from ADR 006; the same-build
+byte-identity promise and its explicit non-promise of cross-version
+byte-determinism; the deliberately uninhabited payload and its first variants,
+which arrive at roadmap 4.1.2; and the recorded rejections (raw input capture à
+la `leafwing_input_playback`; Arrow now, per ADR 006's deferral note). Golden
+bytes land beside the test, and Stage B's replay test goes green. `make all`
 plus `make markdownlint` and `make nixie`; commit.
 
 ### Stage D — documentation and closure
@@ -760,10 +757,10 @@ Update [developers-guide.md](../developers-guide.md) (the headless-testing
 section gains the test-support crate, making the adapters' doc-comment claim
 true; the CI section gains the push trigger and concurrency policy),
 [repository-layout.md](../repository-layout.md) (the new crate),
-[contents.md](../contents.md) (ADR 008), and tick roadmap 1.3.1 and 1.3.2
-with any delivered-shape notes, following the precedent of the 1.2
-entries. Post-commit review pass per AGENTS.md; separate refactor commits
-if the heuristics fire. Complete `Outcomes & retrospective`.
+[contents.md](../contents.md) (ADR 008), and tick roadmap 1.3.1 and 1.3.2 with
+any delivered-shape notes, following the precedent of the 1.2 entries.
+Post-commit review pass per AGENTS.md; separate refactor commits if the
+heuristics fire. Complete `Outcomes & retrospective`.
 
 ## Concrete steps
 
@@ -829,7 +826,7 @@ Acceptance, as verified:
    anywhere — including the ones it exists to detect.
 3. The replay round-trip suite passes twice in a row and `git status` stays
    clean; the golden bytes do not churn.
-4. `docs/adr-007-replay-record-format.md` exists, is linked from
+4. `docs/adr-008-replay-record-format.md` exists, is linked from
    `contents.md`, and `make markdownlint` reports `Summary: 0 error(s)`.
 
 Supporting layering checks: `cargo tree -p thysalion-world -e normal,dev`
@@ -938,9 +935,10 @@ impl RecordedSession {
 }
 ```
 
-Both encode paths enforce the format's two rules — a version this build can
-read back, and strictly increasing ticks — so the recorder and the re-encoder
-cannot drift about what they accept:
+Both encode paths require exactly `SUPPORTED_VERSION` and strictly increasing
+ticks, so the recorder and the re-encoder cannot drift about what they accept.
+The decoder separately accepts older minor versions within the same major;
+writing one requires a version-specific down-converter:
 
 ```rust
 pub enum ReplayEncodeError { Encode { .. }, NonMonotonicTick { .. }, UnsupportedVersion { .. } }

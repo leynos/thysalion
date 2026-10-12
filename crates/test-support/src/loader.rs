@@ -32,6 +32,8 @@ pub struct LoaderSession {
     pub from_json: Option<Scene>,
     /// The outcome of loading each shipped fixture, by name.
     pub fixtures: Vec<(String, Result<LoadedScene, SceneLoadError>)>,
+    #[cfg(test)]
+    fixture_directories: Option<(Dir, Dir)>,
 }
 
 impl LoaderSession {
@@ -46,6 +48,26 @@ impl LoaderSession {
             outcome: None,
             from_json: None,
             fixtures: Vec::new(),
+            #[cfg(test)]
+            fixture_directories: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn with_fixture_directories(directory: Dir, replica: Dir) -> Self {
+        let mut session = Self::new();
+        session.fixture_directories = Some((directory, replica));
+        session
+    }
+
+    #[cfg(test)]
+    fn open_fixture_directories(&self) -> io::Result<(Dir, Dir)> {
+        if let Some((directory, replica)) = self.fixture_directories.as_ref() {
+            Ok((directory.try_clone()?, replica.try_clone()?))
+        } else {
+            let directory = crate::scenes::scene_dir()?;
+            let replica = directory.try_clone()?;
+            Ok((directory, replica))
         }
     }
 
@@ -55,6 +77,8 @@ impl LoaderSession {
     /// in-memory source the other scenarios use. These scenarios exist to prove
     /// the *committed artefacts* load, which an in-memory copy of them could
     /// not: it would prove the constructor agrees with itself.
+    /// Scene-load failures are recorded in [`Self::fixtures`]; `Ok(())` means
+    /// only that no filesystem I/O failed.
     ///
     /// # Errors
     ///
@@ -62,8 +86,14 @@ impl LoaderSession {
     /// opened or cloned, or when a referenced resource cannot be read.
     pub fn load_fixture(&mut self, name: &str) -> io::Result<()> {
         self.document = None;
-        let directory = crate::scenes::scene_dir()?;
-        let replica = directory.try_clone()?;
+        #[cfg(test)]
+        let (directory, replica) = self.open_fixture_directories()?;
+        #[cfg(not(test))]
+        let (directory, replica) = {
+            let directory = crate::scenes::scene_dir()?;
+            let replica = directory.try_clone()?;
+            (directory, replica)
+        };
         let loader = SceneLoader::new(Arc::new(DirSceneSource::new(
             directory,
             crate::scenes::SCENES,
@@ -194,11 +224,7 @@ mod tests {
     //! fixture load leaves no stale selection behind for the next step to
     //! assert against.
 
-    use std::sync::Arc;
-
-    use camino::Utf8PathBuf;
     use cap_std::{ambient_authority, fs_utf8::Dir};
-    use thysalion_world::{loader::SceneLoader, source::DirSceneSource};
 
     use super::LoaderSession;
 
@@ -232,25 +258,30 @@ mod tests {
     }
 
     #[test]
-    fn a_fixture_resource_copy_failure_is_returned() {
+    fn load_fixture_returns_a_resource_copy_failure() {
         let directory = crate::scenes::scene_dir().expect("open the fixture directory");
-        let loader = SceneLoader::new(Arc::new(DirSceneSource::new(
-            directory,
-            crate::scenes::SCENES,
-        )));
-        let loaded_scene = loader
-            .load(&Utf8PathBuf::from("keep-interior.scene.json"))
-            .expect("load the fixture before copying its resources");
-        let crate_directory =
-            Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())
-                .expect("open the crate root, which does not contain the fixture resource");
-        let mut session = LoaderSession::new();
-
+        let replica = Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())
+            .expect("open the crate root, which does not contain the fixture resource");
+        let mut session = LoaderSession::with_fixture_directories(directory, replica);
+        session
+            .load_fixture("bare-cell")
+            .expect("load the fixture before selecting a missing-resource scene");
         assert!(
-            session
-                .adopt_resources(&loaded_scene, &crate_directory)
-                .is_err(),
-            "resource-copy I/O failures must be returned to the caller"
+            session.document.is_some(),
+            "the initial fixture must select a document"
+        );
+
+        let error = session
+            .load_fixture("keep-interior")
+            .expect_err("resource-copy I/O failures must be returned to the caller");
+        assert_eq!(
+            error.kind(),
+            std::io::ErrorKind::NotFound,
+            "the fixture resource must be absent from the injected replica directory"
+        );
+        assert!(
+            session.document.is_none(),
+            "a resource-copy failure must clear the previously selected document"
         );
     }
 }

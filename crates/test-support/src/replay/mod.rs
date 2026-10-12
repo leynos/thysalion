@@ -23,7 +23,7 @@
 //!
 //! # Rules the format inherits
 //!
-//! `docs/adr-007-replay-record-format.md` owns these; they are restated where
+//! `docs/adr-008-replay-record-format.md` owns these; they are restated where
 //! they bite so a reader editing a wire type sees them:
 //!
 //! - MessagePack is written with `rmp_serde::to_vec_named`, never `to_vec`.

@@ -179,9 +179,9 @@ fn ci_keeps_testing_fork_pull_requests() {
 
 #[test]
 fn ci_keeps_one_run_per_ref() {
-    // Push and pull_request together would double every run on an open pull
-    // request. The concurrency group is half of what stops that; the job guard
-    // below is the other half.
+    // Concurrency cancels superseded runs only when their workflow and ref
+    // match. A branch push and its pull_request merge-result run use distinct
+    // refs, so both remain eligible to run.
     let workflow = ci_workflow();
     let concurrency =
         top_level_block(&workflow, "concurrency").expect("ci.yml must declare a concurrency group");

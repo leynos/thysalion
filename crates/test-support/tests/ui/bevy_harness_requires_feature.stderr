@@ -1,7 +1,7 @@
 error[E0432]: unresolved import `thysalion_test_support::BevyHarness`
- --> tests/ui/bevy_harness_requires_feature.rs:1:5
+ --> tests/ui/bevy_harness_requires_feature.rs:3:5
   |
-1 | use thysalion_test_support::BevyHarness;
+3 | use thysalion_test_support::BevyHarness;
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `BevyHarness` in the root
   |
 note: found an item that was configured out

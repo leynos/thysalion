@@ -112,10 +112,12 @@ verification programme is continuously enforced. See thysalion-design.md §14.
     behavioural scenario there builds a `MinimalPlugins` harness app, loads
     the `bare-cell` fixture into it, and asserts against the harness's
     registered diagnostics — the task's three clauses in one test.
-  - `ci.yml` gained a push trigger covering every branch, alongside the
-    retained pull-request trigger for fork contributions; a concurrency
-    group and a same-repository guard keep it to one run per event.
-    `tests/workflow_shape.rs` asserts that shape.
+  - `ci.yml` runs `build-test` for every branch push and every pull-request
+    merge result. Same-repository pull requests can run both events on
+    distinct refs; there is no job-level same-repository guard. The
+    workflow/ref concurrency group cancels only superseded runs with the same
+    workflow and ref. `tests/workflow_shape.rs` asserts the guard's absence
+    and that pull-request merge-result runs execute.
   - Success: a trivial headless behavioural test loads a fixture scene in
     CI on every push.
 - [x] 1.3.2. Build the deterministic replay harness skeleton.

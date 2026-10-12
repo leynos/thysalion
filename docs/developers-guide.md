@@ -12,9 +12,9 @@ available. `make audit` derives the Rust workspace root with `cargo metadata`,
 logs workspace member manifests, and runs `cargo audit` once from the workspace
 root. `make coverage` uses `cargo llvm-cov` with `lld`.
 
-The test suite runs once per pull request, in `ci.yml`'s coverage step. That
-step runs the same tests `make test` runs except the doctests, which
-`build-test` runs in a step of its own with
+`ci.yml` runs its coverage step on every branch push and each pull-request
+merge result. That step runs the same tests `make test` runs except the
+doctests, which `build-test` runs in a step of its own with
 `cargo test --doc --workspace --all-features`. The repository used to carry an
 `act-validation.yml` workflow that ran `make test WITH_ACT=1`, but nothing reads
 `WITH_ACT` and no test is gated on Act, so that workflow ran the whole suite a
@@ -26,11 +26,11 @@ same tests as `make test`. `tests/workflow_suite_contract.rs` holds the split,
 including that coverage enables every declared feature.
 
 `coverage-main.yml` measures coverage on pushes to `main` and on dispatch from
-`main`, and is the only CodeScene caller; `ci.yml` measures pull requests for
-their own ratchet, at the same `generate-coverage` revision with
-`publish-artefact: 'false'`, and names no CodeScene token, host, or command.
-The publisher job runs in the `codescene` environment, which admits `main`
-alone and holds `CS_ACCESS_TOKEN` as an environment secret. A
+`main`, and is the only CodeScene caller; `ci.yml` measures branch pushes and
+pull-request merge results for its own ratchet, at the same `generate-coverage`
+revision with `publish-artefact: 'false'`, and names no CodeScene token, host,
+or command. The publisher job runs in the `codescene` environment, which admits
+`main` alone and holds `CS_ACCESS_TOKEN` as an environment secret. A
 `Check CodeScene token availability` step (id `codescene_token`) runs exactly
 `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
 with no `if:` and no `env`. The upload runs only when that output is `true` and
@@ -57,29 +57,23 @@ it. The decision is recorded in
 
 ### Continuous integration triggers
 
-`ci.yml` runs on every push to every branch, and on pull requests. Both
-triggers are needed and neither is sufficient: without the push trigger the
-suite runs only once a pull request exists (roadmap 1.3.1 requires it on every
-push), and without the pull-request trigger fork contributions would go
-untested, because a fork's pushes raise no event in this repository.
+`ci.yml` runs `build-test` on every branch push and every `pull_request` merge
+result. Both triggers are needed: branch pushes are checked before a pull
+request exists, while pull-request runs cover fork contributions and test
+GitHub's synthetic merge commit. Same-repository pull requests can run both
+events on distinct refs: `refs/heads/…` for the branch push and
+`refs/pull/N/merge` for the pull-request merge result. There is no job-level
+same-repository guard, so both runs execute.
 
-Keeping both would double every run on an open pull request, so two mechanisms
-narrow it back to one run per event that carries new information:
+The workflow-level `concurrency` group is keyed on workflow and ref, with
+`cancel-in-progress: true`. It cancels a superseded run only when its workflow
+and ref match; the branch-push and pull-request merge-result refs therefore do
+not cancel one another. `tests/workflow_shape.rs` asserts that the guard is
+absent and that pull-request merge-result runs are retained.
 
-- A workflow-level `concurrency` group keyed on workflow and ref, with
-  `cancel-in-progress: true`, so a superseded run is cancelled. A push and its
-  own pull-request event carry different refs (`refs/heads/…` against
-  `refs/pull/N/merge`), so a fork's pull-request run is never cancelled by a
-  maintainer's push.
-- An `if` guard on the job that skips `pull_request` events whose head
-  repository is this repository. Required status checks match on job name
-  regardless of the triggering event, so the push-triggered run on the same
-  head commit satisfies the check. A skipped same-repository pull-request run
-  is the design, not a fault to fix.
-
-`tests/workflow_shape.rs` asserts all of the above as *shape* — the triggers,
-the concurrency keys, and the guard's presence — never a literal SHA value; see
-"Workflow pins and Dependabot" below for why that distinction matters.
+`tests/workflow_shape.rs` asserts the trigger, concurrency, and merge-result
+shape without depending on literal action SHA values; see "Workflow pins and
+Dependabot" below for why that distinction matters.
 
 ## Tooling
 
