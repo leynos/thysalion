@@ -1,5 +1,10 @@
 # Nextest configuration.
 #
+# trybuild cases start nested Cargo builds. Serialise them so this workspace
+# does not compete with itself for the package-cache lock.
+[test-groups]
+trybuild = { max-threads = 1 }
+
 # The trybuild compile-fail test drives a scratch Cargo project that
 # cold-compiles the full Bevy dependency graph on its first run (roughly
 # four minutes; seconds thereafter, once the trybuild target directory is
@@ -9,3 +14,8 @@
 [[profile.default.overrides]]
 filter = 'test(non_exhaustive_config_rejects_external_struct_literals)'
 slow-timeout = { period = "60s", terminate-after = 20 }
+test-group = 'trybuild'
+
+[[profile.default.overrides]]
+filter = 'test(compile_time_contracts)'
+test-group = 'trybuild'

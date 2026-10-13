@@ -86,6 +86,7 @@ impl LoaderSession {
     /// opened or cloned, or when a referenced resource cannot be read.
     pub fn load_fixture(&mut self, name: &str) -> io::Result<()> {
         self.document = None;
+        self.outcome = None;
         #[cfg(test)]
         let (directory, replica) = self.open_fixture_directories()?;
         #[cfg(not(test))]
@@ -225,15 +226,15 @@ mod tests {
     //! assert against.
 
     use cap_std::{ambient_authority, fs_utf8::Dir};
+    use thysalion_world::codec::Encoding;
 
     use super::LoaderSession;
 
     #[test]
-    fn a_failed_fixture_load_clears_the_previously_selected_document() {
-        // The scenario this guards: two fixture loads in one session, the
-        // second failing. Without the clear, `document()` would hand back the
-        // first fixture's document and every later assertion would quietly
-        // test the wrong scene.
+    fn a_failed_fixture_load_clears_previous_session_state() {
+        // The scenario this guards: a fixture is selected and loaded, then a
+        // later fixture load fails. Without both clears, later steps could
+        // observe either the stale document or stale successful outcome.
         let mut session = LoaderSession::new();
         session
             .load_fixture("bare-cell")
@@ -243,12 +244,22 @@ mod tests {
             "a shipped fixture must select a document"
         );
 
+        session.load(Encoding::Json);
+        assert!(
+            matches!(session.outcome.as_ref(), Some(Ok(_))),
+            "a successful load must record its outcome"
+        );
+
         session
             .load_fixture("no-such-fixture")
             .expect("record the missing fixture outcome");
         assert!(
             session.document.is_none(),
             "a failed load must leave no document selected"
+        );
+        assert!(
+            session.outcome.is_none(),
+            "a failed fixture load must clear the previous successful outcome"
         );
         assert_eq!(
             session.fixtures.len(),
