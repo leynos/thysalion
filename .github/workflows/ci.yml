@@ -111,6 +111,9 @@ jobs:
           # need its required feature, and test-support's Bevy harness is
           # non-default, so coverage names both to select the same tests.
           features: thysalion-demos/demo-empty,thysalion-test-support/bevy
+          # The cold all-feature lane includes trybuild compiles beyond the
+          # action's default 30-minute Cargo watchdog.
+          cargo-wait-timeout: '3600'
       # The doctests are the only part of `make test` the coverage step does
       # not run. The step denies warnings as `make test`'s doctest line does;
       # the step restates the build standard's frontend and linker flags beside
