@@ -199,11 +199,12 @@ quality criteria.
   PR job tests GitHub's synthetic merge commit, which can differ after the base
   advances; both results matter. Fork PRs have no push event in this
   repository, so their merge-result run must remain. Severity: medium.
-  Likelihood: certain. Mitigation: `headless-test` runs `make test` only on
-  pushes; `build-test` runs only on `pull_request`, with the coverage step
-  unconditionally reachable inside the job. The workflow/ref concurrency group
-  cancels superseded runs only when their workflow and ref match, so these two
-  refs remain separate. The workflow-shape tests pin both job conditions.
+  Likelihood: certain. Mitigation: `headless-test` runs `make test` on pushes
+  and manual dispatch; `build-test` runs only on `pull_request`, with the
+  coverage step unconditionally reachable inside the job. The workflow/ref
+  concurrency group cancels superseded runs only when their workflow and ref
+  match, so these two refs remain separate. The workflow-shape tests pin both
+  job conditions.
 - Risk: the shared `generate-coverage` action (invoked with
   `with-ratchet: 'true'`) rejects push-reachable coverage steps. Hosted CI runs
   [38262379505](https://github.com/leynos/thysalion/actions/runs/38262379505)
@@ -734,16 +735,15 @@ any library crate); `Then` asserts palette arity and that
 
 ### Stage C3 — CI on pushes, manual dispatch, and pull-request merge results
 
-Edit `ci.yml`: add the `push` trigger, workflow/ref `concurrency` group,
-`headless-test` running `make test` on pushes and manual dispatch, and
-pull-request-only `build-test` job. Keep the coverage and doctest steps
-directly in `build-test`, without step-level `if:` conditions. The PR job
-checks the synthetic merge result for both same-repository and fork pull
-requests; the headless job checks the branch head. This split follows the hosted
+Delivered in `ci.yml`: the workflow runs on every branch push, pull requests,
+and manual dispatch. `headless-test` runs `make test` on pushes and manual
+dispatch; pull-request-only `build-test` checks the synthetic merge result for
+same-repository and fork PRs. Keep the coverage and doctest steps directly in
+`build-test`, without step-level `if:` conditions. This split follows the hosted
 `coverage.second-writer` failures and the pinned lane's PR-guard requirement.
-The Stage B workflow-shape assertions go green. The former `act-validation.yml`
-was removed by rebase and is not part of this stage. `make all`; commit; after
-push, confirm Actions runs appear for both jobs.
+The workflow-shape contracts cover the trigger and job scopes. Historical
+rebase context: `act-validation.yml` was removed from `main` and is not part of
+the current workflow tree.
 
 ### Stage C4 — the replay envelope and ADR 008
 

@@ -81,6 +81,9 @@ jobs:
           # need its required feature, and test-support's Bevy harness is
           # non-default, so coverage names both to select the same tests.
           features: thysalion-demos/demo-empty,thysalion-test-support/bevy
+          # CV-005 checks generator-input parity between this publisher and
+          # the pull-request lane.
+          cargo-wait-timeout: '3600'
       # Publishes whether the token exists, and nothing else. The token is in
       # no `env` on this workflow: the upload is a composite action whose
       # nested steps inherit the calling step's `env`. GitHub evaluates the
