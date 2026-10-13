@@ -612,22 +612,22 @@ Carried forward, not fixed here:
 ## Context and orientation
 
 The workspace is a non-virtual Cargo workspace; the root package `thysalion` is
-the composition root, and six member crates live under `crates/` (`world`,
-`sim`, `knowledge`, `presentation`, `harness`, `demos` — packages
-`thysalion-<name>`). Behavioural tests use `rstest-bdd` 0.6.0-beta3: a
+the composition root, and seven member crates live under `crates/` (`world`,
+`sim`, `knowledge`, `presentation`, `harness`, `demos`, `test-support` —
+packages `thysalion-<name>`). Behavioural tests use `rstest-bdd` 0.6.0-beta3: a
 `#[scenario]` macro binds a Gherkin feature file to a test function, and a
 *harness adapter* — a type implementing `rstest_bdd_harness::HarnessAdapter`
 with an associated `Context` — owns scenario execution, handing its context to
 step functions through the reserved fixture name `rstest_bdd_harness_context`.
 
-Two adapters exist today, deliberately identical in shape:
+Two adapters live in `thysalion-test-support`, deliberately identical in shape:
 
-- `crates/harness/tests/headless/support.rs` — `BevyHarness`,
+- `crates/test-support/src/bevy_harness.rs` — `BevyHarness`,
   `Context = bevy::app::App`, building `MinimalPlugins` +
   `HarnessCorePlugin::new(HarnessConfig::default())` per scenario. Consumed by
   `crates/harness/tests/headless/main.rs` against
   `crates/harness/tests/features/harness.feature`.
-- `crates/world/tests/loading/support.rs` — `LoaderHarness`,
+- `crates/test-support/src/loader.rs` — `LoaderHarness`,
   `Context = LoaderSession`, a plain struct wrapping `MemorySceneSource`, a
   decoded `SceneDocument`, and load outcomes. Consumed by
   `crates/world/tests/loading/main.rs` (declared as an explicit `[[test]]`
@@ -641,15 +641,16 @@ Two adapters exist today, deliberately identical in shape:
 (`FRAME_TIME`, `FPS`, `TICK_TIME`).
 
 Continuous integration lives in the three files under `.github/workflows/`:
-`ci.yml` (format, markdownlint, spelling, audit, lint, then tests-with-coverage
-through the pinned `leynos/shared-actions` `generate-coverage` action),
-`coverage-main.yml` (push-to-main coverage upload), and `release.yml` (tag
-builds). Root-level `tests/workflow_shape.rs` asserts release-build scoping and
-40-hex SHA pinning for the three workflows. The former `act-validation.yml` was
-removed from `main` in `e60bb75`; its `WITH_ACT=1` behaviour above is
-historical context. The Makefile's `test` target runs
-`cargo nextest run --workspace --all-targets --all-features` with warnings
-denied, then doctests.
+`ci.yml` runs the coverage `build-test` lane for pull requests, checking the
+merge result, and the `headless-test` lane for pushes and manual dispatch.
+Coverage selects `thysalion-demos/demo-empty` and `thysalion-test-support/bevy`;
+`coverage-main.yml` uploads the push-to-main baseline, and `release.yml`
+builds tags. Root-level `tests/workflow_shape.rs` asserts the workflow split
+and 40-hex SHA pinning. The former `act-validation.yml` was removed from `main`
+in `e60bb75`; its `WITH_ACT=1` behaviour above is historical context. The
+Makefile's `test` target runs workspace tests with all features, doctests, and
+a package-only no-default-features compile-time contract that confirms the Bevy
+harness is hidden by default.
 
 "Input record" (design §14, invariant I1; roadmap 1.3.2) means a serialized
 capture of what design §6.2's input systems would write ahead of a tick —
@@ -814,18 +815,34 @@ Red-Green-Refactor evidence, as observed:
   compile-time/UI contracts for replay errors and Bevy feature gating.
 - Hosted test evidence: workflow-dispatch run
   [38282395232](https://github.com/leynos/thysalion/actions/runs/38282395232)
-  ran `make test` on head `b0d4655087822a8b36acd593ec109b20f6dc9d0a`, before
-  the later documentation-only edits; it reported 292 passed and 2 skipped.
+  ran `make test` on head `b0d4655087822a8b36acd593ec109b20f6dc9d0a`; it
+  reported 292 passed and 2 skipped. This result applies only to that SHA.
   Separately, PR run
   [38279429410](https://github.com/leynos/thysalion/actions/runs/38279429410)
   passed `build-test` coverage and doctests on base
   `39d235ce50dbf70997ed50b068e9d349ff083479` and that same head; it is not the
   source of the `make test` result.
+- Post-b0d changes, in order: `c561f6d` clarified `re_encode` Rustdoc and
+  updated documentation without changing replay behaviour; `8a47388` added the
+  `coverage-main.yml` Cargo timeout input; `9987b3b` added the `ci.yml`
+  coverage watchdog budget; `8ec81be` cleared stale `LoaderSession` outcome
+  state with a regression test and added the Nextest trybuild grouping and
+  timeout overrides; `a7b39b4` switched the Bevy image feature from `zstd_rust`
+  to `zstd_c` and regenerated `Cargo.lock`.
+- Later candidate evidence is on head
+  `a7b39b48ed7bc7ce5144106dfefb387a9c7dfed4`. The Bevy image backend changed
+  from `zstd_rust` to `zstd_c` to avoid the `ruzstd` audit advisory, with the
+  lockfile regenerated. Local `make check-fmt`, `make lint`, `make typecheck`,
+  `make test` (292 passed, 2 skipped), `make markdownlint`, `make nixie`, and
+  `cargo audit` passed on the tree later committed as that candidate. The PR
+  `build-test` and push `headless-test` also passed:
+  <https://github.com/leynos/thysalion/actions/runs/38436528260> and
+  <https://github.com/leynos/thysalion/actions/runs/38436521902>.
 - Local test attempts: an earlier attempt, whose revision is not recorded in
   the gate report, reached 84/292 before thread-spawn failures (`EAGAIN`); see
   `/tmp/test-94355dba-1225-4020-a3ad-89df90410c5c-1-3-stand-up-headless-ci-and-the-verification-spine-doc-change.out`.
-  In the later sequential gate set on head
-  `b0d4655087822a8b36acd593ec109b20f6dc9d0a` plus the uncommitted Rustdoc edit,
+  In the sequential gate set on head
+  `b0d4655087822a8b36acd593ec109b20f6dc9d0a` with an uncommitted Rustdoc edit,
   `make test` failed during `cargo test --no-run` before tests started because
   Cargo could not spawn a thread (`EAGAIN`,
   `WouldBlock: Resource temporarily unavailable`). In that gate sequence,

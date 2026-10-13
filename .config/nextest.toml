@@ -17,5 +17,5 @@ slow-timeout = { period = "60s", terminate-after = 20 }
 test-group = 'trybuild'
 
 [[profile.default.overrides]]
-filter = 'test(compile_time_contracts)'
+filter = 'binary(compile_time_contracts)'
 test-group = 'trybuild'

@@ -195,8 +195,8 @@ there, deliberately the same shape:
 - `BevyHarness` builds a `MinimalPlugins` app with `HarnessCorePlugin` and
   hands it to steps via the reserved `rstest_bdd_harness_context` fixture. It
   sits behind the crate's non-default `bevy` feature, which is what keeps
-  `thysalion-world` — a dev-dependent of this crate — free of `bevy` until ADR
-  005 stages that dependency in at roadmap 2.1.1.
+  `thysalion-world` — which dev-depends on this crate — free of `bevy` until
+  ADR 005 stages that dependency in at roadmap 2.1.1.
 - `LoaderHarness` hands steps a `LoaderSession`: a plain struct wrapping a
   scene source, a selected document, and the outcome of the last load. It is on
   the default-feature path, so a suite that only loads scenes pays for no
@@ -221,7 +221,8 @@ diagnostics. Unit-level mathematics uses plain `rstest`; generated-input
 properties (zoom clamping, the rig's action-sequence model) use `proptest`; and
 compile-time contracts (for example, struct-literal construction of
 `#[non_exhaustive]` harness types being rejected) are pinned with `trybuild`
-cases under `crates/harness/tests/ui/`.
+cases under `crates/harness/tests/ui/` and `crates/test-support/tests/ui/`. The
+latter also covers replay errors and the Bevy feature gate.
 
 The windowed half is behaviourally tested too, without a window or graphics
 device: `crates/harness/src/windowed_tests.rs` runs `DemoHarnessPlugin` under
