@@ -805,15 +805,33 @@ Red-Green-Refactor evidence, as observed:
   which does not fire on test-binary items but does fire once they are library
   items, and `clippy::let_underscore_must_use` on the two step functions that
   discard those accessors' results once `#[must_use]` was added.
-- Green: `make test` reports `292 passed, 2 skipped`, against
-  214 before the change. The fourteen new tests are the combined headless
-  scenario (1), the replay suite (8 active, plus one `#[ignore]`d regeneration
-  helper), the workflow-shape additions (4, beside the two that already
-  existed), and the loader regression test (1). No losses.
-- Gates: `make check-fmt`, `make lint` (rustdoc, Clippy, Whitaker),
-  `make test`, `make spelling`, `make scripts-test`, `make scenes-check`,
-  `make markdownlint`, `make nixie`, and `make coverage` all green at every
-  commit on this branch.
+- Earlier-stage test accounting: the initial fourteen additions were the
+  combined headless scenario (1), replay examples (8 active, plus one ignored
+  regeneration helper), workflow-shape additions (4, alongside two existing
+  tests), and loader regression (1). That breakdown predates later work and is
+  not the final suite inventory. Later additions include malformed-input
+  decoder cases, tick-sequence and version-pair property tests, and
+  compile-time/UI contracts for replay errors and Bevy feature gating.
+- Hosted test evidence: workflow-dispatch run
+  [38282395232](https://github.com/leynos/thysalion/actions/runs/38282395232)
+  ran `make test` on head `b0d4655087822a8b36acd593ec109b20f6dc9d0a`, before
+  the later documentation-only edits; it reported 292 passed and 2 skipped.
+  Separately, PR run
+  [38279429410](https://github.com/leynos/thysalion/actions/runs/38279429410)
+  passed `build-test` coverage and doctests on base
+  `39d235ce50dbf70997ed50b068e9d349ff083479` and that same head; it is not the
+  source of the `make test` result.
+- Local test attempts: an earlier attempt, whose revision is not recorded in
+  the gate report, reached 84/292 before thread-spawn failures (`EAGAIN`); see
+  `/tmp/test-94355dba-1225-4020-a3ad-89df90410c5c-1-3-stand-up-headless-ci-and-the-verification-spine-doc-change.out`.
+  In the later sequential gate set on head
+  `b0d4655087822a8b36acd593ec109b20f6dc9d0a` plus the uncommitted Rustdoc edit,
+  `make test` failed during `cargo test --no-run` before tests started because
+  Cargo could not spawn a thread (`EAGAIN`,
+  `WouldBlock: Resource temporarily unavailable`). In that gate sequence,
+  `make check-fmt`, `make lint`, and `make typecheck` passed.
+- Earlier gate observations remain scoped to their recorded stages and
+  revisions; they do not establish that every gate passed at every commit.
 - Mutation-checked rather than merely green, because three of the new tests
   are *guards* and a guard that cannot fail is worse than none: narrowing
   `ci.yml`'s push trigger to `[main]` and deleting it outright each fail the
@@ -833,8 +851,10 @@ Acceptance, as verified:
    load-bearing: without it `grep` reads the alternation literally and matches
    nothing, so the criterion would appear to pass by finding no duplicates
    anywhere — including the ones it exists to detect.
-3. The replay round-trip suite passes twice in a row and `git status` stays
-   clean; the golden bytes do not churn.
+3. The empty-session golden test preserves roadmap 1.3.2's byte-identity
+   criterion. Separately, the populated-session round-trip test records ticks 3
+   and 11, each with an empty input list. Together these cover empty sessions
+   and sessions containing tick records, without input values.
 4. `docs/adr-008-replay-record-format.md` exists, is linked from
    `contents.md`, and `make markdownlint` reports `Summary: 0 error(s)`.
 
@@ -850,8 +870,9 @@ Acceptance, phrased as behaviour:
    doctests (roadmap 1.3.1's criterion).
 2. `rg "struct BevyHarness|struct LoaderHarness" crates/` matches only
    under `crates/test-support/src/`.
-3. Running the replay round-trip test twice in a row passes both times,
-   and `git status` stays clean — the golden bytes do not churn.
+3. The empty-session golden test preserves roadmap 1.3.2's byte-identity
+   criterion. The populated-session round-trip test separately covers ticks 3
+   and 11, each with an empty input list.
 4. `docs/adr-008-replay-record-format.md` exists, is linked from
    `contents.md`, and `make markdownlint` passes.
 

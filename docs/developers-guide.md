@@ -240,18 +240,20 @@ headless and leave only thin windowed shims excluded.
 `thysalion_test_support::replay` carries the deterministic replay session
 format of design §14 (invariant I1): a versioned `SessionHeader` followed by
 tick-stamped `TickRecord`s. The payload type `InputRecord` is uninhabited until
-roadmap step 4.1.2 defines the circuit boundary, so recordings are currently
-headers alone — deliberately, so no speculative record vocabulary becomes
-permanent wire-compatibility burden. [ADR 008](adr-008-replay-record-format.md)
-owns the rules; the short version is that the format copies ADR 006's
-canonical-encoding discipline wholesale.
+roadmap step 4.1.2 defines the circuit boundary, so no input values are
+recorded yet. Session documents can still contain tick records with empty input
+lists. [ADR 008](adr-008-replay-record-format.md) owns the rules; the short
+version is that the format copies ADR 006's canonical-encoding discipline
+wholesale.
 
-Record, replay, and re-record must produce identical bytes within one build.
-That, plus the checked-in golden bytes under
-`crates/test-support/tests/fixtures/golden/`, is what
-`crates/test-support/tests/replay_round_trip.rs` asserts. Refresh the golden
-bytes only deliberately — a change there is a wire-format change and needs a
-`FormatVersion` bump and an ADR 008 version-history entry:
+The empty-session byte-identity criterion has checked-in golden bytes under
+`crates/test-support/tests/fixtures/golden/` and is asserted by
+`an_empty_session_round_trips_byte_identically`. Separately,
+`a_populated_session_round_trips_byte_identically` records and replays ticks 3
+and 11, each with an empty input list. Both tests check record/replay/re-record
+byte identity within one build. Refresh the golden bytes only deliberately — a
+change there is a wire-format change and needs a `FormatVersion` bump and an
+ADR 008 version-history entry:
 
 ```console
 $ cargo test -p thysalion-test-support --test replay_round_trip -- \

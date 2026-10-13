@@ -337,7 +337,10 @@ impl RecordedSession {
     /// # Errors
     ///
     /// Returns [`ReplayEncodeError::Encode`] when the underlying encoder
-    /// fails. The version and tick-ordering arms are unreachable for a session
-    /// that came from [`SessionReplayer::open`], which already checked both.
+    /// fails. Tick-ordering errors are unreachable for a session opened by
+    /// [`SessionReplayer::open`], which already checked that invariant. The
+    /// [`ReplayEncodeError::UnsupportedVersion`] can still occur after a future
+    /// minor-version bump if `open` accepted an older compatible minor version:
+    /// encoding requires the exact current `SUPPORTED_VERSION`.
     pub fn re_encode(&self) -> Result<Vec<u8>, ReplayEncodeError> { encode(&self.document) }
 }

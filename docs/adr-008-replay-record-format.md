@@ -67,10 +67,10 @@ pub enum InputRecord {}
 ```
 
 An uninhabited payload is the whole of this record's answer to the timing
-problem. It makes `TickRecord.inputs` provably empty until the first real
-variants land, so the envelope, the version rule, the recorder, the replayer,
-and the byte-identity test all exist and are all exercised, while nothing
-meaningless reaches the wire.
+problem. No input values can be recorded until the first real variants land,
+but a session may contain tick records with empty `inputs` lists. The envelope,
+version rule, recorder, replayer, and byte-identity tests can therefore be
+exercised without putting speculative input vocabulary on the wire.
 
 The alternative that suggests itself — a `Placeholder` variant, or a raw byte
 blob, to "have something to record" — is worse than it looks in a corpus
@@ -160,6 +160,11 @@ Roadmap 1.3.2's criterion is that recording and replaying an empty session is
 byte-identical. That is a *same-build round-trip* promise: record, replay, and
 re-record within one binary yields identical bytes. It is what
 `an_empty_session_round_trips_byte_identically` asserts.
+
+The separate `a_populated_session_round_trips_byte_identically` test records
+and replays tick records numbered 3 and 11, each with an empty input list. It
+tests byte identity for a session containing ticks; the empty-session test
+remains the roadmap criterion and the source of the golden bytes.
 
 It is explicitly **not** a promise of cross-version wire byte-determinism — the
 same promise ADR 006 declines to make for scene documents. A later build may
@@ -303,9 +308,9 @@ is better met by a dumping tool than by a second writer that can drift.
 
 ### Negative
 
-- The format cannot record anything yet. That is the point, and it does mean
-  the recorder and replayer are exercised only against empty sessions until
-  phase 4.
+- The format cannot record input values yet. Tick records with empty input
+  lists can be recorded and replayed, while phase 4 defines the first input
+  variants.
 - The tick-ordering rule is checked in two places, which is a small duplication
   to keep in step.
 - A session references its scene by name and content hash but nothing yet
