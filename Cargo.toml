@@ -35,7 +35,7 @@ bevy = { version = "0.19", default-features = false, features = [
   "bevy_pbr",
   "tonemapping_luts",
   "ktx2",
-  "zstd_rust",
+  "zstd_c",
   "ui_api",
   "ui_bevy_render",
   "png",
