@@ -12,21 +12,22 @@ available. `make audit` derives the Rust workspace root with `cargo metadata`,
 logs workspace member manifests, and runs `cargo audit` once from the workspace
 root. `make coverage` uses `cargo llvm-cov` with `lld`.
 
-The test suite runs once per pull request, in `ci.yml`'s coverage step. That
-step runs the same tests `make test` runs except the doctests, which
-`build-test` runs in a step of its own with
+`ci.yml` runs `headless-test` with `make test` on every branch push and manual
+`workflow_dispatch`. Its `pull_request`-only `build-test` job runs coverage on
+each merge result and runs doctests in a step of its own with
 `cargo test --doc --workspace --all-features`. The repository used to carry an
 `act-validation.yml` workflow that ran `make test WITH_ACT=1`, but nothing reads
 `WITH_ACT` and no test is gated on Act, so that workflow ran the whole suite a
-second time and was removed. `make test` passes `--all-features`, and the only
-declared feature, `thysalion-demos/demo-empty`, gates the `demo-empty` binary
-through `required-features`, so both coverage steps pass that feature and
-select the same 215 tests `make test` does. `tests/workflow_suite_contract.rs`
-holds the split, including that coverage enables every declared feature.
+second time and was removed. `make test` passes `--all-features`. The
+`thysalion-demos/demo-empty` feature gates the `demo-empty` binary through
+`required-features`, and `thysalion-test-support/bevy` enables the shared
+Bevy-backed harness, so both coverage steps pass these features and select the
+same tests as `make test`. `tests/workflow_suite_contract.rs` holds the split,
+including that coverage enables every declared feature.
 
 `coverage-main.yml` measures coverage on pushes to `main` and on dispatch from
-`main`, and is the only CodeScene caller; `ci.yml` measures pull requests for
-their own ratchet, at the same `generate-coverage` revision with
+`main`, and is the only CodeScene caller; `ci.yml` measures pull-request merge
+results for its own ratchet, at the same `generate-coverage` revision with
 `publish-artefact: 'false'`, and names no CodeScene token, host, or command.
 The publisher job runs in the `codescene` environment, which admits `main`
 alone and holds `CS_ACCESS_TOKEN` as an environment secret. A
@@ -53,6 +54,29 @@ is not a full commit, the target stops running the pinned checker, the
 repository parameter is wrong, `make all` drops the target or CI stops running
 it. The decision is recorded in
 [ADR 007](adr-007-adopt-the-shared-cv005-contract-library.md).
+
+### Continuous integration triggers
+
+`ci.yml` runs its `headless-test` job on every branch push and its `build-test`
+job for each `pull_request` merge result. The push job runs `make test` without
+starting a coverage lane. The pull-request job covers fork contributions and
+tests GitHub's synthetic merge commit. Same-repository pull requests can run
+both jobs on distinct refs: `refs/heads/…` for the branch push and
+`refs/pull/N/merge` for the merge result. `build-test` is scoped to
+`pull_request`, with no same-repository skip; its direct coverage step has no
+step-level `if:`. Manual dispatches select `headless-test`; `build-test`
+remains pull-request-only.
+
+The workflow-level `concurrency` group is keyed on workflow and ref, with
+`cancel-in-progress: true`. A manual dispatch and a push to the same branch
+share a ref, so a newer run can cancel the older one; the pull-request merge
+ref is distinct and does not cancel the branch run. `tests/workflow_shape.rs`
+asserts the headless job's push and manual-dispatch scope and that `build-test`
+has no same-repository skip and retains the pull-request merge-result run.
+
+`tests/workflow_shape.rs` asserts the trigger, concurrency, and merge-result
+shape without depending on literal action SHA values; see "Workflow pins and
+Dependabot" below for why that distinction matters.
 
 ## Tooling
 
@@ -84,13 +108,14 @@ falls back to the `ld.lld` every rustup toolchain ships. Set
 `COVERAGE_CODEGEN_BACKEND` or `COVERAGE_LLD_DIR` to opt out on a host whose own
 toolchain already works.
 
-CI runs the doctests outside the Makefile, in a standalone `Run doctests` step
-of `ci.yml` that calls `cargo test --doc` directly, so the Makefile's
-`STANDARD_RUSTFLAGS` cannot reach it. The step therefore assigns its own
-`RUSTFLAGS` with the frontend flag, the Linux linker flag and `-D warnings`,
-because an assigned `RUSTFLAGS` replaces every `rustflags` source in
-`.cargo/config.toml`. `tests/build_standard_contract.rs` reads that step,
-scoped to the step itself, and fails if any of the three is dropped.
+The pull-request-only `build-test` job runs doctests outside the Makefile, in a
+standalone `Run doctests` step of `ci.yml` that calls `cargo test --doc`
+directly, so the Makefile's `STANDARD_RUSTFLAGS` cannot reach it. The step
+therefore assigns its own `RUSTFLAGS` with the frontend flag, the Linux linker
+flag and `-D warnings`, because an assigned `RUSTFLAGS` replaces every
+`rustflags` source in `.cargo/config.toml`. `tests/build_standard_contract.rs`
+reads that step, scoped to the step itself, and fails if any of the three is
+dropped.
 
 Install `clang`, `lld`, `mold`, `python3`, and `cargo-audit` before running the
 full generated workflow locally on Linux.
@@ -163,15 +188,41 @@ binaries on disk and rejects anything else before Cargo runs
 
 ### Headless testing and the coverage boundary
 
-Behavioural tests use `rstest-bdd` (0.6.0-beta3) with a Bevy harness adapter
-(`crates/harness/tests/headless/support.rs`) that builds a `MinimalPlugins` app
-with `HarnessCorePlugin` and hands it to steps via the reserved
-`rstest_bdd_harness_context` fixture. Feature files live in
-`crates/harness/tests/features/`. Unit-level mathematics uses plain `rstest`;
-generated-input properties (zoom clamping, the rig's action-sequence model) use
-`proptest`; and compile-time contracts (for example, struct-literal
-construction of `#[non_exhaustive]` harness types being rejected) are pinned
-with `trybuild` cases under `crates/harness/tests/ui/`.
+Behavioural tests use `rstest-bdd` (0.6.0-beta3) with harness adapters shared
+from `thysalion-test-support` (`crates/test-support/`). Two adapters live
+there, deliberately the same shape:
+
+- `BevyHarness` builds a `MinimalPlugins` app with `HarnessCorePlugin` and
+  hands it to steps via the reserved `rstest_bdd_harness_context` fixture. It
+  sits behind the crate's non-default `bevy` feature, which is what keeps
+  `thysalion-world` — which dev-depends on this crate — free of `bevy` until
+  ADR 005 stages that dependency in at roadmap 2.1.1.
+- `LoaderHarness` hands steps a `LoaderSession`: a plain struct wrapping a
+  scene source, a selected document, and the outcome of the last load. It is on
+  the default-feature path, so a suite that only loads scenes pays for no
+  engine.
+
+`crates/test-support/src/scenes.rs` is the single statement of where the
+committed fixture scenes live and the single place that takes ambient
+filesystem authority to reach them; every suite that reads a fixture goes
+through it.
+
+A helper belongs in `thysalion-test-support` when two or more test targets need
+it and it drives public crate surface. A helper one suite uses stays in that
+suite's `tests/` tree. Plane crates take the crate as a *dev*-dependency only:
+the dev-dependency loop with `thysalion-world` is the `serde`/`serde_test`
+shape and is legal to Cargo, but a normal-edge cycle is not.
+
+Feature files live beside their suites — `crates/harness/tests/features/`,
+`crates/world/tests/features/`, and `crates/test-support/tests/features/`, the
+last of which hosts the combined scenario that builds a headless app, loads a
+fixture scene into it, and asserts against the harness's registered
+diagnostics. Unit-level mathematics uses plain `rstest`; generated-input
+properties (zoom clamping, the rig's action-sequence model) use `proptest`; and
+compile-time contracts (for example, struct-literal construction of
+`#[non_exhaustive]` harness types being rejected) are pinned with `trybuild`
+cases under `crates/harness/tests/ui/` and `crates/test-support/tests/ui/`. The
+latter also covers replay errors and the Bevy feature gate.
 
 The windowed half is behaviourally tested too, without a window or graphics
 device: `crates/harness/src/windowed_tests.rs` runs `DemoHarnessPlugin` under
@@ -184,6 +235,31 @@ execute in continuous integration; they carry `#[coverage(off)]` and the
 Makefile's coverage target mirrors the same boundary with an ignore pattern. Do
 not count new windowed code against the coverage ratchet — keep logic testable
 headless and leave only thin windowed shims excluded.
+
+### The replay envelope
+
+`thysalion_test_support::replay` carries the deterministic replay session
+format of design §14 (invariant I1): a versioned `SessionHeader` followed by
+tick-stamped `TickRecord`s. The payload type `InputRecord` is uninhabited until
+roadmap step 4.1.2 defines the circuit boundary, so no input values are
+recorded yet. Session documents can still contain tick records with empty input
+lists. [ADR 008](adr-008-replay-record-format.md) owns the rules; the short
+version is that the format copies ADR 006's canonical-encoding discipline
+wholesale.
+
+The empty-session byte-identity criterion has checked-in golden bytes under
+`crates/test-support/tests/fixtures/golden/` and is asserted by
+`an_empty_session_round_trips_byte_identically`. Separately,
+`a_populated_session_round_trips_byte_identically` records and replays ticks 3
+and 11, each with an empty input list. Both tests check record/replay/re-record
+byte identity within one build. Refresh the golden bytes only deliberately — a
+change there is a wire-format change and needs a `FormatVersion` bump and an
+ADR 008 version-history entry:
+
+```console
+$ cargo test -p thysalion-test-support --test replay_round_trip -- \
+    --ignored regenerate
+```
 
 Screenshots (`F12`, on key release) save to
 `screenshots/<slug>-<timestamp>-<sequence>.png` (git-ignored). Bevy screenshots

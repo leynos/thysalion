@@ -19,7 +19,9 @@
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
+use cap_std::fs_utf8::Dir;
 use serde::Deserialize;
+use thysalion_test_support::scenes::{FIXTURE_NAMES as FIXTURES, SCENES, scene_dir};
 use thysalion_world::{
     codec::{Encoding, decode_document, encode_document},
     loader::{LoadedScene, SceneLoader},
@@ -27,10 +29,12 @@ use thysalion_world::{
     source::DirSceneSource,
 };
 
-#[path = "support/scenes.rs"]
-mod scenes_support;
-
-use scenes_support::{FIXTURE_NAMES as FIXTURES, SCENES, scene_dir as scenes};
+fn scenes() -> Dir {
+    match scene_dir() {
+        Ok(directory) => directory,
+        Err(error) => panic!("the committed fixture directory must be available: {error}"),
+    }
+}
 
 /// Loads a fixture through the real loader and the real filesystem adapter.
 ///
