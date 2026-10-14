@@ -27,6 +27,10 @@ documentation set.
 - [ADR 007: adopt the shared CV-005 contract library](adr-007-adopt-the-shared-cv005-contract-library.md)
   records the move from a local copy of the CV-005 contract to the pinned
   shared check.
+- [ADR 008: the replay record format](adr-008-replay-record-format.md)
+  records the versioned replay session envelope, its uninhabited payload, the
+  same-build byte-identity promise, and the deferrals of raw input capture and
+  columnar storage.
 - [World plane architecture](world-plane-architecture.md) documents the
   `thysalion-world` crate's module tree, the `SceneSource` port, reading a
   diagnostic report, the scene format reference, and the version-history table.

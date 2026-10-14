@@ -33,7 +33,6 @@ fn route_reader_covers_runner_shapes_and_every_suite_entrypoint() {
 #[case::removed(MINIMAL_INSTALL_ROUTING.replace("      - name: Install build tools\n        run: make install-build-tools\n", ""))]
 #[case::moved_after_suite(MINIMAL_INSTALL_ROUTING.replace("      - name: Install build tools\n        run: make install-build-tools\n      - name: Run suite\n        run: make test\n", "      - name: Run suite\n        run: make test\n      - name: Install build tools\n        run: make install-build-tools\n"))]
 #[case::conditional(MINIMAL_INSTALL_ROUTING.replace("        run: make install-build-tools\n", "        if: runner.os == 'Linux'\n        run: make install-build-tools\n"))]
-#[case::conditional_job(MINIMAL_INSTALL_ROUTING.replace("  test:\n    runs-on:", "  test:\n    if: runner.os == 'Linux'\n    runs-on:"))]
 #[case::soft_failure(MINIMAL_INSTALL_ROUTING.replace("        run: make install-build-tools\n", "        continue-on-error: true\n        run: make install-build-tools\n"))]
 fn installer_mutations_are_reported(#[case] source: String) {
     let report = inspect_routing(&source).expect("mutated workflow must remain inspectable");
@@ -48,6 +47,19 @@ fn installer_mutations_are_reported(#[case] source: String) {
             .iter()
             .all(|path| path.contains(":test:step-")),
         "every installer finding must identify the affected suite step"
+    );
+}
+
+#[test]
+fn job_condition_keeps_an_unconditional_in_job_installer() {
+    let source = MINIMAL_INSTALL_ROUTING.replace(
+        "  test:\n    runs-on:",
+        "  test:\n    if: github.event_name == 'pull_request'\n    runs-on:",
+    );
+    let report = inspect_routing(&source).expect("conditioned job must remain inspectable");
+    assert!(
+        report.missing_installers.is_empty(),
+        "job-level conditions gate the suite and its installer together"
     );
 }
 

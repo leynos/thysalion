@@ -23,9 +23,9 @@ pub(super) fn inspect_job(
     value: &Yaml,
     report: &mut Report,
 ) -> Result<(), String> {
-    let job = job_mapping(value, location)?;
+    job_mapping(value, location)?;
     let steps = job_steps(value, location)?;
-    let routes = classify_steps(steps, job, location)?;
+    let routes = classify_steps(steps, location)?;
     if routes.suite.is_empty() {
         return Ok(());
     }
@@ -62,16 +62,11 @@ fn job_steps<'a>(value: &'a Yaml, location: JobLocation<'_>) -> Result<&'a [Yaml
     Ok(steps)
 }
 
-fn classify_steps(
-    steps: &[Yaml],
-    job: &yaml_rust2::yaml::Hash,
-    location: JobLocation<'_>,
-) -> Result<StepRoutes, String> {
+fn classify_steps(steps: &[Yaml], location: JobLocation<'_>) -> Result<StepRoutes, String> {
     let mut routes = StepRoutes::default();
     for (index, step) in steps.iter().enumerate() {
         let step_route = classify_step(
             step,
-            job,
             StepLocation {
                 job: location,
                 index,
@@ -99,11 +94,7 @@ fn record_linux_suite_entries(location: JobLocation<'_>, routes: StepRoutes, rep
 }
 
 /// Classifies one step, rejecting routes the literal reader cannot resolve.
-fn classify_step(
-    step_value: &Yaml,
-    job: &yaml_rust2::yaml::Hash,
-    location: StepLocation<'_>,
-) -> Result<StepRoute, String> {
+fn classify_step(step_value: &Yaml, location: StepLocation<'_>) -> Result<StepRoute, String> {
     let step = step_value
         .as_hash()
         .ok_or_else(|| format!("{location} is not a mapping"))?;
@@ -111,7 +102,7 @@ fn classify_step(
     let uses = optional_text(step, WorkflowField::Uses, location)?;
     match (run, uses) {
         (Some(_), Some(_)) => Err(format!("{location} has both run and uses")),
-        (Some(command), None) => classify_run_step(step, job, WorkflowCommand(command), location),
+        (Some(command), None) => classify_run_step(step, WorkflowCommand(command), location),
         (None, Some(action)) if action.starts_with("./") || action.starts_with("$/") => {
             Err(format!("{location} local action unresolved"))
         }
@@ -125,7 +116,6 @@ fn classify_step(
 
 fn classify_run_step(
     step: &yaml_rust2::yaml::Hash,
-    job: &yaml_rust2::yaml::Hash,
     command: WorkflowCommand<'_>,
     location: StepLocation<'_>,
 ) -> Result<StepRoute, String> {
@@ -135,7 +125,7 @@ fn classify_run_step(
     }
     Ok(StepRoute {
         is_suite,
-        is_installer: is_unconditional_installer(step, job, command),
+        is_installer: is_unconditional_installer(step, command),
     })
 }
 
@@ -180,14 +170,9 @@ fn has_unresolved_suite_route(command: WorkflowCommand<'_>) -> bool {
             })
 }
 
-/// Accepts only a standalone, unguarded Make invocation of the installer target.
-fn is_unconditional_installer(
-    step: &yaml_rust2::yaml::Hash,
-    job: &yaml_rust2::yaml::Hash,
-    command: WorkflowCommand<'_>,
-) -> bool {
+/// Accepts a standalone installer step that is not step-gated.
+fn is_unconditional_installer(step: &yaml_rust2::yaml::Hash, command: WorkflowCommand<'_>) -> bool {
     let is_unconditional = mapping_field(step, WorkflowField::If).is_none()
-        && mapping_field(job, WorkflowField::If).is_none()
         && matches!(
             mapping_field(step, WorkflowField::ContinueOnError),
             None | Some(Yaml::Boolean(false))

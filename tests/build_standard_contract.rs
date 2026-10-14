@@ -136,34 +136,54 @@ fn test_make_routes_restate_flags_and_run_preflight_first() {
         )
         .expect("evaluate Make test target");
         let commands = cargo_lines(RouteText(&output));
-        assert_eq!(
-            commands.len(),
-            2,
-            "test and doctest must both invoke Cargo: {output}"
-        );
-        let suite = commands.first().expect("suite command must be present");
-        let doctest = commands.get(1).expect("doctest command must be present");
-        assert!(suite.contains(expected_first), "wrong suite route: {suite}");
-        assert!(
-            doctest.contains("probe-cargo test --doc"),
-            "missing doctest: {doctest}"
-        );
-        assert!(
-            suite.contains("--jobs=3") && doctest.contains("--jobs=3"),
-            "BUILD_JOBS must reach suite and doctests: {commands:?}"
-        );
-        for command in commands {
-            assert!(
-                development_route_matches(RouteText(command), BuildHost::Linux)
-                    .expect("read effective flags"),
-                "test route loses its standard flags: {command}"
-            );
-        }
+        assert_test_cargo_routes(&commands, expected_first);
         assert!(
             preflight_precedes_cargo(RouteText(&output)),
             "test preflight must precede Cargo: {output}"
         );
     }
+}
+
+fn assert_test_cargo_routes(commands: &[&str], expected_first: &str) {
+    assert_eq!(
+        commands.len(),
+        3,
+        "suite, doctest, and feature contract must invoke Cargo: {commands:?}"
+    );
+    let [suite, doctest, feature_contract] = commands else {
+        return;
+    };
+    assert!(suite.contains(expected_first), "wrong suite route: {suite}");
+    assert!(
+        doctest.contains("probe-cargo test --doc"),
+        "missing doctest: {doctest}"
+    );
+    assert!(
+        suite.contains("--jobs=3") && doctest.contains("--jobs=3"),
+        "BUILD_JOBS must reach suite and doctests: {commands:?}"
+    );
+    assert_default_feature_contract(feature_contract);
+    for command in commands {
+        let route_matches = development_route_matches(RouteText(command), BuildHost::Linux);
+        assert!(
+            matches!(&route_matches, Ok(true)),
+            "test route loses its standard flags: {command}; result: {route_matches:?}"
+        );
+    }
+}
+
+fn assert_default_feature_contract(command: &str) {
+    assert!(
+        command.contains(
+            "probe-cargo test -p thysalion-test-support --no-default-features --test \
+             compile_time_contracts bevy_harness_is_hidden_without_feature"
+        ),
+        "missing default-feature API contract test: {command}"
+    );
+    assert!(
+        command.contains("--jobs=3"),
+        "BUILD_JOBS must reach the feature contract test: {command}"
+    );
 }
 
 /// Removing any one development requirement invalidates the route.

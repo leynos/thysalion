@@ -11,7 +11,8 @@
   pipeline), [ADR 002](adr-002-dbsp-as-logic-authority.md) (DBSP as logic
   authority), [ADR 003](adr-003-oxigraph-knowledge-plane.md) (oxigraph
   knowledge plane), and [ADR 004](adr-004-tiered-lighting-software-ddgi.md)
-  (tiered lighting). The
+  (tiered lighting). [ADR 008](adr-008-replay-record-format.md) records the
+  replay wire format. The
   [documentation style guide](documentation-style-guide.md) governs
   conventions; the [repository layout](repository-layout.md) governs file
   placement.

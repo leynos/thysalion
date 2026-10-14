@@ -102,14 +102,39 @@ This step answers whether the invariant-based verification strategy can run
 without a GPU or a window from day one, which decides how much of the design's
 verification programme is continuously enforced. See thysalion-design.md §14.
 
-- [ ] 1.3.1. Wire headless Bevy test scaffolding into CI.
+- [x] 1.3.1. Wire headless Bevy test scaffolding into CI.
   - MinimalPlugins app construction, fixture-scene loading, and the
     diagnostics counters exposed for assertions.
+  - The scaffolding existed in duplicate before this step: one
+    `rstest-bdd` harness adapter per consuming crate's `tests/` tree, and
+    no test that combined an app with a loaded scene. Both adapters are now
+    promoted into `thysalion-test-support` (`crates/test-support/`), and a
+    behavioural scenario there builds a `MinimalPlugins` harness app, loads
+    the `bare-cell` fixture into it, and asserts against the harness's
+    registered diagnostics — the task's three clauses in one test.
+  - `ci.yml` runs `headless-test` with `make test` on every branch push and
+    `build-test` on every pull-request merge result. Same-repository pull
+    requests can run both jobs on distinct refs. `build-test` is scoped to
+    pull requests, with no same-repository skip; its coverage step has no
+    step-level `if:`. The workflow/ref concurrency group cancels only
+    superseded runs with the same workflow and ref. `tests/workflow_shape.rs`
+    asserts the push and manual-dispatch headless job and retained
+    merge-result run.
+  - `ci.yml` also runs `headless-test` on `workflow_dispatch`; `build-test`
+    remains limited to pull requests. `tests/workflow_shape.rs` asserts the
+    manual-dispatch trigger and headless job condition. Concurrency is keyed on
+    workflow and ref, so dispatch and push runs on the same branch can supersede
+    one another while a PR merge-result run uses a distinct ref.
   - Success: a trivial headless behavioural test loads a fixture scene in
     CI on every push.
-- [ ] 1.3.2. Build the deterministic replay harness skeleton.
+- [x] 1.3.2. Build the deterministic replay harness skeleton.
   - Record and replay input-record sequences against whatever simulation
     exists; storage format versioned from the start.
+  - The envelope only, deliberately: `thysalion_test_support::replay`
+    defines a versioned session header and a stream of tick-stamped
+    records whose payload enum is uninhabited, so no speculative input
+    vocabulary reaches the wire before roadmap 4.1.2 defines the circuit
+    boundary. See adr-008-replay-record-format.md.
   - See thysalion-design.md §14 (I1).
   - Success: recording and replaying an empty session is byte-identical;
     the harness is invoked from CI.

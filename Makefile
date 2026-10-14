@@ -119,9 +119,12 @@ clean: ## Remove build artifacts
 	$(CARGO) clean
 	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
+# The workspace harness enables Bevy through its dev dependency. A separate
+# package-only command checks that the default-feature API hides BevyHarness.
 test: check-build-tools ## Run tests with warnings treated as errors
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --doc --workspace --all-features $(BUILD_JOBS)
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test -p thysalion-test-support --no-default-features --test compile_time_contracts bevy_harness_is_hidden_without_feature $(BUILD_JOBS)
 
 coverage: check-build-tools ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"

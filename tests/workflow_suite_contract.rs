@@ -1,6 +1,26 @@
-//! Contract that pull requests run the suite once through coverage, with
-//! doctests in a separate unconditional step. The workflow reader also checks
-//! build-tool provisioning before every Linux suite route.
+//! Contract tests for the CI suite and coverage steps.
+//!
+//! `make test` runs the suite with `--all-targets --all-features` and then
+//! the doctests. The push and manual-dispatch `headless-test` job in `ci.yml`
+//! runs that command; its pull-request-only `build-test` job measures the same
+//! suite with coverage and runs the doctests in a step of its own. The
+//! repository used to carry an `act-validation.yml` workflow running
+//! `make test WITH_ACT=1`; nothing reads `WITH_ACT` and no test is gated on
+//! Act, so it ran the whole suite a second time and was removed.
+//!
+//! These tests read the workflows textually and the manifest as TOML, and
+//! hold the split:
+//!
+//! - suite commands run once in each lane: `make test` in the push and manual-dispatch
+//!   `headless-test` job, and coverage plus doctests in the pull-request-only `build-test` job;
+//! - the doctest and coverage steps in `build-test` have no step-level `if:`; its pull-request
+//!   guard keeps coverage off pushes while checking both fork and same-repository merge results;
+//! - no workflow turns on coverage doctests;
+//! - coverage in `ci.yml` and `coverage-main.yml` passes every declared feature, so `make test`'s
+//!   `--all-features` and coverage select the same tests.
+//!
+//! The readers live in `workflow_suite/reading.rs` and also check build-tool
+//! provisioning before each Linux suite route.
 
 use rstest::rstest;
 
@@ -13,7 +33,7 @@ mod whitaker;
 
 use reading::{Command, Job, Manifest, Workflow, manifest_dir, workflows};
 
-/// The one suite command a workflow may run outside the coverage step.
+/// The doctest command the pull-request coverage step does not run.
 const DOCTEST_COMMAND: &str = "cargo test --doc --workspace --all-features";
 
 /// The coverage action every pull request's suite run goes through.
@@ -21,6 +41,9 @@ const COVERAGE_ACTION: &str = "leynos/shared-actions/.github/actions/generate-co
 
 /// The job that must run both the coverage step and the doctest step.
 const SUITE_JOB: &str = "build-test";
+
+/// The push and manual-dispatch job that runs the headless suite without coverage.
+const HEADLESS_TEST_JOB: &str = "headless-test";
 
 /// Returns the `build-test` job of `ci.yml`, if it exists.
 fn suite_job(found: &[(String, String)]) -> Option<Job<'_>> {
@@ -87,67 +110,63 @@ fn suite_spellings_are_recognized(#[case] line: &str, #[case] expected: bool) {
 }
 
 #[test]
-fn only_the_doctest_step_runs_the_suite_outside_coverage() {
+fn suite_commands_are_confined_to_the_headless_and_pull_request_jobs() {
     let found = workflows().expect("failed to read the workflows");
-    let (doctests, repeated): (Vec<_>, Vec<_>) =
-        suite_runs(&found)
-            .into_iter()
-            .partition(|(name, job, command)| {
-                *command == DOCTEST_COMMAND && *name == "ci.yml" && *job == SUITE_JOB
-            });
+    let runs = suite_runs(&found);
+    let doctests = runs
+        .iter()
+        .filter(|(name, job, command)| {
+            *command == DOCTEST_COMMAND && *name == "ci.yml" && *job == SUITE_JOB
+        })
+        .count();
+    let headless_suite = runs
+        .iter()
+        .filter(|(name, job, command)| {
+            *command == "make test" && *name == "ci.yml" && *job == HEADLESS_TEST_JOB
+        })
+        .count();
     assert!(
-        repeated.is_empty(),
-        "the suite runs outside coverage in {repeated:?}"
+        runs.len() == 2,
+        "only the doctest and headless suite commands may run: {runs:?}"
     );
     assert_eq!(
-        doctests.len(),
-        1,
+        headless_suite, 1,
+        "`make test` must run once in the push and manual-dispatch {HEADLESS_TEST_JOB} job"
+    );
+    assert_eq!(
+        doctests, 1,
         "`{DOCTEST_COMMAND}` must run once, in {SUITE_JOB}"
     );
 }
 
-#[test]
-fn build_test_runs_the_doctests_unconditionally() {
-    let found = workflows().expect("failed to read the workflows");
-    let job = suite_job(&found).expect("ci.yml must define build-test");
-    assert!(
-        !job.is_conditional(),
-        "{SUITE_JOB} must run on every pull request"
-    );
-    let doctest = Command::from_line(DOCTEST_COMMAND);
-    let steps: Vec<_> = job
-        .steps()
-        .into_iter()
-        .filter(|step| step.runs(doctest))
-        .collect();
-    assert_eq!(
-        steps.len(),
-        1,
-        "{SUITE_JOB} must run the doctests in one step"
-    );
-    assert!(
-        !steps.iter().any(reading::Step::is_conditional),
-        "the doctest step must always run"
-    );
+#[derive(Clone, Copy, Debug)]
+enum RequiredSuiteStep {
+    Doctests,
+    Coverage,
 }
 
-#[test]
-fn build_test_runs_coverage_unconditionally() {
+#[rstest]
+#[case::doctests(RequiredSuiteStep::Doctests)]
+#[case::coverage(RequiredSuiteStep::Coverage)]
+fn build_test_runs_required_step_unconditionally(#[case] required_step: RequiredSuiteStep) {
     let found = workflows().expect("failed to read the workflows");
     let job = suite_job(&found).expect("ci.yml must define build-test");
     let steps: Vec<_> = job
         .steps()
         .into_iter()
-        .filter(|step| step.uses(COVERAGE_ACTION))
+        .filter(|step| match required_step {
+            RequiredSuiteStep::Doctests => step.runs(Command::from_line(DOCTEST_COMMAND)),
+            RequiredSuiteStep::Coverage => step.uses(COVERAGE_ACTION),
+        })
         .collect();
     assert_eq!(
         steps.len(),
         1,
-        "{SUITE_JOB} must run the coverage action once"
+        "{required_step:?} must match exactly one step in {SUITE_JOB}"
     );
     assert!(
-        !steps.iter().any(reading::Step::is_conditional),
-        "coverage must always run"
+        steps.first().is_some_and(|step| !step.is_conditional()),
+        "{required_step:?} step must carry no step-level `if:`"
     );
 }
 
@@ -187,7 +206,7 @@ fn manifest_features_are_read(#[case] text: &str, #[case] expected: &[&str]) {
 }
 
 /// The features the coverage steps pass, which must be every declared one.
-const COVERAGE_FEATURES: &str = "thysalion-demos/demo-empty";
+const COVERAGE_FEATURES: &str = "thysalion-demos/demo-empty,thysalion-test-support/bevy";
 
 /// The workflows whose coverage step must pass the features.
 const COVERAGE_WORKFLOWS: [&str; 2] = ["ci.yml", "coverage-main.yml"];
@@ -217,10 +236,7 @@ fn workspace_features() -> std::io::Result<Vec<String>> {
 
 #[test]
 fn coverage_enables_every_declared_feature() {
-    let mut passed: Vec<String> = COVERAGE_FEATURES
-        .split_whitespace()
-        .map(str::to_owned)
-        .collect();
+    let mut passed: Vec<String> = COVERAGE_FEATURES.split(',').map(str::to_owned).collect();
     passed.sort();
     assert_eq!(
         workspace_features().expect("failed to read the workspace manifests"),
