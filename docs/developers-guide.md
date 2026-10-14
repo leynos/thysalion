@@ -279,6 +279,13 @@ there, deliberately the same shape:
   the default-feature path, so a suite that only loads scenes pays for no
   engine.
 
+`LoaderSession::document`, `load`, and `load_other` return `Result` for missing
+document selection or encoding-operation failures. BDD steps should propagate
+those errors, adding context when useful. Scene-load success or failure is
+recorded separately in `outcome` for assertions. Use `loaded()` for successful
+loads and `diagnostics()` for validation failures; their Rustdoc documents each
+accessor's preconditions.
+
 `crates/test-support/src/scenes.rs` is the single statement of where the
 committed fixture scenes live and the single place that takes ambient
 filesystem authority to reach them; every suite that reads a fixture goes

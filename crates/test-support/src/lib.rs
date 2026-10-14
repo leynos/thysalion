@@ -29,14 +29,15 @@
 //! # Failure boundaries
 //!
 //! Fixture directory and resource I/O failures propagate from the public
-//! helpers as `io::Result`. At `rstest-bdd` step boundaries, whose functions
-//! return `()`, callers handle those errors with context so a failed operation
-//! still reports which fixture or resource could not be loaded.
+//! helpers as `io::Result`. The loader's `document`, `load`, and `load_other`
+//! operations also return `Result` for missing document selection or encoding
+//! failures. `rstest-bdd` steps can return `Result` and propagate these
+//! operation errors, adding context so failures identify the relevant fixture
+//! or resource. Scene-load success or failure is a separate outcome stored in
+//! [`LoaderSession::outcome`] for assertions.
 //!
-//! Other failures can still panic: malformed scenario misuse and failed
-//! encoding or semantic assertions indicate invalid test setup or a violated
-//! test contract. The relevant functions document those conditions under a
-//! `# Panics` heading.
+//! Invalid scenario setup and failed semantic assertions can still panic; the
+//! relevant functions document panic conditions under a `# Panics` heading.
 //!
 //! [`replay`] is the exception, and the boundary is meaningful: a recording is
 //! *data*, frequently written by a different build, so a decode failure is an
