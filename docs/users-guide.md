@@ -92,8 +92,8 @@ and how to read a diagnostic report.
 
 ### Rust consumers
 
-The validated Rust API uses `scene::palette::FacePassability` for each face of
-`scene::palette::Passability` instead of a bare boolean. Convert values with
+The validated palette API uses `scene::palette::FacePassability` for each face
+of `scene::palette::Passability` instead of a bare boolean. Convert values with
 `FacePassability::from(true)` (or `false`) and read them with `is_passable`.
 The document API still encodes six flat booleans, so scene files and their
 schema are unchanged and the scene format version does not change. See the
