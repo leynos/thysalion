@@ -1,0 +1,12 @@
+error[E0308]: mismatched types
+ --> tests/ui/passability/legacy_boolean_face.rs:7:25
+  |
+7 |     passability.pos_x = true;
+  |     -----------------   ^^^^ expected `FacePassability`, found `bool`
+  |     |
+  |     expected due to the type of this binding
+  |
+help: call `Into::into` on this expression to convert `bool` into `FacePassability`
+  |
+7 |     passability.pos_x = true.into();
+  |                             +++++++

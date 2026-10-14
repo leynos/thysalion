@@ -57,14 +57,20 @@ jobs:
           key: cross-${{ env.CROSS_REVISION }}
       - name: Install cross
         env:
-          # Clear repository build flags from .cargo/config.toml (mold linker
-          # and Cranelift codegen-backend) before installing cross from CROSS_REVISION.
+          # Install the pinned release tool with stable Cargo outside the
+          # repository's nightly development configuration.
           RUSTFLAGS: ""
         run: |
           if [ -x "$HOME/.cargo/bin/cross" ]; then
             exit 0
           fi
-          cargo install cross --git https://github.com/cross-rs/cross --rev "${CROSS_REVISION}"
+          unset CARGO_ENCODED_RUSTFLAGS CARGO_UNSTABLE_CODEGEN_BACKEND
+          unset CARGO_PROFILE_DEV_CODEGEN_BACKEND CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND
+          unset CARGO_PROFILE_TEST_CODEGEN_BACKEND CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND
+          unset CARGO_PROFILE_RELEASE_CODEGEN_BACKEND CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND
+          unset CARGO_PROFILE_BENCH_CODEGEN_BACKEND CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND
+          cd /
+          cargo +stable install cross --git https://github.com/cross-rs/cross --rev "${CROSS_REVISION}"
       - name: Cache cargo registry
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
@@ -75,17 +81,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ matrix.target }}-
       - name: Build release binary
-        # Use +stable to override rust-toolchain.toml (which specifies nightly
-        # with Cranelift for development) and ensure release builds use stable.
+        # Cross uses stable Cargo for releases; the pinned nightly remains for
+        # development, whose backend is LLVM under the documented exception.
         env:
-          # Build release artifacts without repository-local linker flags,
-          # including mold rustflags from .cargo/config.toml.
+          # An empty value excludes development rustflags. Stable Cargo reads
+          # the checkout config, so it must omit unsupported backend keys.
+          # Run from outside the tree and select the same manifest explicitly.
           RUSTFLAGS: ""
+          # Cross forwards Cargo target variables into its images. Override
+          # the repository's Linux clang linker with each image's GCC linker.
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: gcc
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         # -p thysalion is load-bearing: demo crates (thysalion-demos and the
         # Bevy-dependent harness) must never enter the release build graph —
         # they do not cross-compile for these targets. A workflow-shape test
         # (tests/workflow_shape.rs) asserts this flag stays present.
-        run: cross +stable build --release -p thysalion --target ${{ matrix.target }}
+        run: |
+          unset CARGO_ENCODED_RUSTFLAGS CARGO_UNSTABLE_CODEGEN_BACKEND
+          unset CARGO_PROFILE_DEV_CODEGEN_BACKEND CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND
+          unset CARGO_PROFILE_TEST_CODEGEN_BACKEND CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND
+          unset CARGO_PROFILE_RELEASE_CODEGEN_BACKEND CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND
+          unset CARGO_PROFILE_BENCH_CODEGEN_BACKEND CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND
+          cd /
+          cross +stable build --manifest-path "${GITHUB_WORKSPACE}/Cargo.toml" \
+            --release -p thysalion --target ${{ matrix.target }}
       - name: Prepare artifact
         run: |
           mkdir -p artifacts/${{ matrix.os }}-${{ matrix.arch }}
@@ -117,4 +136,3 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/*/*
-

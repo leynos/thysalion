@@ -60,33 +60,55 @@ fn the_local_index_and_the_position_are_a_bijection(
 fn the_index_mapping_is_z_major() {
     let size = SMALL_CHUNK;
     // Within a chunk of side s, (x, y, z) sits at z*s*s + y*s + x.
-    assert_eq!(VoxelPos::new(1, 0, 0).local_index(size), 1);
-    assert_eq!(VoxelPos::new(0, 1, 0).local_index(size), 4);
-    assert_eq!(VoxelPos::new(0, 0, 1).local_index(size), 16);
+    assert_eq!(
+        VoxelPos::new(1, 0, 0).local_index(size),
+        1,
+        "the x offset should be the least-significant index"
+    );
+    assert_eq!(
+        VoxelPos::new(0, 1, 0).local_index(size),
+        4,
+        "the y offset should follow one full x row"
+    );
+    assert_eq!(
+        VoxelPos::new(0, 0, 1).local_index(size),
+        16,
+        "the z offset should follow one full x-y plane"
+    );
 }
 
 #[rstest]
 fn an_index_past_the_chunk_has_no_position() {
     let size = SMALL_CHUNK;
-    assert_eq!(VoxelPos::from_local_index(size.volume(), size), None);
+    assert_eq!(
+        VoxelPos::from_local_index(size.volume(), size),
+        None,
+        "the first index past the chunk should have no position"
+    );
 }
 
 #[rstest]
 fn a_zero_length_run_is_rejected() {
     let error = expand(&[run(0, 1)], 4).expect_err("must reject");
-    assert!(matches!(error, RunDecodeError::ZeroLength { ordinal: 0 }));
+    assert!(
+        matches!(error, RunDecodeError::ZeroLength { ordinal: 0 }),
+        "a zero-length first run should report its ordinal"
+    );
 }
 
 #[rstest]
 fn adjacent_runs_sharing_an_index_are_rejected() {
     let error = expand(&[run(2, 1), run(2, 1)], 4).expect_err("must reject");
-    assert!(matches!(
-        error,
-        RunDecodeError::AdjacentDuplicate {
-            ordinal: 0,
-            index: 1
-        }
-    ));
+    assert!(
+        matches!(
+            error,
+            RunDecodeError::AdjacentDuplicate {
+                ordinal: 0,
+                index: 1
+            }
+        ),
+        "adjacent duplicate runs should report their ordinal and index"
+    );
 }
 
 #[rstest]
@@ -105,21 +127,32 @@ fn a_run_stream_claiming_a_vast_volume_is_refused_before_allocating() {
     // The length check runs before any allocation proportional to the declared
     // lengths, so this is a cheap rejection rather than an allocation failure.
     let error = expand(&[run(u32::MAX, 1)], 64).expect_err("must reject");
-    assert!(matches!(
-        error,
-        RunDecodeError::LengthMismatch {
-            actual: 4_294_967_295,
-            expected: 64
-        }
-    ));
+    assert!(
+        matches!(
+            error,
+            RunDecodeError::LengthMismatch {
+                actual: 4_294_967_295,
+                expected: 64
+            }
+        ),
+        "the oversized stream should fail the length check before allocation"
+    );
 }
 
 #[rstest]
 fn a_single_valued_chunk_reports_a_uniform_index() {
     let voxels = vec![VoxelIndex::new(3); 8];
-    assert_eq!(uniform_index(&voxels), Some(VoxelIndex::new(3)));
+    assert_eq!(
+        uniform_index(&voxels),
+        Some(VoxelIndex::new(3)),
+        "a single-valued chunk should report its shared index"
+    );
     let mixed = vec![VoxelIndex::new(3), VoxelIndex::AIR];
-    assert_eq!(uniform_index(&mixed), None);
+    assert_eq!(
+        uniform_index(&mixed),
+        None,
+        "a mixed chunk should not report a uniform index"
+    );
 }
 
 #[rstest]
@@ -134,9 +167,13 @@ fn a_single_valued_dense_chunk_is_elided_to_a_uniform_payload() {
         .expect("one chunk volume");
 
     let chunks = grid.to_chunks();
-    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks.len(), 1, "one dense chunk should serialize once");
     let payload = chunks.first().map(|entry| &entry.payload);
-    assert_eq!(payload, Some(&ChunkPayloadDocument::Uniform(2)));
+    assert_eq!(
+        payload,
+        Some(&ChunkPayloadDocument::Uniform(2)),
+        "a single-valued dense chunk should serialize as a uniform payload"
+    );
 }
 
 #[rstest]
@@ -170,7 +207,11 @@ fn a_position_outwith_the_extent_is_none_and_an_empty_chunk_is_air() {
     let size = SMALL_CHUNK;
     let extent = Extent::new(4, 4, 4, size).expect("aligned");
     let grid = VoxelGrid::empty(extent, size).expect("the extent is chunk-aligned");
-    assert_eq!(grid.get(VoxelPos::new(0, 0, 0)), Some(VoxelIndex::AIR));
+    assert_eq!(
+        grid.get(VoxelPos::new(0, 0, 0)),
+        Some(VoxelIndex::AIR),
+        "an empty in-bounds chunk should read as air"
+    );
     assert_eq!(
         grid.get(VoxelPos::new(4, 0, 0)),
         None,
@@ -196,7 +237,11 @@ proptest! {
     fn the_run_codec_is_a_fixpoint(voxels in dense_chunk(64)) {
         let runs = collapse(&voxels);
         let expanded = expand(&runs, 64).expect("canonical runs must expand");
-        prop_assert_eq!(expanded, voxels);
+        prop_assert_eq!(
+            expanded,
+            voxels,
+            "expanding collapsed voxels should reproduce the input"
+        );
     }
 
     /// Collapse produces the canonical form, which is stronger than a fixpoint.
@@ -220,7 +265,11 @@ proptest! {
     fn expanding_and_re_collapsing_is_stable(voxels in dense_chunk(64)) {
         let once = collapse(&voxels);
         let twice = collapse(&expand(&once, 64).expect("expand"));
-        prop_assert_eq!(once, twice);
+        prop_assert_eq!(
+            once,
+            twice,
+            "collapsing expanded canonical runs should be stable"
+        );
     }
 }
 

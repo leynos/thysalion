@@ -134,8 +134,7 @@ management. Contributors should follow these best practices when working on the
 project:
 
 - Run `make check-fmt`, `make lint`, and `make test` before committing. These
-  targets wrap the following commands, so contributors understand the exact
-  behaviour and policy enforced:
+  targets apply the repository's formatting, lint, and test policies:
   - `make check-fmt` executes:
 
     ```sh
@@ -143,23 +142,27 @@ project:
     ```
 
     validating formatting across the entire workspace without modifying files.
-  - `make lint` executes:
-
-    ```sh
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
-    ```
-
-    linting every target with all features enabled and denying all Clippy
-    warnings.
-  - `make test` executes:
-
-    ```sh
-    cargo test --workspace
-    ```
-
-    running the full workspace test suite. Use `make fmt`
-    (`cargo fmt --workspace`) to apply formatting fixes reported by the
-    formatter check.
+  - `make lint` runs rustdoc, Clippy, and the installer-managed Whitaker suite.
+    Clippy checks all workspace targets and features with warnings denied.
+  - `make test` runs the full workspace suite, preferring `cargo nextest` when
+    it is installed, and then runs doctests. Use `make fmt` to apply formatting
+    fixes reported by the check.
+- On Linux, run `make install-build-tools` before development builds. It
+  installs the pinned `mold` binary and required components for the pinned
+  nightly toolchain; `make check-build-tools` is the preflight used by build,
+  test, lint, coverage, typecheck, and demo targets. Install `clang` separately.
+- Bare Cargo development commands discover `.cargo/config.toml`. It leaves
+  Cargo's LLVM backend in effect, enables `-Zthreads=8`, and uses `mold` on
+  Linux. Make recipes that set `RUSTFLAGS` restate those flags and the warnings
+  policy; they also clear inherited backend overrides. Release and coverage
+  routes explicitly clear or replace development settings. The release workflow
+  invokes stable Cargo from outside the repository with an absolute manifest
+  path, but Cross loads the checkout configuration inside its container; that
+  config therefore omits `codegen-backend` keys.
+- The authoritative lint tables are in the root `Cargo.toml`; the root package
+  and every workspace member inherit them. See the `Lint baseline` section of
+  the developers' guide for thresholds, environment restrictions and toolchain
+  components.
 - Clippy warnings MUST be disallowed.
 - Fix any warnings emitted during tests in the code itself rather than
   silencing them.
@@ -203,8 +206,8 @@ project:
 - Place function attributes **after** doc comments.
 - Do not use `return` in single-line functions.
 - Use predicate functions for conditional criteria with more than two branches.
-- Lints must not be silenced except as a **last resort**.
-- Lint rule suppressions must be tightly scoped and include a clear reason.
+- Fix lint findings at source. Never add `#[allow]`; use `#[expect]` only for
+  macro-expansion artefacts or genuine floating-point arithmetic, with a reason.
 - Use `concat!()` to combine long string literals rather than escaping newlines
   with a backslash.
 - Prefer single line versions of functions where appropriate. i.e.,
@@ -313,13 +316,7 @@ project:
 
 ## Markdown guidance
 
-- Validate Markdown files using `make markdownlint`. This target also runs the
-  en-GB-oxendict spelling gate.
-- Inline code spans are checked. An identifier or a deliberately US spelling
-  inside backticks is not exempt, so record it under `[patterns]` in
-  `typos.local.toml` and include the backticks in the pattern. Scoping the
-  pattern to the backticked form keeps the same word flagged in prose. Never
-  widen the exception back to all inline code.
+- Validate Markdown files using `make markdownlint`.
 - Run `make fmt` after any documentation changes to format all Markdown
   files and fix table markup.
 - Validate Mermaid diagrams in Markdown files by running `make nixie`.

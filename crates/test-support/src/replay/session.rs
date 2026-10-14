@@ -234,6 +234,7 @@ fn decode<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, ReplayDecod
 /// ```
 #[derive(Debug, Clone)]
 pub struct SessionRecorder {
+    /// The header and ticks accumulated until `finish` validates and encodes them.
     document: SessionDocument,
 }
 
@@ -316,6 +317,7 @@ impl SessionReplayer {
 /// A decoded session, ready to be replayed or re-encoded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordedSession {
+    /// The decoded document, validated for version compatibility and tick order.
     document: SessionDocument,
 }
 

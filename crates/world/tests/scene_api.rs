@@ -71,13 +71,10 @@ fn validate(document: &SceneDocument) -> Result<(), Vec<SceneDiagnostic>> {
     thysalion_world::scene::validation::validate(document, &source(), &policy).map(|_| ())
 }
 
-/// Parses `raw` against the project namespaces, or fails the test.
-fn parsed(raw: &str) -> ConceptIri {
+/// Parses `raw` against the project namespaces.
+fn parsed(raw: &str) -> Result<ConceptIri, ConceptIriProblem> {
     let table = NamespaceTable::default();
-    match ConceptIri::parse(raw, &table) {
-        Ok(iri) => iri,
-        Err(problem) => panic!("{raw} must parse against the project namespaces: {problem}"),
-    }
+    ConceptIri::parse(raw, &table)
 }
 
 #[rstest]
@@ -91,7 +88,12 @@ fn a_parsed_identifier_exposes_its_parts(
     #[case] expected: &str,
     #[case] read: fn(&ConceptIri) -> String,
 ) {
-    assert_eq!(read(&parsed("thy:OakDoor")), expected);
+    let iri = parsed("thy:OakDoor").expect("the fixture IRI must parse against project namespaces");
+    assert_eq!(
+        read(&iri),
+        expected,
+        "parsed identifier must expose the requested component {expected:?}"
+    );
 }
 
 #[rstest]
@@ -101,7 +103,11 @@ fn a_parsed_identifier_exposes_its_parts(
 #[case::space_in_local("thy:Oak Door", ConceptIriProblem::IllegalCharacter(' '))]
 fn a_malformed_identifier_names_its_fault(#[case] raw: &str, #[case] expected: ConceptIriProblem) {
     let table = NamespaceTable::default();
-    assert_eq!(ConceptIri::parse(raw, &table), Err(expected));
+    assert_eq!(
+        ConceptIri::parse(raw, &table),
+        Err(expected),
+        "malformed identifier {raw:?} must report the expected parse fault"
+    );
 }
 
 #[test]
@@ -116,20 +122,32 @@ fn an_unpublished_prefix_is_rejected_by_name() {
         problem,
         ConceptIriProblem::UnknownPrefix {
             found: SmolStr::new("zzz"),
-        }
+        },
+        "unknown-prefix errors must preserve the prefix supplied by the document"
     );
 }
 
 #[test]
 fn the_project_table_expands_the_prefixes_it_publishes() {
     let table = NamespaceTable::default();
-    assert!(table.contains(THYSALION_PREFIX));
-    assert_eq!(table.base(THYSALION_PREFIX), Some(THYSALION_BASE));
+    assert!(
+        table.contains(THYSALION_PREFIX),
+        "project namespace table must include the thysalion prefix"
+    );
+    assert_eq!(
+        table.base(THYSALION_PREFIX),
+        Some(THYSALION_BASE),
+        "published prefix must resolve to its base IRI"
+    );
 }
 
 #[test]
 fn the_project_table_has_no_base_for_an_unpublished_prefix() {
-    assert_eq!(NamespaceTable::default().base("zzz"), None);
+    assert_eq!(
+        NamespaceTable::default().base("zzz"),
+        None,
+        "unpublished prefixes must have no base IRI"
+    );
 }
 
 #[test]
@@ -138,14 +156,24 @@ fn the_project_table_lists_its_prefixes_in_sorted_order() {
     let prefixes: Vec<&str> = table.prefixes().collect();
     // Sorted, because the table is a `BTreeMap` and a report that lists the
     // permitted prefixes must not reorder between runs.
-    assert_eq!(prefixes, vec![SCENE_PREFIX, THYSALION_PREFIX]);
+    assert_eq!(
+        prefixes,
+        vec![SCENE_PREFIX, THYSALION_PREFIX],
+        "published prefixes must be reported in sorted order"
+    );
 }
 
 #[test]
 fn an_empty_table_rejects_every_prefix() {
     let table = NamespaceTable::empty();
-    assert!(!table.contains(THYSALION_PREFIX));
-    assert!(ConceptIri::parse("thy:OakDoor", &table).is_err());
+    assert!(
+        !table.contains(THYSALION_PREFIX),
+        "empty namespace table must contain no published prefixes"
+    );
+    assert!(
+        ConceptIri::parse("thy:OakDoor", &table).is_err(),
+        "empty namespace table must reject project identifiers"
+    );
 }
 
 #[rstest]
@@ -157,7 +185,11 @@ fn an_encoding_is_inferred_from_the_extension(
     #[case] path: &str,
     #[case] expected: Option<Encoding>,
 ) {
-    assert_eq!(Encoding::from_path(Utf8Path::new(path)), expected);
+    assert_eq!(
+        Encoding::from_path(Utf8Path::new(path)),
+        expected,
+        "encoding inference for {path:?} must match its extension"
+    );
 }
 
 #[rstest]
@@ -168,8 +200,16 @@ fn each_encoding_names_itself(
     #[case] extension: &str,
     #[case] displayed: &str,
 ) {
-    assert_eq!(encoding.extension(), extension);
-    assert_eq!(encoding.to_string(), displayed);
+    assert_eq!(
+        encoding.extension(),
+        extension,
+        "encoding {encoding:?} must expose its canonical extension"
+    );
+    assert_eq!(
+        encoding.to_string(),
+        displayed,
+        "encoding {encoding:?} must use its canonical display name"
+    );
 }
 
 #[test]
@@ -184,7 +224,8 @@ fn a_chunk_coordinate_locates_its_origin_corner() {
             x: 32,
             y: 64,
             z: 96,
-        }
+        },
+        "chunk coordinate origin must scale each component by chunk size"
     );
 }
 
@@ -197,7 +238,10 @@ fn an_unrecognized_extension_is_the_callers_fault_not_the_documents() {
     };
     // Reported rather than swallowed, because guessing produces a parse error
     // that blames the document for the caller's mistake.
-    assert_eq!(reported, path);
+    assert_eq!(
+        reported, path,
+        "loader errors must preserve the caller's unrecognized path"
+    );
 }
 
 #[test]
@@ -226,7 +270,10 @@ fn a_replaced_namespace_table_is_the_one_enforced() {
     else {
         panic!("`thy:` must be unknown once the table is emptied");
     };
-    assert!(carries(&diagnostics, DiagnosticCode::ConceptIriInvalid));
+    assert!(
+        carries(&diagnostics, DiagnosticCode::ConceptIriInvalid),
+        "replacement namespace policy must emit a concept-IRI diagnostic"
+    );
 }
 
 #[test]
@@ -239,7 +286,10 @@ fn a_document_from_a_future_build_is_refused_before_its_other_rules() {
     // Exactly one: a future document may legitimately break every other rule,
     // and reporting those would send the reader chasing consequences.
     assert_eq!(diagnostics.len(), 1, "{diagnostics:?}");
-    assert!(carries(&diagnostics, DiagnosticCode::UnsupportedVersion));
+    assert!(
+        carries(&diagnostics, DiagnosticCode::UnsupportedVersion),
+        "future major version must produce an unsupported-version diagnostic"
+    );
 }
 
 #[test]
@@ -251,8 +301,14 @@ fn a_zero_chunk_size_is_refused_before_the_payload_is_sized_from_it() {
     };
     // Both, and in this order: the design-conformance complaint is about the
     // value, and the zero complaint is why phase two cannot proceed.
-    assert!(carries(&diagnostics, DiagnosticCode::ChunkSizeNotDesign));
-    assert!(carries(&diagnostics, DiagnosticCode::ZeroDimension));
+    assert!(
+        carries(&diagnostics, DiagnosticCode::ChunkSizeNotDesign),
+        "non-design chunk size must report design-conformance failure"
+    );
+    assert!(
+        carries(&diagnostics, DiagnosticCode::ZeroDimension),
+        "zero chunk size must report a zero-dimension diagnostic"
+    );
 }
 
 /// The bound is the run encoding, not the machine word: a chunk serializes as
@@ -289,7 +345,8 @@ fn coordinate_arithmetic_saturates_rather_than_wrapping() {
             x: u32::MAX,
             y: u32::MAX,
             z: u32::MAX,
-        }
+        },
+        "large chunk coordinates must saturate at the voxel-coordinate limit"
     );
     let outwith = VoxelPos {
         x: u32::MAX,

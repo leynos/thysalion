@@ -19,7 +19,6 @@ use crate::{
         document::{
             EmissionDocument,
             MaterialClass,
-            Passability,
             SimProperties,
             SlopeDirection,
             VoxelTypeDocument,
@@ -34,6 +33,9 @@ use crate::{
     },
 };
 
+mod passability;
+pub use passability::{FacePassability, Passability};
+
 /// The largest palette a 16-bit index can address.
 pub const MAX_PALETTE_ENTRIES: usize = u16::MAX as usize + 1;
 
@@ -44,7 +46,9 @@ pub const MAX_PALETTE_ENTRIES: usize = u16::MAX as usize + 1;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub struct LightEmission {
+    /// Emitted-light strength on the validated 0–15 scale.
     intensity: u8,
+    /// Red, green, and blue components of emitted light.
     colour: [u8; 3],
 }
 
@@ -130,6 +134,7 @@ pub struct VoxelType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Palette {
+    /// Validated voxel kinds in wire order, which fixes index meaning.
     entries: Vec<VoxelType>,
 }
 
@@ -272,7 +277,7 @@ fn convert_entry(
         (Ok(checked), true) => Ok(VoxelType {
             name: entry.name.clone(),
             material: entry.material,
-            passable: entry.passable,
+            passable: entry.passable.into(),
             slope: entry.slope,
             emission: checked,
             sim: entry.sim,

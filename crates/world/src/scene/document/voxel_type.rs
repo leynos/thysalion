@@ -73,69 +73,112 @@ pub enum Face {
     NegZ,
 }
 
-/// Per-face passability for pathfinding.
+/// The wire boolean for one named voxel face.
 ///
-/// Six named fields rather than design §7.2's `[bool; 6]`. An array requires
-/// every reader to agree on the index-to-face mapping and offers no way to
-/// notice when one does not; lille's equivalent used a dictionary keyed by
-/// unit-normal strings with no completeness guarantee, and was never
-/// implemented.
+/// The transparent representation keeps each property a flat boolean in the
+/// scene document and schema. The validated domain uses [`crate::scene::palette::FacePassability`]
+/// instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "a voxel has exactly six faces, each independently passable. The lint's remedy is to \
-              collapse booleans into a state enum, which does not apply here, and both \
-              alternative encodings were considered and rejected: an array loses the face names, \
-              and a bitmask loses the legibility of a hand-authored `pos_x: true`."
-)]
-pub struct Passability {
-    /// Whether an agent may cross the `+x` face.
-    pub pos_x: bool,
-    /// Whether an agent may cross the `-x` face.
-    pub neg_x: bool,
-    /// Whether an agent may cross the `+y` face.
-    pub pos_y: bool,
-    /// Whether an agent may cross the `-y` face.
-    pub neg_y: bool,
-    /// Whether an agent may cross the `+z` face.
-    pub pos_z: bool,
-    /// Whether an agent may cross the `-z` face.
-    pub neg_z: bool,
+#[schemars(inline)]
+#[serde(transparent)]
+pub struct PassabilityFaceDocument(bool);
+
+impl PassabilityFaceDocument {
+    /// Creates a document face value from its boolean representation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::scene::document::PassabilityFaceDocument;
+    ///
+    /// let face = PassabilityFaceDocument::new(true);
+    /// assert!(face.is_passable());
+    /// ```
+    #[must_use]
+    pub const fn new(is_passable: bool) -> Self { Self(is_passable) }
+
+    /// The boolean value represented by this document face.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::scene::document::PassabilityFaceDocument;
+    ///
+    /// let face = PassabilityFaceDocument::new(false);
+    /// assert!(!face.is_passable());
+    /// ```
+    #[must_use]
+    pub const fn is_passable(self) -> bool { self.0 }
 }
 
-impl Passability {
-    /// Every face passable, as air is.
+/// Converts a boolean into a wire face value.
+///
+/// # Examples
+///
+/// ```
+/// use thysalion_world::scene::document::PassabilityFaceDocument;
+///
+/// let face = PassabilityFaceDocument::from(true);
+/// assert!(face.is_passable());
+/// ```
+impl From<bool> for PassabilityFaceDocument {
+    fn from(is_passable: bool) -> Self { Self::new(is_passable) }
+}
+
+/// Per-face passability in its flat wire representation.
+///
+/// Each field serializes as a boolean; the validated domain representation
+/// lives in `scene::palette`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[schemars(rename = "Passability")]
+#[serde(deny_unknown_fields)]
+pub struct PassabilityDocument {
+    /// Whether an agent may cross the `+x` face.
+    pub pos_x: PassabilityFaceDocument,
+    /// Whether an agent may cross the `-x` face.
+    pub neg_x: PassabilityFaceDocument,
+    /// Whether an agent may cross the `+y` face.
+    pub pos_y: PassabilityFaceDocument,
+    /// Whether an agent may cross the `-y` face.
+    pub neg_y: PassabilityFaceDocument,
+    /// Whether an agent may cross the `+z` face.
+    pub pos_z: PassabilityFaceDocument,
+    /// Whether an agent may cross the `-z` face.
+    pub neg_z: PassabilityFaceDocument,
+}
+
+impl PassabilityDocument {
+    /// Creates a value with the same passability on every face.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use thysalion_world::scene::document::PassabilityDocument;
+    ///
+    /// let solid = PassabilityDocument::closed();
+    /// assert!(!solid.pos_x.is_passable());
+    /// assert!(!solid.neg_z.is_passable());
+    /// ```
     #[must_use]
-    pub const fn open() -> Self {
+    const fn uniform(is_passable: bool) -> Self {
+        let face = PassabilityFaceDocument::new(is_passable);
         Self {
-            pos_x: true,
-            neg_x: true,
-            pos_y: true,
-            neg_y: true,
-            pos_z: true,
-            neg_z: true,
+            pos_x: face,
+            neg_x: face,
+            pos_y: face,
+            neg_y: face,
+            pos_z: face,
+            neg_z: face,
         }
     }
+
+    /// Every face passable, as air is.
+    #[must_use]
+    pub const fn open() -> Self { Self::uniform(true) }
 
     /// No face passable, as a solid block is.
     #[must_use]
-    pub const fn closed() -> Self {
-        Self {
-            pos_x: false,
-            neg_x: false,
-            pos_y: false,
-            neg_y: false,
-            pos_z: false,
-            neg_z: false,
-        }
-    }
-
-    /// Whether any face admits passage.
-    #[must_use]
-    pub const fn is_any_passable(&self) -> bool {
-        self.pos_x || self.neg_x || self.pos_y || self.neg_y || self.pos_z || self.neg_z
-    }
+    pub const fn closed() -> Self { Self::uniform(false) }
 }
 
 /// Light emitted by a voxel kind.
@@ -201,7 +244,7 @@ pub struct VoxelTypeDocument {
     /// Material class, selecting the texture set and shading parameters.
     pub material: MaterialClass,
     /// Per-face passability for pathfinding.
-    pub passable: Passability,
+    pub passable: PassabilityDocument,
     /// Direction of rise for ramps and stairs.
     pub slope: SlopeDirection,
     /// Emitted light.

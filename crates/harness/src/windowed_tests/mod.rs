@@ -56,34 +56,36 @@ fn send(app: &mut App, action: HarnessAction) {
         .write(action);
 }
 
-fn camera_yaw(app: &mut App) -> f32 {
+fn camera_yaw(app: &mut App) -> Result<f32, String> {
     let mut query = app.world_mut().query::<&CameraYaw>();
-    match query.single(app.world()) {
-        Ok(yaw) => yaw.0,
-        Err(error) => panic!("exactly one harness camera expected: {error}"),
-    }
+    query
+        .single(app.world())
+        .map(|yaw| yaw.0)
+        .map_err(|error| format!("exactly one harness camera expected: {error}"))
 }
 
-fn overlay_visibility(app: &mut App) -> Visibility {
+fn overlay_visibility(app: &mut App) -> Result<Visibility, String> {
     let mut query = app
         .world_mut()
         .query_filtered::<&Visibility, With<OverlayText>>();
-    match query.single(app.world()) {
-        Ok(visibility) => *visibility,
-        Err(error) => panic!("exactly one overlay entity expected: {error}"),
-    }
+    query
+        .single(app.world())
+        .copied()
+        .map_err(|error| format!("exactly one overlay entity expected: {error}"))
 }
 
-fn overlay_text(app: &mut App) -> String {
+fn overlay_text(app: &mut App) -> Result<String, String> {
     let mut query = app.world_mut().query_filtered::<&Text, With<OverlayText>>();
-    match query.single(app.world()) {
-        Ok(text) => text.0.clone(),
-        Err(error) => panic!("exactly one overlay entity expected: {error}"),
-    }
+    query
+        .single(app.world())
+        .map(|text| text.0.clone())
+        .map_err(|error| format!("exactly one overlay entity expected: {error}"))
 }
 
 /// Absolute angular gap between a yaw and its target.
-fn gap_to(app: &mut App, target: f32) -> f32 { shortest_angle_delta(camera_yaw(app), target).abs() }
+fn gap_to(app: &mut App, target: f32) -> Result<f32, String> {
+    Ok(shortest_angle_delta(camera_yaw(app)?, target).abs())
+}
 
 #[expect(
     clippy::float_arithmetic,
@@ -142,7 +144,7 @@ fn projection_tracks_the_rig_zoom() {
 )]
 fn quadrant_turns_settle_monotonically_toward_the_target() {
     let mut app = windowed_app();
-    let start = camera_yaw(&mut app);
+    let start = camera_yaw(&mut app).expect("startup must spawn one harness camera");
     send(&mut app, HarnessAction::RotateRight);
     app.update();
     let target = app.world().resource::<RigState>().quadrant().yaw_radians();
@@ -151,7 +153,7 @@ fn quadrant_turns_settle_monotonically_toward_the_target() {
         initial_gap > 0.1,
         "a quarter turn leaves a real gap to close"
     );
-    let mut previous_gap = gap_to(&mut app, target);
+    let mut previous_gap = gap_to(&mut app, target).expect("one harness camera must remain");
     assert!(
         previous_gap <= initial_gap + f32::EPSILON * 4.0,
         "the yaw must never move away from the target"
@@ -159,7 +161,7 @@ fn quadrant_turns_settle_monotonically_toward_the_target() {
     for _ in 0..300 {
         std::thread::sleep(Duration::from_millis(2));
         app.update();
-        let gap = gap_to(&mut app, target);
+        let gap = gap_to(&mut app, target).expect("one harness camera must remain");
         assert!(
             gap <= previous_gap + f32::EPSILON * 4.0,
             "the yaw must approach the target monotonically ({gap} after {previous_gap})"
@@ -179,30 +181,34 @@ fn quadrant_turns_settle_monotonically_toward_the_target() {
 #[rstest]
 fn overlay_toggles_on_odd_batches_and_ignores_even_batches() {
     let mut app = windowed_app();
+    let initial_visibility = overlay_visibility(&mut app).expect("startup must spawn one overlay");
     assert_eq!(
-        overlay_visibility(&mut app),
+        initial_visibility,
         Visibility::default(),
         "the overlay starts visible"
     );
     send(&mut app, HarnessAction::ToggleOverlay);
     app.update();
+    let hidden_visibility = overlay_visibility(&mut app).expect("one overlay must remain");
     assert_eq!(
-        overlay_visibility(&mut app),
+        hidden_visibility,
         Visibility::Hidden,
         "one toggle hides the overlay"
     );
     send(&mut app, HarnessAction::ToggleOverlay);
     send(&mut app, HarnessAction::ToggleOverlay);
     app.update();
+    let even_batch_visibility = overlay_visibility(&mut app).expect("one overlay must remain");
     assert_eq!(
-        overlay_visibility(&mut app),
+        even_batch_visibility,
         Visibility::Hidden,
         "an even batch of toggles in one frame cancels out"
     );
     send(&mut app, HarnessAction::ToggleOverlay);
     app.update();
+    let shown_visibility = overlay_visibility(&mut app).expect("one overlay must remain");
     assert_eq!(
-        overlay_visibility(&mut app),
+        shown_visibility,
         Visibility::Inherited,
         "the next single toggle shows the overlay again"
     );
@@ -211,18 +217,19 @@ fn overlay_toggles_on_odd_batches_and_ignores_even_batches() {
 /// Forces the throttle to the brink and updates until the overlay text
 /// changes from its value at entry; bounded so a broken refresh still
 /// fails loudly (via the caller's assertion) rather than hanging.
-fn refresh_overlay_now(app: &mut App) {
-    let before = overlay_text(app);
+fn refresh_overlay_now(app: &mut App) -> Result<(), String> {
+    let before = overlay_text(app)?;
     for _ in 0..100 {
         app.world_mut()
             .resource_mut::<OverlayTimer>()
             .advance_to_brink();
         std::thread::sleep(Duration::from_millis(1));
         app.update();
-        if overlay_text(app) != before {
-            return;
+        if overlay_text(app)? != before {
+            return Ok(());
         }
     }
+    Ok(())
 }
 
 #[rstest]
@@ -231,15 +238,15 @@ fn overlay_refresh_is_throttled_until_the_interval_elapses() {
     // Two immediate updates take microseconds — far below the 0.2 s
     // throttle — so the placeholder text must survive them.
     app.update();
+    let placeholder = overlay_text(&mut app).expect("startup must spawn one overlay");
     assert_eq!(
-        overlay_text(&mut app),
-        "diagnostics…",
+        placeholder, "diagnostics…",
         "the overlay must not refresh before the throttle interval"
     );
-    refresh_overlay_now(&mut app);
+    refresh_overlay_now(&mut app).expect("overlay must remain available during refresh");
+    let refreshed = overlay_text(&mut app).expect("one overlay must remain");
     assert_ne!(
-        overlay_text(&mut app),
-        "diagnostics…",
+        refreshed, "diagnostics…",
         "the overlay must refresh once the interval elapses"
     );
 }
@@ -247,11 +254,11 @@ fn overlay_refresh_is_throttled_until_the_interval_elapses() {
 #[rstest]
 fn overlay_renders_missing_and_populated_tick_diagnostics() {
     let mut app = windowed_app();
-    refresh_overlay_now(&mut app);
+    refresh_overlay_now(&mut app).expect("overlay must remain available during refresh");
+    let without_tick = overlay_text(&mut app).expect("one overlay must remain");
     assert!(
-        overlay_text(&mut app).ends_with("tick: n/a"),
-        "without a tick measurement the readout must say so, got {:?}",
-        overlay_text(&mut app)
+        without_tick.ends_with("tick: n/a"),
+        "without a tick measurement the readout must say so, got {without_tick:?}"
     );
     app.world_mut()
         .resource_mut::<DiagnosticsStore>()
@@ -261,10 +268,10 @@ fn overlay_renders_missing_and_populated_tick_diagnostics() {
             time: bevy::platform::time::Instant::now(),
             value: 2.5,
         });
-    refresh_overlay_now(&mut app);
+    refresh_overlay_now(&mut app).expect("overlay must remain available during refresh");
+    let with_tick = overlay_text(&mut app).expect("one overlay must remain");
     assert!(
-        overlay_text(&mut app).ends_with("2.50 ms/tick"),
-        "a tick measurement must appear in the readout, got {:?}",
-        overlay_text(&mut app)
+        with_tick.ends_with("2.50 ms/tick"),
+        "a tick measurement must appear in the readout, got {with_tick:?}"
     );
 }

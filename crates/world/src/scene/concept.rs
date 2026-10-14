@@ -56,6 +56,7 @@ pub enum ConceptIriProblem {
 /// change rather than a state-plane one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NamespaceTable {
+    /// Prefix-to-base mappings supplied by the caller.
     bases: BTreeMap<SmolStr, SmolStr>,
 }
 
@@ -105,7 +106,9 @@ impl Default for NamespaceTable {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub struct ConceptIri {
+    /// Validated `prefix:local` spelling retained for round trips.
     raw: SmolStr,
+    /// Byte offset separating the prefix from the local name.
     colon: usize,
 }
 

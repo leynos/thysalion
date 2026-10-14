@@ -156,7 +156,7 @@ escalation, not workarounds.
   the `-p thysalion` scope (pattern assertion, compatible with the
   no-literal-SHA rule). Note the Stage A `cargo build -p thysalion` spike
   proves manifest scoping only, not the cross toolchain path.
-- Risk: Bevy 0.19 compile times inflate CI. Cranelift and mold accelerate
+- Risk: Bevy 0.19 compile times inflate CI. Cranelift and `mold` accelerate
   *local* dev builds only; the CI-dominating passes (clippy, rustdoc, Whitaker,
   LLVM coverage instrumentation) are untouched by them. Severity: medium.
   Likelihood: medium. Mitigation: the curated feature list is the main lever;

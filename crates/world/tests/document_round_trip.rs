@@ -101,8 +101,9 @@ proptest! {
 }
 
 #[test]
-fn wire_contract_holds_for_the_minimal_document() -> Result<(), TestCaseError> {
+fn wire_contract_holds_for_the_minimal_document() {
     assert_wire_contract(&minimal_document())
+        .expect("the minimal fixture must satisfy the wire contract");
 }
 
 #[test]
@@ -114,8 +115,11 @@ fn json_re_encoding_reproduces_the_same_messagepack_bytes() {
     let indirect = encode_document(&via_json, Encoding::MessagePack).expect("re-encode");
     assert_eq!(
         direct, indirect,
-        "a document round-tripped through JSON must re-encode to identical MessagePack bytes, or \
-         the phase-8 content hash is not well defined"
+        concat!(
+            "a document round-tripped through JSON must re-encode to identical MessagePack bytes, \
+             or ",
+            "the phase-8 content hash is not well defined"
+        )
     );
 }
 
@@ -231,7 +235,10 @@ fn a_newer_major_version_is_refused() {
         .expect("object")
         .insert("version".to_owned(), version_value(2, 0));
     let future = serde_json::to_vec(&value).expect("re-encode");
-    assert!(decode_document(&future, Encoding::Json).is_err());
+    assert!(
+        decode_document(&future, Encoding::Json).is_err(),
+        "the reader should reject documents with an unsupported major version"
+    );
 }
 
 #[test]
@@ -251,5 +258,8 @@ fn the_payload_enum_uses_newtype_variants() {
         index: 1,
     }]);
     let runs_rendered = serde_json::to_string(&runs).expect("encode");
-    assert_eq!(runs_rendered, r#"{"runs":[{"length":4,"index":1}]}"#);
+    assert_eq!(
+        runs_rendered, r#"{"runs":[{"length":4,"index":1}]}"#,
+        "run payloads should serialize as a named list of run objects"
+    );
 }

@@ -147,28 +147,35 @@ fn given_obstructed_spawn(#[from(rstest_bdd_harness_context)] session: &mut Load
 ///
 /// Shared by the two `When` steps that need it, so the round-trip's reference
 /// side cannot drift from the plain load it is compared against.
-fn load_json_and_keep(session: &mut LoaderSession) {
-    session.load(Encoding::Json);
+fn load_json_and_keep(session: &mut LoaderSession) -> Result<(), String> {
+    session.load(Encoding::Json)?;
     if let Some(Ok(loaded)) = session.outcome.as_ref() {
         session.from_json = Some(loaded.scene.clone());
     }
+    Ok(())
 }
 
 #[when("the scene is loaded")]
-fn when_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    load_json_and_keep(session);
+fn when_loaded(
+    #[from(rstest_bdd_harness_context)] session: &mut LoaderSession,
+) -> Result<(), String> {
+    load_json_and_keep(session)
 }
 
 #[when("the document is re-encoded as MessagePack and loaded")]
-fn when_loaded_as_msgpack(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    load_json_and_keep(session);
-    session.load(Encoding::MessagePack);
+fn when_loaded_as_msgpack(
+    #[from(rstest_bdd_harness_context)] session: &mut LoaderSession,
+) -> Result<(), String> {
+    load_json_and_keep(session)?;
+    session.load(Encoding::MessagePack)
 }
 
 #[when("the minimal handwritten scene document is loaded afterwards")]
-fn when_minimal_loaded_after(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+fn when_minimal_loaded_after(
+    #[from(rstest_bdd_harness_context)] session: &mut LoaderSession,
+) -> Result<(), String> {
     let document = minimal_document();
-    session.load_other(&document);
+    session.load_other(&document)
 }
 
 #[then("loading succeeds")]
@@ -186,12 +193,20 @@ fn then_fails(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
 
 #[then("the scene reports 3 palette entries")]
 fn then_three_palette_entries(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    assert_eq!(session.loaded().scene.palette().len(), 3);
+    assert_eq!(
+        session.loaded().scene.palette().len(),
+        3,
+        "loaded scene must contain the fixture's three palette entries"
+    );
 }
 
 #[then("the scene reports 32784 non-air voxels")]
 fn then_non_air_count(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    assert_eq!(session.loaded().scene.non_air_count(), 32_784);
+    assert_eq!(
+        session.loaded().scene.non_air_count(),
+        32_784,
+        "loaded scene must report the fixture's non-air voxel count"
+    );
 }
 
 #[then("the loaded scene equals the scene loaded from JSON")]
@@ -199,7 +214,11 @@ fn then_equals_json(#[from(rstest_bdd_harness_context)] session: &mut LoaderSess
     let Some(from_json) = session.from_json.as_ref() else {
         panic!("the JSON load must run before the comparison");
     };
-    assert_eq!(&session.loaded().scene, from_json);
+    assert_eq!(
+        &session.loaded().scene,
+        from_json,
+        "binary and JSON loads must produce identical scenes"
+    );
 }
 
 #[then("the diagnostics name the unknown palette index")]
@@ -325,19 +344,25 @@ fn given_named_fixture(#[from(rstest_bdd_harness_context)] session: &mut LoaderS
 }
 
 #[when("each fixture scene is loaded from disk")]
-fn when_each_fixture_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
+fn when_each_fixture_loaded(
+    #[from(rstest_bdd_harness_context)] session: &mut LoaderSession,
+) -> Result<(), String> {
     for name in FIXTURE_NAMES {
-        if let Err(error) = session.load_fixture(name) {
-            panic!("failed to load fixture {name} from disk: {error}");
-        }
+        session
+            .load_fixture(name)
+            .map_err(|error| format!("failed to load fixture {name} from disk: {error}"))?;
     }
+    Ok(())
 }
 
 #[when("the fixture is loaded from disk")]
-fn when_fixture_loaded(#[from(rstest_bdd_harness_context)] session: &mut LoaderSession) {
-    if let Err(error) = session.load_fixture("keep-interior") {
-        panic!("failed to load keep-interior from disk: {error}");
-    }
+fn when_fixture_loaded(
+    #[from(rstest_bdd_harness_context)] session: &mut LoaderSession,
+) -> Result<(), String> {
+    session
+        .load_fixture("keep-interior")
+        .map_err(|error| format!("failed to load keep-interior from disk: {error}"))?;
+    Ok(())
 }
 
 #[then("every fixture scene loads")]

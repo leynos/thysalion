@@ -512,6 +512,27 @@ the index-to-face mapping and offers no way to notice when one does not;
 lille's equivalent used a dictionary keyed by unit-normal strings with no
 completeness guarantee, and was never implemented.
 
+The wire value is `scene::document::PassabilityDocument`. Its six named fields
+use `PassabilityFaceDocument`, a transparent boolean wrapper; both wire types
+carry the serde and schema derives used for parsing and encoding. The wrapper
+keeps the JSON and schema representation as six flat booleans. The validated
+domain value is `scene::palette::Passability`; each named face uses
+`scene::palette::FacePassability`, a marker whose scope is these six voxel
+faces rather than unrelated boolean properties. `Palette::from_document`
+converts the wire marker to the domain marker while building a validated
+palette. The domain types have no serde or schema derives, so parsing and
+encoding remain in the document boundary and validated palette and pathfinding
+code use the domain types.
+
+Rust callers constructing document values use `PassabilityFaceDocument::new` or
+convert booleans with `.into()`, then can inspect them with `is_passable`.
+Callers constructing domain values convert booleans with
+`FacePassability::from` or `FacePassability::new` and inspect them with
+`is_passable`. `Passability::open` and `Passability::closed` provide uniform
+values for all six faces. This preserves the six flat boolean fields in JSON
+and the scene schema; the scene format version does not change. This follows
+the document/domain boundary in [ADR 006](adr-006-scene-document-model.md).
+
 `slope` is a closed set of four compass directions plus `Flat`, rather than an
 `IVec2`. A vector admits meaningless values such as `(7, -3)` that validation
 would then have to reject, and the set of meaningful ones is small and fixed.

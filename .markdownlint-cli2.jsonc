@@ -15,6 +15,7 @@
     ".node_modules/**",
     "**/node_modules/**",
     "**/target/**",
+    "**/.pytest_cache/**",
     ".vtcode/**",
     ".terraform/**",
     ".uv-cache/**",

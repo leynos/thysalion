@@ -126,30 +126,32 @@ impl LoaderSession {
 
     /// The document a `Given` step selected.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics when no `Given` step ran, which is a malformed scenario rather
-    /// than a runtime condition.
-    #[must_use]
-    pub fn document(&self) -> &SceneDocument {
-        // `expect` rather than a `let ... else` would be shorter, but the
-        // workspace allows it only inside `#[test]` functions, and a
-        // step-definition helper is neither.
-        let Some(document) = self.document.as_ref() else {
-            panic!("a Given step must select a document");
-        };
-        document
+    /// Returns an error when no `Given` step selected a document.
+    pub fn document(&self) -> Result<&SceneDocument, &'static str> {
+        self.document
+            .as_ref()
+            .ok_or("a Given step must select a document")
     }
 
     /// Encodes the selected document and loads it.
-    pub fn load(&mut self, encoding: Encoding) {
-        let document = self.document().clone();
-        self.load_other_as(&document, encoding);
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no document was selected or encoding fails.
+    pub fn load(&mut self, encoding: Encoding) -> Result<(), String> {
+        let document = self.document().map_err(str::to_owned)?.clone();
+        self.load_other_as(&document, encoding)
     }
 
     /// Loads a document other than the selected one, leaving the selection.
-    pub fn load_other(&mut self, document: &SceneDocument) {
-        self.load_other_as(document, Encoding::Json);
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the document cannot be encoded.
+    pub fn load_other(&mut self, document: &SceneDocument) -> Result<(), String> {
+        self.load_other_as(document, Encoding::Json)
     }
 
     /// Encodes `document` and loads it through a fresh loader.
@@ -158,17 +160,17 @@ impl LoaderSession {
     /// state, so reusing one would prove nothing that this does not, and
     /// constructing one per load is what a caller actually does.
     ///
-    /// # Panics
-    ///
-    /// Panics when the document will not encode, which is a broken fixture
-    /// rather than a runtime condition.
-    fn load_other_as(&mut self, document: &SceneDocument, encoding: Encoding) {
-        let bytes = match encode_document(document, encoding) {
-            Ok(bytes) => bytes,
-            Err(error) => panic!("the fixture document must encode: {error}"),
-        };
+    /// Returns an encoding error if the selected fixture is malformed.
+    fn load_other_as(
+        &mut self,
+        document: &SceneDocument,
+        encoding: Encoding,
+    ) -> Result<(), String> {
+        let bytes = encode_document(document, encoding)
+            .map_err(|error| format!("encode the fixture document: {error}"))?;
         let loader = SceneLoader::new(Arc::new(self.source.clone()));
         self.outcome = Some(loader.load_bytes(&bytes, encoding));
+        Ok(())
     }
 
     /// The loaded scene, or a panic naming what actually happened.
@@ -177,6 +179,7 @@ impl LoaderSession {
     ///
     /// Panics when the last load failed or no load ran.
     #[must_use]
+    #[track_caller]
     pub fn loaded(&self) -> &LoadedScene {
         match self.outcome.as_ref() {
             Some(Ok(loaded)) => loaded,
@@ -191,6 +194,7 @@ impl LoaderSession {
     ///
     /// Panics when the last load succeeded or no load ran.
     #[must_use]
+    #[track_caller]
     pub fn diagnostics(&self) -> &[thysalion_world::scene::validation::SceneDiagnostic] {
         match self.outcome.as_ref() {
             Some(Err(SceneLoadError::Invalid { diagnostics, .. })) => diagnostics,
@@ -244,7 +248,9 @@ mod tests {
             "a shipped fixture must select a document"
         );
 
-        session.load(Encoding::Json);
+        session
+            .load(Encoding::Json)
+            .expect("the selected fixture must load as JSON");
         assert!(
             matches!(session.outcome.as_ref(), Some(Ok(_))),
             "a successful load must record its outcome"
