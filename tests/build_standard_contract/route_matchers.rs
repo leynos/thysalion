@@ -83,6 +83,7 @@ pub(crate) fn coverage_route_matches(command: RouteText<'_>) -> bool {
     let environment = RouteText(environment_text);
     [
         coverage_backend_is_llvm(environment),
+        backend_selectors_unset(environment),
         !arguments
             .split_whitespace()
             .any(|argument| argument == "--config" || argument.starts_with("--config=")),

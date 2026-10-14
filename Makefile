@@ -128,7 +128,7 @@ test: check-build-tools ## Run tests with warnings treated as errors
 
 coverage: check-build-tools ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"
-	env -u CARGO_ENCODED_RUSTFLAGS PATH="$(COVERAGE_LLD_DIR):$$PATH" \
+	env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) PATH="$(COVERAGE_LLD_DIR):$$PATH" \
 		CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
 		CARGO_UNSTABLE_CODEGEN_BACKEND=true \
 		CARGO_PROFILE_DEV_CODEGEN_BACKEND=$(COVERAGE_CODEGEN_BACKEND) \

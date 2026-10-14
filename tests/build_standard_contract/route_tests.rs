@@ -52,6 +52,43 @@ fn coverage_make_route_uses_llvm_and_clears_higher_precedence_flags() {
     }
 }
 
+/// A caller's release-profile override cannot change coverage's backend route.
+#[test]
+fn coverage_release_override_clears_inherited_backend_selectors() {
+    let output = make_output(
+        MakeTarget::Coverage,
+        &["CARGO=probe-cargo", "TEST_FLAGS=--release"],
+    )
+    .expect("evaluate coverage target with release override");
+    let commands = cargo_lines(RouteText(&output));
+    let command = commands
+        .first()
+        .expect("coverage must invoke Cargo with release flags");
+    assert!(
+        command
+            .split_whitespace()
+            .any(|argument| argument == "--release"),
+        "release override did not reach Cargo: {command}"
+    );
+    assert!(
+        coverage_route_matches(RouteText(command)),
+        "coverage did not clear inherited profile selectors: {command}"
+    );
+    for selector in PROFILE_BACKEND_SELECTORS {
+        let missing = command.replace(&format!("-u {} ", selector.0), "");
+        assert_ne!(
+            missing, *command,
+            "missing {} mutation was a no-op",
+            selector.0
+        );
+        assert!(
+            !coverage_route_matches(RouteText(&missing)),
+            "accepted coverage route without clearing {}: {missing}",
+            selector.0
+        );
+    }
+}
+
 /// Release invokes Cargo outside the repository with ambient Rust flags cleared.
 #[test]
 fn release_make_route_uses_external_manifest_and_clears_flags() {
