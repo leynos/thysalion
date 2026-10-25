@@ -25,3 +25,4 @@ rustflags = ["-Zthreads=8"]
 [target.'cfg(target_os = "linux")']
 linker = "clang"
 rustflags = ["-Zthreads=8", "-C", "link-arg=-fuse-ld=mold"]
+
