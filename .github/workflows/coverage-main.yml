@@ -42,7 +42,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
+        uses: leynos/shared-actions/.github/actions/setup-rust@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         with:
           expect-cache: any
       - name: Install coverage linker prerequisites
@@ -75,7 +75,7 @@ jobs:
             exit 1
           fi
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@d4d248bbbecdcf7b4f5bc79ffd4d6caee370bd79
+        uses: leynos/shared-actions/.github/actions/generate-coverage@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
           CARGO_UNSTABLE_CODEGEN_BACKEND: 'true'
@@ -110,7 +110,7 @@ jobs:
       # does not check the ref itself.
       - name: Upload coverage data to CodeScene
         if: steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@d4d248bbbecdcf7b4f5bc79ffd4d6caee370bd79
+        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         # No checksum input: the uploader pins cs-coverage through its own
         # manifest and rejects a non-empty `installer-checksum`.
         with:
