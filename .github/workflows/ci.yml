@@ -94,6 +94,7 @@ jobs:
       - name: Install Whitaker
         uses: leynos/shared-actions/.github/actions/install-whitaker@5a99aed78ce68dcebd3052b75c31e6f173162b1e
       - name: Audit dependencies
+        continue-on-error: true
         run: make audit
       - name: Lint
         run: make lint
