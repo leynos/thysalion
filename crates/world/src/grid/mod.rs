@@ -171,8 +171,12 @@ impl VoxelGrid {
     pub const fn chunk_size(&self) -> ChunkSize { self.chunk_size }
 
     /// The number of chunks actually stored.
+    ///
+    /// Counted through the map iterator's exact size, which is not `const`:
+    /// `BTreeMap::len` is const-stable only on newer toolchains than the one
+    /// Whitaker's driver builds with.
     #[must_use]
-    pub fn populated_chunks(&self) -> usize { self.chunks.len() }
+    pub fn populated_chunks(&self) -> usize { self.chunks.iter().len() }
 
     /// Whether `pos` lies inside the declared extent.
     #[must_use]
