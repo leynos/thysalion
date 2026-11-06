@@ -26,3 +26,9 @@ rustflags = ["-Zthreads=8"]
 linker = "clang"
 rustflags = ["-Zthreads=8", "-C", "link-arg=-fuse-ld=mold"]
 
+
+# Development builds keep no incremental state or debug information (see
+# `[profile.dev]` in `Cargo.toml`). On a nightly from 2026-07-31 Cargo
+# coordinates metadata output itself; no raw rustc metadata flags are used.
+[unstable]
+embed-metadata = false

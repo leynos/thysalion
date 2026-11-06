@@ -162,6 +162,18 @@ LLVM on the nightly toolchain pinned in `rust-toolchain.toml`.
 releases build on stable. Revisit the exception if releases move to the pinned
 nightly.
 
+Recorded state: the pin is `nightly-2026-11-05` and the suite has not been
+measured under Cranelift on it, because the exception rests on the stable
+release build and not on test results. The review is deferred to 1 April 2027.
+
+### Development build footprint
+
+The development profile sets `incremental = false` and `debug = 0` in
+`Cargo.toml`. `.cargo/config.toml` also sets
+`[unstable] embed-metadata = false`, the native Cargo key for nightlies from
+2026-07-31. To debug, set `CARGO_PROFILE_DEV_DEBUG=true`; to rebuild
+incrementally, set `CARGO_INCREMENTAL=1`.
+
 ## Lint baseline
 
 The authoritative workspace Clippy, Rust and rustdoc tables live in
