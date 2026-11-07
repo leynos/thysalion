@@ -87,6 +87,25 @@ share them only when another concrete caller needs the same interpretation.
 Contract readers verify repository configuration and do not form application
 interfaces.
 
+## Fetching dependencies before tests
+
+The stable-release configuration test starts its own `cargo`, and the coverage
+run can start more. Cargo resolves dependencies while it holds the
+package-cache lock in `$CARGO_HOME`, so a nested `cargo` that resolves cold can
+wait on another repository's build for many minutes. The fix is to fetch once,
+before any test starts, and to run the nested call offline:
+
+- `make test` depends on the `fetch` target, which runs
+  `cargo fetch --locked`. A failed fetch stops the run.
+- `ci.yml` and `coverage-main.yml` run `cargo fetch --locked` as an
+  unconditional step before the coverage-flag guard, with no `|| true`. The
+  guard must stay the step directly before coverage.
+- The stable-release test sets `CARGO_NET_OFFLINE=true` after its environment
+  removals. Its fixture has no dependencies.
+
+Prepare a direct or offline run with `cargo fetch --locked` first. The estate
+lint rule `nested-cargo-offline-tests` checks all three.
+
 ## Tooling
 
 Bare Cargo development builds discover `.cargo/config.toml`, which enables the

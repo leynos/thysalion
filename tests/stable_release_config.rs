@@ -152,6 +152,9 @@ fn stable_cargo_accepts_the_repository_configuration() {
     for variable in BACKEND_ENVIRONMENT_VARIABLES {
         command.env_remove(variable);
     }
+    // Set last, after the removals above: the fixture has no dependencies, so
+    // nothing here may reach the network or wait on the index.
+    command.env("CARGO_NET_OFFLINE", "true");
     let output = command
         .output()
         .expect("run `cargo +stable check`; is the stable toolchain installed?");
