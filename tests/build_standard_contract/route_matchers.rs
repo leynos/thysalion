@@ -25,6 +25,9 @@ pub(crate) fn cargo_lines(output: RouteText<'_>) -> Vec<&str> {
         .0
         .lines()
         .filter(|line| line.contains("probe-cargo"))
+        // `cargo fetch` downloads the locked dependencies and compiles nothing,
+        // so it carries no build standard.
+        .filter(|line| !line.contains("probe-cargo fetch"))
         .collect()
 }
 

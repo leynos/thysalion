@@ -103,6 +103,9 @@ jobs:
           echo "Coverage RUSTFLAGS: -C link-arg=-fuse-ld=lld"
           echo "Coverage CFLAGS: -fuse-ld=lld"
           echo "Coverage LDFLAGS: -fuse-ld=lld"
+      - name: Fetch dependencies
+        # Tests start their own cargo offline; fetch once so none resolves cold.
+        run: cargo fetch --locked
       # The shared coverage action cannot unset an inherited variable from a
       # caller's `uses:` step. Fail before measurement rather than silently
       # letting encoded flags outrank the LLVM/lld coverage RUSTFLAGS.
