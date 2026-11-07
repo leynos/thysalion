@@ -66,6 +66,9 @@ jobs:
           echo "Coverage RUSTFLAGS: -C link-arg=-fuse-ld=lld"
           echo "Coverage CFLAGS: -fuse-ld=lld"
           echo "Coverage LDFLAGS: -fuse-ld=lld"
+      - name: Fetch dependencies
+        # Tests start their own cargo offline; fetch once so none resolves cold.
+        run: cargo fetch --locked
       # The coverage action does not clear encoded rustflags, which take
       # precedence over RUSTFLAGS and could reactivate development settings.
       - name: Check coverage flag isolation

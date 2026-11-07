@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release coverage lint lint-clippy lint-whitaker \
+.PHONY: help all clean fetch test build release coverage lint lint-clippy lint-whitaker \
 	typecheck fmt check-fmt markdownlint spelling nixie audit rust-audit demo \
 	scenes scenes-check scripts-test install-build-tools check-build-tools \
 	install-markdownlint test-workflow-contracts
@@ -121,7 +121,10 @@ clean: ## Remove build artifacts
 
 # The workspace harness enables Bevy through its dev dependency. A separate
 # package-only command checks that the default-feature API hides BevyHarness.
-test: check-build-tools ## Run tests with warnings treated as errors
+fetch: ## Download the locked dependencies once, so nested cargo runs offline
+	$(CARGO) fetch --locked --target "$${CARGO_BUILD_TARGET:-host-tuple}"
+
+test: check-build-tools fetch ## Run tests with warnings treated as errors
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --doc --workspace --all-features $(BUILD_JOBS)
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test -p thysalion-test-support --no-default-features --test compile_time_contracts bevy_harness_is_hidden_without_feature $(BUILD_JOBS)
