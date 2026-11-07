@@ -122,7 +122,7 @@ clean: ## Remove build artifacts
 # The workspace harness enables Bevy through its dev dependency. A separate
 # package-only command checks that the default-feature API hides BevyHarness.
 fetch: ## Download the locked dependencies once, so nested cargo runs offline
-	$(CARGO) fetch --locked
+	$(CARGO) fetch --locked --target "$${CARGO_BUILD_TARGET:-host-tuple}"
 
 test: check-build-tools fetch ## Run tests with warnings treated as errors
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
