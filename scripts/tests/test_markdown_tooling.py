@@ -41,6 +41,7 @@ def run_make(
 
 
 def test_local_installer_uses_the_exact_ci_package_version() -> None:
+    """Check the local installer adds markdownlint-cli2 at its exact pinned version."""
     result = run_make("--dry-run", "install-markdownlint", "BUN=probe-bun")
 
     assert result.returncode == 0, result.stderr
@@ -48,6 +49,7 @@ def test_local_installer_uses_the_exact_ci_package_version() -> None:
 
 
 def test_markdownlint_commands_keep_the_mdlint_override() -> None:
+    """Check that the fmt and markdownlint targets both honour the MDLINT override."""
     formatter = run_make(
         "--dry-run", "fmt", "MDLINT=probe-markdownlint"
     )
@@ -65,6 +67,7 @@ def test_markdownlint_commands_keep_the_mdlint_override() -> None:
 
 
 def test_missing_bun_has_an_actionable_install_error() -> None:
+    """Check that a missing Bun fails with an error saying how to install it."""
     result = run_make(
         "install-markdownlint",
         "BUN=missing-bun-for-markdownlint-contract",
@@ -76,6 +79,7 @@ def test_missing_bun_has_an_actionable_install_error() -> None:
 
 
 def test_markdownlint_failure_stops_before_spelling(tmp_path: Path) -> None:
+    """Check that a markdownlint failure stops the target before spelling runs."""
     failing_linter = tmp_path / "failing-markdownlint"
     failing_linter.write_text(
         "#!/bin/sh\nprintf 'controlled markdownlint failure\\n' >&2\nexit 23\n",
@@ -106,6 +110,10 @@ def test_markdownlint_failure_stops_before_spelling(tmp_path: Path) -> None:
 
 
 def test_markdownlint_ignores_generated_pytest_cache(tmp_path: Path) -> None:
+    """Check markdownlint skips generated pytest cache files but lints others.
+
+    The test skips when markdownlint-cli2 is missing, unless CI requires it.
+    """
     config = REPOSITORY_ROOT / ".markdownlint-cli2.jsonc"
     assert '"**/.pytest_cache/**"' in config.read_text(encoding="utf-8")
 
@@ -148,6 +156,7 @@ def test_markdownlint_ignores_generated_pytest_cache(tmp_path: Path) -> None:
 
 
 def test_ci_provisions_markdownlint_before_python_contracts() -> None:
+    """Check that CI sets up Bun and installs markdownlint before the script tests."""
     workflow = (REPOSITORY_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     setup = workflow.index("      - name: Setup Bun for Markdown contracts\n")
     install = workflow.index("      - name: Install Markdown test linter\n")
@@ -166,6 +175,7 @@ def test_ci_provisions_markdownlint_before_python_contracts() -> None:
 
 
 def test_setup_bun_contract_accepts_commit_bumps_but_rejects_mutable_refs() -> None:
+    """Check the setup-bun pin accepts full SHAs and rejects tags and short SHAs."""
     assert has_pinned_setup_bun("uses: oven-sh/setup-bun@" + "a" * 40)
     assert not has_pinned_setup_bun("uses: oven-sh/setup-bun@v2")
     assert not has_pinned_setup_bun("uses: oven-sh/setup-bun@" + "a" * 39)
@@ -174,6 +184,7 @@ def test_setup_bun_contract_accepts_commit_bumps_but_rejects_mutable_refs() -> N
 def test_ci_mode_refuses_missing_markdownlint_cli(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Check CI mode fails, rather than skipping, when markdownlint-cli2 is missing."""
     monkeypatch.setenv("REQUIRE_MARKDOWNLINT_CLI", "true")
     monkeypatch.setattr(shutil, "which", lambda _: None)
 

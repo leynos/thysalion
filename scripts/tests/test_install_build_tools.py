@@ -33,6 +33,7 @@ class InstallerHarness:
     installed_prefix: Path
 
     def run(self, **overrides: str) -> subprocess.CompletedProcess[str]:
+        """Run the installer with this harness's environment plus overrides."""
         environment = self.environment | overrides
         return subprocess.run(
             [str(INSTALLER)],
@@ -55,11 +56,16 @@ class InstallerHarness:
         return list(Path(self.environment["TMPDIR"]).glob("thysalion-build-tools.*"))
 
     def events(self) -> list[str]:
+        """List the external commands the fake tools recorded, in order."""
         return self.event_log.read_text(encoding="utf-8").splitlines()
 
 
 @pytest.fixture
 def installer(tmp_path: Path) -> InstallerHarness:
+    """Build an offline installer environment with fake tools and a fixture archive.
+
+    Paths are isolated under tmp_path, and PATH puts the fake tools first.
+    """
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     _install_fake_commands(fake_bin)
@@ -118,6 +124,11 @@ def installer(tmp_path: Path) -> InstallerHarness:
 def test_installer_downloads_verifies_extracts_and_provisions_the_pinned_tools(
     installer: InstallerHarness,
 ) -> None:
+    """Check a successful run downloads, verifies, and unpacks mold.
+
+    It then installs the pinned toolchain and components, and publishes the
+    mold bin directory through GITHUB_PATH.
+    """
     result = installer.run()
 
     assert result.returncode == 0, result.stderr
@@ -159,6 +170,7 @@ def test_installer_downloads_verifies_extracts_and_provisions_the_pinned_tools(
 def test_installer_reports_download_failure_before_unpacking(
     installer: InstallerHarness,
 ) -> None:
+    """Check a failed download stops the installer before anything is unpacked."""
     result = installer.run(FAKE_CURL_FAIL="1")
 
     _assert_failed_installation_was_cleaned_up(installer, result)
@@ -169,6 +181,7 @@ def test_installer_reports_download_failure_before_unpacking(
 def test_installer_rejects_a_checksum_mismatch_before_unpacking(
     installer: InstallerHarness,
 ) -> None:
+    """Check a checksum mismatch stops the installer before anything is unpacked."""
     installer.checksum_file.write_text(f"{'0' * 64}  {ARCHIVE_NAME}\n", encoding="utf-8")
 
     result = installer.run()
@@ -181,6 +194,7 @@ def test_installer_rejects_a_checksum_mismatch_before_unpacking(
 def test_installer_reports_extraction_failure_before_rustup(
     installer: InstallerHarness,
 ) -> None:
+    """Check a failed unpack stops the installer before rustup runs."""
     result = installer.run(FAKE_TAR_FAIL="1")
 
     _assert_failed_installation_was_cleaned_up(installer, result)
@@ -191,6 +205,7 @@ def test_installer_reports_extraction_failure_before_rustup(
 def test_installer_stops_when_the_pinned_toolchain_install_fails(
     installer: InstallerHarness,
 ) -> None:
+    """Check a failed toolchain install stops before any components are added."""
     result = installer.run(FAKE_RUSTUP_FAIL="toolchain")
 
     _assert_failed_installation_was_cleaned_up(installer, result)
@@ -205,6 +220,7 @@ def test_installer_stops_when_the_pinned_toolchain_install_fails(
 def test_installer_stops_when_a_required_component_cannot_be_added(
     installer: InstallerHarness,
 ) -> None:
+    """Check a failed component install stops the installer after the toolchain."""
     result = installer.run(FAKE_RUSTUP_FAIL="component")
 
     _assert_failed_installation_was_cleaned_up(installer, result)
@@ -221,6 +237,7 @@ def test_installer_stops_when_a_required_component_cannot_be_added(
 def test_installer_propagates_a_github_path_append_failure(
     installer: InstallerHarness, tmp_path: Path
 ) -> None:
+    """Check a failed GITHUB_PATH append fails the whole installation."""
     github_path_directory = tmp_path / "github-path-directory"
     github_path_directory.mkdir()
 
@@ -303,6 +320,7 @@ if [[ ${FAKE_RUSTUP_FAIL:-} == "${1:-}" ]]; then exit 17; fi
 
 
 def _write_archive(archive: Path) -> None:
+    """Write a gzipped tar holding the fixture mold executable."""
     metadata = tarfile.TarInfo("mold/bin/mold")
     metadata.size = len(MOLD_CONTENT)
     with tarfile.open(archive, mode="w:gz") as mold_archive:
@@ -310,10 +328,12 @@ def _write_archive(archive: Path) -> None:
 
 
 def _write_checksum(checksum_file: Path, archive: Path) -> None:
+    """Write a SHA256SUMS line that matches the archive digest."""
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     checksum_file.write_text(f"{digest}  {ARCHIVE_NAME}\n", encoding="utf-8")
 
 
 def _write_executable(path: Path, source: str) -> None:
+    """Write a script to path and make it executable."""
     path.write_text(source, encoding="utf-8")
     path.chmod(0o755)

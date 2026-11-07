@@ -94,6 +94,7 @@ def scene_source(tmp_path: Path):
         scene: str = MINIMAL_SCENE,
         legend: str = MINIMAL_LEGEND,
     ) -> Path:
+        """Write the authoring files for one scene and return its directory."""
         source = tmp_path / "test"
         (source / "layers").mkdir(parents=True, exist_ok=True)
         (source / "scene.toml").write_text(scene, encoding="utf-8")
@@ -119,6 +120,7 @@ def test_a_layer_raster_places_voxels_at_the_content_origin(scene_source) -> Non
 
 
 def test_an_absent_layer_is_air_rather_than_an_error(scene_source) -> None:
+    """Treat a layer with no file as air rather than as an error."""
     # Files need not be contiguous. A two-storey keep in a 64-tall scene would
     # otherwise need sixty-two empty files.
     source = scene_source({"z001.txt": "####\n####\n"})
@@ -128,6 +130,7 @@ def test_an_absent_layer_is_air_rather_than_an_error(scene_source) -> None:
 
 
 def test_an_unlisted_character_is_an_error_rather_than_silent_air(scene_source) -> None:
+    """Refuse a raster character that legend.toml does not list."""
     # Silently treating an unknown character as empty space is how a mistyped
     # legend produces a scene with holes in it that loads perfectly well.
     source = scene_source({"z000.txt": "#?..\n....\n"})
@@ -136,6 +139,7 @@ def test_an_unlisted_character_is_an_error_rather_than_silent_air(scene_source) 
 
 
 def test_a_short_row_is_an_error_rather_than_being_padded(scene_source) -> None:
+    """Refuse a raster row narrower than the content extent rather than padding it."""
     # Padding hides a truncated edit, which is exactly the mistake this format
     # invites: the author deletes to the end of a line and the missing voxels
     # silently become air.
@@ -145,24 +149,28 @@ def test_a_short_row_is_an_error_rather_than_being_padded(scene_source) -> None:
 
 
 def test_a_missing_row_is_an_error(scene_source) -> None:
+    """Refuse a raster with fewer rows than the content extent."""
     source = scene_source({"z000.txt": "####\n"})
     with pytest.raises(generator.SourceError, match="expected 2 rows"):
         generator.compile_scene(source)
 
 
 def test_trailing_whitespace_is_stripped_before_a_row_is_measured(scene_source) -> None:
+    """Ignore trailing spaces when measuring the width of a raster row."""
     source = scene_source({"z000.txt": "####   \n####\n"})
     document, _ = generator.compile_scene(source)
     assert document["voxels"]
 
 
 def test_a_layer_past_the_content_extent_is_refused(scene_source) -> None:
+    """Refuse a layer file whose offset lies outside the content extent."""
     source = scene_source({"z009.txt": "####\n####\n"})
     with pytest.raises(generator.SourceError, match="outwith the content extent"):
         generator.compile_scene(source)
 
 
 def test_an_all_air_chunk_is_omitted_entirely(scene_source) -> None:
+    """Omit a chunk whose voxels are all air from the document."""
     # The elision that makes a mostly-empty wilderness extent affordable. A
     # chunk of nothing must cost nothing.
     source = scene_source({"z000.txt": "....\n....\n"})
@@ -171,6 +179,7 @@ def test_an_all_air_chunk_is_omitted_entirely(scene_source) -> None:
 
 
 def test_a_single_valued_chunk_becomes_a_uniform_payload(scene_source) -> None:
+    """Encode a chunk holding one voxel type as a uniform payload."""
     scene = MINIMAL_SCENE.replace("content_extent = [4, 2, 2]", "content_extent = [32, 32, 32]")
     layer = "\n".join("#" * 32 for _ in range(32)) + "\n"
     source = scene_source({f"z{index:03}.txt": layer for index in range(32)}, scene=scene)
@@ -179,6 +188,7 @@ def test_a_single_valued_chunk_becomes_a_uniform_payload(scene_source) -> None:
 
 
 def test_runs_are_maximal_and_never_zero_length(scene_source) -> None:
+    """Check that no run is empty and no two adjacent runs share an index."""
     source = scene_source({"z000.txt": "##..\n..##\n"})
     document, _ = generator.compile_scene(source)
     runs = document["voxels"][0]["payload"]["runs"]
@@ -189,6 +199,7 @@ def test_runs_are_maximal_and_never_zero_length(scene_source) -> None:
 
 
 def test_run_lengths_sum_to_the_chunk_volume(scene_source) -> None:
+    """Check that a chunk's run lengths add up to its voxel count."""
     source = scene_source({"z000.txt": "##..\n..##\n"})
     document, _ = generator.compile_scene(source)
     runs = document["voxels"][0]["payload"]["runs"]
@@ -196,6 +207,7 @@ def test_run_lengths_sum_to_the_chunk_volume(scene_source) -> None:
 
 
 def test_chunk_entries_are_sorted_z_major(scene_source) -> None:
+    """Check that chunk entries are sorted by z, then y, then x."""
     # Sorted entries are what make the encoding canonical, which is what the
     # content hash design section 12.3 requires depends on.
     scene = MINIMAL_SCENE.replace("dimensions = [32, 32, 32]", "dimensions = [64, 64, 32]").replace(
@@ -211,6 +223,7 @@ def test_chunk_entries_are_sorted_z_major(scene_source) -> None:
 
 
 def test_prototype_keys_are_sorted(scene_source) -> None:
+    """Check that entity prototypes are emitted in sorted key order."""
     # The Rust model holds prototypes in a `BTreeMap`, so the canonical form is
     # sorted. Python dictionaries preserve insertion order, which would
     # otherwise leak authoring order into the bytes and the content hash.
@@ -227,6 +240,7 @@ concept = "thy:Anvil"
 
 
 def test_authored_angles_compile_to_centidegrees(scene_source) -> None:
+    """Check that authored angles and lengths compile to integer units."""
     # The promised mitigation for the all-integer document's authoring cost.
     source = scene_source({"z000.txt": "####\n####\n"})
     document, _ = generator.compile_scene(source)
@@ -236,10 +250,12 @@ def test_authored_angles_compile_to_centidegrees(scene_source) -> None:
 
 
 def test_a_fractional_angle_rounds_to_the_nearest_centidegree() -> None:
+    """Check that a fractional angle rounds to the nearest centidegree."""
     assert generator.parse_quantity("17.45deg", "deg", 100, "test") == 1_745
 
 
 def test_a_quantity_without_its_unit_is_refused() -> None:
+    """Refuse a bare number where a quantity needs its unit suffix."""
     # Guessing that a bare "17.45" meant degrees is how a scene ends up lit
     # from a hundredth of the intended angle.
     with pytest.raises(generator.SourceError, match="does not end in"):
@@ -247,10 +263,12 @@ def test_a_quantity_without_its_unit_is_refused() -> None:
 
 
 def test_a_bare_integer_passes_through_unchanged() -> None:
+    """Check that a bare integer quantity is returned as it is."""
     assert generator.parse_quantity(1_745, "deg", 100, "test") == 1_745
 
 
 def test_compilation_is_deterministic(scene_source) -> None:
+    """Check that two compilations render identical document and provenance bytes."""
     # `make scenes-check` compares bytes. A generator that is only usually
     # deterministic makes that check flaky, and a flaky check is one skip marker
     # away from being no check at all.
@@ -262,6 +280,7 @@ def test_compilation_is_deterministic(scene_source) -> None:
 
 
 def test_the_rendered_document_is_compact_with_one_trailing_newline(scene_source) -> None:
+    """Check that the rendered document is compact with one trailing newline."""
     source = scene_source({"z000.txt": "####\n####\n"})
     document, _ = generator.compile_scene(source)
     rendered = generator.render(document)
@@ -271,6 +290,7 @@ def test_the_rendered_document_is_compact_with_one_trailing_newline(scene_source
 
 
 def test_the_rendered_document_uses_the_rust_declaration_order(scene_source) -> None:
+    """Check that top-level keys render in Rust declaration order, not sorted."""
     # Not sorted. Matching `serde`'s struct field order is what lets the
     # cross-language test in `crates/world/tests/generated_fixtures.rs` compare
     # the Rust re-encoding to this output byte for byte, rather than settling
@@ -293,6 +313,7 @@ def test_the_rendered_document_uses_the_rust_declaration_order(scene_source) -> 
 
 
 def test_provenance_names_the_layer_file_and_line(scene_source) -> None:
+    """Check that provenance names the layer file and line behind a chunk."""
     # What carries a positional diagnostic the last step, from a chunk-local
     # position to something a person actually wrote.
     source = scene_source({"z001.txt": "....\n..#.\n"})
@@ -301,12 +322,14 @@ def test_provenance_names_the_layer_file_and_line(scene_source) -> None:
 
 
 def test_provenance_records_nothing_for_an_empty_scene(scene_source) -> None:
+    """Check that an all-air scene records no provenance chunks."""
     source = scene_source({"z000.txt": "....\n....\n"})
     _, provenance = generator.compile_scene(source)
     assert provenance["chunks"] == []
 
 
 def test_check_mode_passes_when_the_output_is_current(scene_source, tmp_path: Path) -> None:
+    """Check that check mode passes when the fixtures match the sources."""
     source = scene_source({"z000.txt": "####\n####\n"})
     output = tmp_path / "out"
     assert generator.write_all([source], output) == 0
@@ -316,6 +339,7 @@ def test_check_mode_passes_when_the_output_is_current(scene_source, tmp_path: Pa
 
 
 def test_check_mode_fails_on_a_hand_edited_fixture(scene_source, tmp_path: Path) -> None:
+    """Check that check mode fails when a committed fixture is hand-edited."""
     # The guard that stops the authoring sources and the fixtures drifting apart
     # until the sources become decoration.
     source = scene_source({"z000.txt": "####\n####\n"})
@@ -328,6 +352,7 @@ def test_check_mode_fails_on_a_hand_edited_fixture(scene_source, tmp_path: Path)
 
 
 def test_check_mode_fails_on_a_missing_fixture(scene_source, tmp_path: Path) -> None:
+    """Check that check mode fails when a committed fixture is missing."""
     source = scene_source({"z000.txt": "####\n####\n"})
     output = tmp_path / "out"
     output.mkdir()
