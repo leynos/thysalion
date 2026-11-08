@@ -9,6 +9,7 @@ gate is a prerequisite of the lint target.
 
 from __future__ import annotations
 
+import os
 import shutil
 import stat
 import subprocess
@@ -25,7 +26,7 @@ CLEAN_REPORT = (
     "| scripts/build.py | COVERED |\nRESULT: PASSED (minimum: 100.0%, actual: 100.0%)\n"
 )
 MISSED_REPORT = (
-    "| scripts/build.py |  MISSED |\nRESULT: PASSED (minimum: 100.0%, actual: 99.6%)\n"
+    "| scripts/build.py |  MISSED |\nRESULT: PASSED (minimum: 100.0%, actual: 100.0%)\n"
 )
 
 
@@ -73,6 +74,46 @@ def test_tool_failure_status_propagates(tmp_path: Path) -> None:
 
     assert result.returncode != 0
     assert "Error 3" in result.stderr
+
+
+def test_long_report_with_early_missed_row_fails_cleanly(tmp_path: Path) -> None:
+    """A MISSED row ahead of a long report fails the gate with its own message."""
+    padding = "| scripts/build.py | COVERED |\n" * 50_000
+    result = run_gate(write_stub(tmp_path, MISSED_REPORT + padding, 0))
+
+    assert result.returncode != 0
+    assert "undocumented definitions remain" in result.stderr
+
+
+def test_long_clean_report_passes(tmp_path: Path) -> None:
+    """A long report with no MISSED row passes the gate."""
+    padding = "| scripts/build.py | COVERED |\n" * 50_000
+    result = run_gate(write_stub(tmp_path, padding + CLEAN_REPORT, 0))
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_report_scanner_failure_fails_the_gate(tmp_path: Path) -> None:
+    """A scanner error other than 'no match' fails the gate, not a clean pass."""
+    stub_directory = tmp_path / "bin"
+    stub_directory.mkdir()
+    failing_grep = stub_directory / "grep"
+    failing_grep.write_text("#!/bin/sh\nexit 2\n", encoding="utf-8")
+    failing_grep.chmod(failing_grep.stat().st_mode | stat.S_IXUSR)
+    environment = {**os.environ, "PATH": f"{stub_directory}{os.pathsep}{os.environ['PATH']}"}
+
+    assert MAKE is not None  # narrowed by the module skip marker
+    stub = write_stub(tmp_path, CLEAN_REPORT, 0)
+    result = subprocess.run(
+        [MAKE, "-s", "-C", str(REPOSITORY_ROOT), "interrogate", f"INTERROGATE={stub}"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environment,
+    )
+
+    assert result.returncode != 0
+    assert "MISSED check failed" in result.stderr
 
 
 def test_lint_runs_the_gate_first() -> None:

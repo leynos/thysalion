@@ -19,7 +19,10 @@ The generated `Makefile` exposes these public targets:
 
 - `make all` runs formatting checks, linting, tests, and spelling checks.
 - `make check-fmt` verifies Rust formatting.
-- `make lint` runs rustdoc, Clippy, and Whitaker with warnings denied.
+- `make lint` runs the docstring gate, then rustdoc, Clippy, and Whitaker with
+  warnings denied.
+- `make interrogate` fails on any undocumented Python definition under
+  `scripts`. It runs Interrogate on Python 3.14 through `uv`.
 - `make test` runs `cargo nextest run` when cargo-nextest is installed and
   falls back to `cargo test` otherwise. All projects also run doctests.
 - `make build` builds the debug target.

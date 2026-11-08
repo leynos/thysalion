@@ -6,7 +6,13 @@ project.
 ## Local Workflow
 
 Use `make all` as the public entrypoint for formatting, linting, and tests.
-`make lint` runs rustdoc, Clippy, and Whitaker. `make test` prefers
+`make lint` runs the docstring gate, then rustdoc, Clippy, and Whitaker.
+`make interrogate` is that gate: it runs Interrogate `1.7.0` through `uv` on
+Python 3.14 over `scripts` (set `INTERROGATE_TARGETS` to add a directory), with
+Interrogate's default exclusions. It fails when the tool exits non-zero and
+also when the verbose report holds any `MISSED` row, because the percentage is
+rounded to one decimal place and would pass a lone gap. A `grep` failure while
+scanning the report also fails the gate. `make test` prefers
 `cargo nextest run` and falls back to `cargo test` when cargo-nextest is not
 available. `make audit` derives the Rust workspace root with `cargo metadata`,
 logs workspace member manifests, and runs `cargo audit` once from the workspace
