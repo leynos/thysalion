@@ -116,6 +116,48 @@ def test_report_scanner_failure_fails_the_gate(tmp_path: Path) -> None:
     assert "MISSED check failed" in result.stderr
 
 
+def run_real_gate(source: Path) -> subprocess.CompletedProcess[str]:
+    """Run ``make interrogate`` with the real tool over the ``source`` directory."""
+    assert MAKE is not None  # narrowed by the module skip marker
+    return subprocess.run(
+        [
+            MAKE,
+            "-s",
+            "-C",
+            str(REPOSITORY_ROOT),
+            "interrogate",
+            f"INTERROGATE_TARGETS={source}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="uv is not installed")
+def test_real_tool_passes_documented_and_fails_undocumented(tmp_path: Path) -> None:
+    """The real Interrogate passes documented code and fails a lone gap."""
+    documented = tmp_path / "documented"
+    documented.mkdir()
+    (documented / "module.py").write_text(
+        '"""A documented module."""\n\n\ndef helper() -> None:\n    """Do nothing."""\n',
+        encoding="utf-8",
+    )
+    undocumented = tmp_path / "undocumented"
+    undocumented.mkdir()
+    (undocumented / "module.py").write_text(
+        '"""A documented module."""\n\n\ndef helper() -> None:\n    pass\n',
+        encoding="utf-8",
+    )
+
+    passing = run_real_gate(documented)
+    failing = run_real_gate(undocumented)
+
+    assert passing.returncode == 0, passing.stderr
+    assert failing.returncode != 0
+    assert "helper" in failing.stdout
+
+
 def test_lint_runs_the_gate_first() -> None:
     """A dry run of ``make lint`` reaches the interrogate recipe before clippy."""
     assert MAKE is not None  # narrowed by the module skip marker
