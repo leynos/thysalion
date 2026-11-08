@@ -140,7 +140,7 @@ coverage: check-build-tools ## Generate lcov coverage with lld for llvm-tools co
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		$(CARGO) llvm-cov --lcov --output-path lcov.info $(COVERAGE_IGNORE) $(TEST_FLAGS)
 
-lint: lint-clippy lint-whitaker ## Run the Rust lint gates in order
+lint: interrogate lint-clippy lint-whitaker ## Run the docstring gate, then the Rust lint gates in order
 
 # Interrogate scans each target recursively, subject to its default exclusions.
 INTERROGATE_VERSION ?= 1.7.0
@@ -167,10 +167,6 @@ interrogate: ## Enforce complete Python docstring coverage
 	    printf '%s\n' 'interrogate: undocumented definitions remain (or the MISSED check failed); see above' >&2; \
 	    exit 1; \
 	  fi
-
-# `lint` runs the docstring gate; Make adds this prerequisite to the `lint`
-# rule above.
-lint: interrogate
 
 lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) doc --no-deps --workspace
