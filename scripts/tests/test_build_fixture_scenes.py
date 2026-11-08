@@ -250,7 +250,7 @@ def test_authored_angles_compile_to_centidegrees(scene_source) -> None:
 
 
 def test_a_fractional_angle_rounds_to_the_nearest_centidegree() -> None:
-    """Check that a fractional angle rounds to the nearest centidegree."""
+    """Check that 17.45deg converts to 1,745 centidegrees."""
     assert generator.parse_quantity("17.45deg", "deg", 100, "test") == 1_745
 
 
