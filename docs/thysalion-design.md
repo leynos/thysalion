@@ -7,13 +7,13 @@
 - **Audience:** developers implementing Thysalion's engine and content
   pipeline, and reviewers evaluating its architecture.
 - **Companion documents:**
-  [ADR 001](adr-001-meshed-voxel-rendering-pipeline.md) (meshed rendering
-  pipeline), [ADR 002](adr-002-dbsp-as-logic-authority.md) (DBSP as logic
-  authority), [ADR 003](adr-003-oxigraph-knowledge-plane.md) (oxigraph
-  knowledge plane), and [ADR 004](adr-004-tiered-lighting-software-ddgi.md)
-  (tiered lighting). [ADR 008](adr-008-replay-record-format.md) records the
-  replay wire format. The
-  [documentation style guide](documentation-style-guide.md) governs
+  [ADR 001](adrs/adr-0001-meshed-voxel-rendering-pipeline.md) (meshed rendering
+  pipeline), [ADR 002](adrs/adr-0002-dbsp-as-logic-authority.md) (DBSP as logic
+  authority), [ADR 003](adrs/adr-0003-oxigraph-knowledge-plane.md) (oxigraph
+  knowledge plane), and
+  [ADR 004](adrs/adr-0004-tiered-lighting-software-ddgi.md) (tiered lighting).
+  [ADR 008](adrs/adr-0008-replay-record-format.md) records the replay wire
+  format. The [documentation style guide](documentation-style-guide.md) governs
   conventions; the [repository layout](repository-layout.md) governs file
   placement.
 - **Scope:** the runtime architecture of the game engine and its content
@@ -358,7 +358,7 @@ Each plane has one authority relationship:
 | Presentation         | Meshes, lighting textures, UI                                                | Mutate game state                          |
 
 The planes map onto Cargo workspace crates —
-[ADR 005](adr-005-workspace-crate-layout.md) records the crate-per-plane
+[ADR 005](adrs/adr-0005-workspace-crate-layout.md) records the crate-per-plane
 layout, the plane-to-crate name table, the layering rules that keep the crate
 dependency graph acyclic while allowing the cyclic data flow above, and the
 demo harness contract shared by every capability demonstration.
@@ -504,7 +504,7 @@ long run of air agree without a lookup (§7.3). The palette is indexed by a
 16-bit value, so a scene holds at most 65,536 voxel types.
 
 Two encodings here were revised at roadmap step 1.2 and are recorded in
-[ADR 006](adr-006-scene-document-model.md).
+[ADR 006](adrs/adr-0006-scene-document-model.md).
 
 `passable` is six _named_ fields — `pos_x`, `neg_x`, `pos_y`, `neg_y`, `pos_z`,
 `neg_z` — rather than `[bool; 6]`. An array obliges every reader to agree on
@@ -531,7 +531,8 @@ Callers constructing domain values convert booleans with
 `is_passable`. `Passability::open` and `Passability::closed` provide uniform
 values for all six faces. This preserves the six flat boolean fields in JSON
 and the scene schema; the scene format version does not change. This follows
-the document/domain boundary in [ADR 006](adr-006-scene-document-model.md).
+the document/domain boundary in
+[ADR 006](adrs/adr-0006-scene-document-model.md).
 
 `slope` is a closed set of four compass directions plus `Flat`, rather than an
 `IVec2`. A vector admits meaningless values such as `(7, -3)` that validation
@@ -583,8 +584,8 @@ stream fragments on every raster row of a spatially localized region and
 rewrites wholesale on a one-chunk edit; chunk-keying makes encoding, decoding,
 hashing, and diffing scale with populated volume rather than with declared
 extent. The wilderness scene class of §7.1 ships in kilobytes as a result,
-against 256 MiB dense. [ADR 006](adr-006-scene-document-model.md) records the
-reversal trigger.
+against 256 MiB dense. [ADR 006](adrs/adr-0006-scene-document-model.md) records
+the reversal trigger.
 
 Validation happens entirely at load and is all-or-nothing: unknown palette
 references, out-of-bounds spawns, or dangling knowledge IRIs fail the load with

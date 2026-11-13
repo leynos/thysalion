@@ -91,7 +91,7 @@ scenes all later spikes and CI suites consume. See thysalion-design.md §7.
     tooling can target the format as data rather than by depending on
     `thysalion-world`.
   - See thysalion-design.md §7.3 and §7.4, and
-    adr-006-scene-document-model.md.
+    adrs/adr-0006-scene-document-model.md.
   - Success: CI regenerates the artefact and compares it byte for byte;
     every fixture scene validates against it, and every corrupt fixture
     whose fault is structural is rejected by it.
@@ -134,7 +134,7 @@ verification programme is continuously enforced. See thysalion-design.md §14.
     defines a versioned session header and a stream of tick-stamped
     records whose payload enum is uninhabited, so no speculative input
     vocabulary reaches the wire before roadmap 4.1.2 defines the circuit
-    boundary. See adr-008-replay-record-format.md.
+    boundary. See adrs/adr-0008-replay-record-format.md.
   - See thysalion-design.md §14 (I1).
   - Success: recording and replaying an empty session is byte-identical;
     the harness is invoked from CI.
@@ -153,7 +153,8 @@ zoom, walk a proxy party marker indoors, and watch roofs cut away.
 
 This step answers whether load-time binary greedy meshing over
 `bevy_voxel_world` delivers the diorama workload on Bevy 0.19's batched path.
-See thysalion-design.md §8.1 and adr-001-meshed-voxel-rendering-pipeline.md.
+See thysalion-design.md §8.1 and
+adrs/adr-0001-meshed-voxel-rendering-pipeline.md.
 
 - [ ] 2.1.1. Integrate `bevy_voxel_world` with authored-scene delivery.
   - Requires steps 1.1–1.2.
@@ -272,7 +273,7 @@ spread; flip a switch to replay the session and observe identical outcomes.
 This step answers whether the extract → step → apply cycle, retraction
 discipline, and identity map — lille's mechanics — hold under Bevy 0.19 and
 current dbsp. Everything later in the phase rests on it. See
-thysalion-design.md §6.2, §10.1, and adr-002-dbsp-as-logic-authority.md.
+thysalion-design.md §6.2, §10.1, and adrs/adr-0002-dbsp-as-logic-authority.md.
 
 - [ ] 4.1.1. Implement `DbspCircuit`, the `SimId` identity map, and the
   chained extract/apply systems.
@@ -346,7 +347,7 @@ and inspect any graph live.
 
 This step answers whether TriG authoring, load-time validation, and the
 event-only query rule are workable in practice. See thysalion-design.md
-§11.1–11.2, §11.5–11.6, and adr-003-oxigraph-knowledge-plane.md.
+§11.1–11.2, §11.5–11.6, and adrs/adr-0003-oxigraph-knowledge-plane.md.
 
 - [ ] 5.1.1. Implement the knowledge store wrapper with the named-graph
   layout and TriG loading.
@@ -477,7 +478,7 @@ probe visualization, and a live probe-budget readout.
 
 This step answers whether the voxel grid suffices as the acceleration structure
 and the Chebyshev test prevents leaks in the cut-away fixtures. See
-thysalion-design.md §9.3 and adr-004-tiered-lighting-software-ddgi.md.
+thysalion-design.md §9.3 and adrs/adr-0004-tiered-lighting-software-ddgi.md.
 
 - [ ] 7.1.1. Implement probe volumes, octahedral irradiance and depth
   textures, and the DDA probe-ray kernel.
@@ -620,7 +621,7 @@ See thysalion-design.md §15 (Table 7) for the re-opening criteria.
   - Requires phase 9.
 - [ ] 10.1.3. Evaluate the raymarched rendering tier if 9.1.3 fails the
   visual target.
-  - See adr-001-meshed-voxel-rendering-pipeline.md.
+  - See adrs/adr-0001-meshed-voxel-rendering-pipeline.md.
 - [ ] 10.1.4. Revisit multiplayer lockstep, WASM builds, and formal proof
   of circuit rules as their criteria trigger.
   - See thysalion-design.md §15.

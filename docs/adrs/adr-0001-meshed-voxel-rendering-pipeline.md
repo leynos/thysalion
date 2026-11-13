@@ -12,7 +12,7 @@ volume rendering is the documented fallback, not the baseline.
 ## Context and problem statement
 
 Thysalion renders dense, high-detail voxel dioramas
-([design](thysalion-design.md) §8) in the visual style of the reference
+([design](../thysalion-design.md) §8) in the visual style of the reference
 concept art. Two rendering families exist in the Rust/Bevy ecosystem: meshing
 voxels into triangles and rasterizing them through the standard pipeline, or
 raymarching a voxel volume (sparse voxel octree or brickmap) in a custom GPU
@@ -58,7 +58,7 @@ _Table 1: comparison of rendering options._
 
 Option A. The art style does not need per-voxel raymarching fidelity, and
 option A inherits the entire Bevy lighting and batching stack that the tiered
-lighting design ([ADR 004](adr-004-tiered-lighting-software-ddgi.md)) builds
+lighting design ([ADR 004](adr-0004-tiered-lighting-software-ddgi.md)) builds
 on. The voxel grid still resides on the GPU for lighting and simulation
 purposes, so a raymarched tier can be added later without restructuring;
 VoxelHex's sparse-voxel brick tree is the documented starting point should the

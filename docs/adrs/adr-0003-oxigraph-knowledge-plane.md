@@ -13,7 +13,7 @@ in the DBSP circuit, not by the store.
 ## Context and problem statement
 
 Ultima-VII-style NPCs know different, possibly wrong, things, and narrative
-content is gated on world state ([design](thysalion-design.md) §11). This
+content is gated on world state ([design](../thysalion-design.md) §11). This
 "meaning" layer changes slowly, is authored by designers, and must be queryable
 with expressive patterns. The question is where it lives: an RDF quad store
 with SPARQL (oxigraph), bespoke fact components in the ECS, or a Datalog fact

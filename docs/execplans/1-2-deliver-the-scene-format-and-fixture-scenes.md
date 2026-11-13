@@ -65,8 +65,8 @@ single easiest mistake to make here, so they are separated at the outset.
   construction and can never detect a wire break.
 
 This step also resolves the open question
-[ADR 005](../adr-005-workspace-crate-layout.md) forwarded to it: whether the
-scene format becomes a leaf `thysalion-scene` crate or stays inside
+[ADR 005](../adrs/adr-0005-workspace-crate-layout.md) forwarded to it: whether
+the scene format becomes a leaf `thysalion-scene` crate or stays inside
 `thysalion-world`. The answer, and its reversal trigger, are recorded in a new
 ADR 006.
 
@@ -77,7 +77,7 @@ escalation, not workarounds.
 
 - The plane authority table in [thysalion-design.md](../thysalion-design.md)
   §6.1 and the layering rules in
-  [ADR 005](../adr-005-workspace-crate-layout.md) govern crate edges.
+  [ADR 005](../adrs/adr-0005-workspace-crate-layout.md) govern crate edges.
   `thysalion-world` is the dependency sink: no plane crate may become a
   dependency of it. In particular the scene model must not depend on
   `thysalion-knowledge`, `thysalion-sim`, or `thysalion-presentation`, and must
@@ -483,9 +483,9 @@ travel with the C1 commit.
   over the shipped artefacts. Measurements in `Artefacts and notes`.
 - [x] (2026-07-30) Stage D: documentation, ADR 006, design-document
   amendments, refactor, and cleanup. Delivered:
-  `docs/adr-006-scene-document-model.md`, resolving ADR 005's forwarded open
-  question; `docs/world-plane-architecture.md` with the format reference, the
-  worked example, and the version-history table; amendments to design §7.2,
+  `docs/adrs/adr-0006-scene-document-model.md`, resolving ADR 005's forwarded
+  open question; `docs/world-plane-architecture.md` with the format reference,
+  the worked example, and the version-history table; amendments to design §7.2,
   §7.3, §7.4, and §10.5; updates to `contents.md`, `repository-layout.md`,
   `developers-guide.md`, and `users-guide.md`; and a refactor pass that
   consolidated the duplicated fixture-locating test helpers.
@@ -2290,12 +2290,12 @@ for each fixture in `Artefacts and notes`, against the tolerances. Commit task
 
 ### Stage D: documentation, ADR 006, refactor, and cleanup
 
-- Write `docs/adr-006-scene-document-model.md`. It must record, at minimum: the
-  format staying in `thysalion-world` behind an optional `bevy` feature, with
-  the revised reversal trigger, resolving ADR 005's forwarded open question;
-  the two-stage document-to-domain shape as the mechanism for all-or-nothing
-  loading; the all-integer document; named-field MessagePack and why
-  `to_vec_named` is load-bearing for correctness rather than only for
+- Write `docs/adrs/adr-0006-scene-document-model.md`. It must record, at
+  minimum: the format staying in `thysalion-world` behind an optional `bevy`
+  feature, with the revised reversal trigger, resolving ADR 005's forwarded
+  open question; the two-stage document-to-domain shape as the mechanism for
+  all-or-nothing loading; the all-integer document; named-field MessagePack and
+  why `to_vec_named` is load-bearing for correctness rather than only for
   evolvability; the reserved air index; chunk-keyed sparse storage with its own
   reversal trigger (if step 2.1.2's mesher or `bevy_voxel_world`'s chunk map
   makes it redundant) and its access complexity, so a future swap has a
@@ -2918,8 +2918,8 @@ Documentation to read before starting, in this order:
   (the voxel world model — the specification this step implements), §10.5
   (fixed-point material fields), §11.5 (knowledge authoring), §12.1 (ownership
   matrix), and §14 (invariants).
-- [ADR 005](../adr-005-workspace-crate-layout.md) — crate layering, the lint
-  and allowance policy, and the open question this step resolves.
+- [ADR 005](../adrs/adr-0005-workspace-crate-layout.md) — crate layering, the
+  lint and allowance policy, and the open question this step resolves.
 - [roadmap.md](../roadmap.md) §1.2 — the tasks and their success criteria; and
   §2.1, §3.2, §4.2 for the consumers this format must serve.
 - [developers-guide.md](../developers-guide.md) — the demo harness contract,

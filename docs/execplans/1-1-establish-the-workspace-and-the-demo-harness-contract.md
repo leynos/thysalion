@@ -980,7 +980,7 @@ Go/no-go: Stage B tests pass; the manual verification script in
 
 ### Stage D: documentation, ADR, refactor, and cleanup
 
-- New ADR `docs/adr-005-workspace-crate-layout.md` (Y-statement per the
+- New ADR `docs/adrs/adr-0005-workspace-crate-layout.md` (Y-statement per the
   `arch-decision-records` skill and the style guide's ADR template). It owns:
   the crate-per-plane layout and plane-to-crate name table; the non-virtual
   workspace and composition-root role of the root package; `world` as

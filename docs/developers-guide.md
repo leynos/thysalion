@@ -61,7 +61,7 @@ parameter. [`tests/cv005_wiring.rs`](../tests/cv005_wiring.rs) fails if the pin
 is not a full commit, the target stops running the pinned checker, the
 repository parameter is wrong, `make all` drops the target or CI stops running
 it. The decision is recorded in
-[ADR 007](adr-007-adopt-the-shared-cv005-contract-library.md).
+[ADR 007](adrs/adr-0007-adopt-the-shared-cv005-contract-library.md).
 
 ### Continuous integration triggers
 
@@ -257,7 +257,7 @@ migration for both document and domain callers.
 
 Every capability demonstration binary in `crates/demos` builds on the shared
 harness in `crates/harness` (`thysalion-harness`). The harness is a two-plugin
-contract, decided in [ADR 005](adr-005-workspace-crate-layout.md):
+contract, decided in [ADR 005](adrs/adr-0005-workspace-crate-layout.md):
 
 - `HarnessCorePlugin` is headless-safe: camera-rig state (`RigState`),
   input mapping, and diagnostics registration. It runs under `MinimalPlugins`
@@ -364,8 +364,8 @@ format of design §14 (invariant I1): a versioned `SessionHeader` followed by
 tick-stamped `TickRecord`s. The payload type `InputRecord` is uninhabited until
 roadmap step 4.1.2 defines the circuit boundary, so no input values are
 recorded yet. Session documents can still contain tick records with empty input
-lists. [ADR 008](adr-008-replay-record-format.md) owns the rules; the short
-version is that the format copies ADR 006's canonical-encoding discipline
+lists. [ADR 008](adrs/adr-0008-replay-record-format.md) owns the rules; the
+short version is that the format copies ADR 006's canonical-encoding discipline
 wholesale.
 
 The empty-session byte-identity criterion has checked-in golden bytes under
@@ -396,7 +396,7 @@ TriG sources). The compiled documents are committed build artefacts,
 deliberately: a contributor with no `uv` must still be able to build, test, and
 run the demos. The authoring sources are the review surface; the compiled JSON
 is not. The format itself is decided in
-[ADR 006](adr-006-scene-document-model.md) and referenced in full in
+[ADR 006](adrs/adr-0006-scene-document-model.md) and referenced in full in
 [World plane architecture](world-plane-architecture.md).
 
 ### The authoring format

@@ -13,12 +13,12 @@ enumerated per rule class.
 ## Context and problem statement
 
 A simulation-first RPG derives most of its interesting state: perception,
-spread, structure membership, social aggregates ([design](thysalion-design.md)
-§10.2). Deriving such state imperatively across ECS systems scatters
-invalidation logic and breeds stale-cache bugs; the question is whether to
-adopt an incremental view maintenance engine (DBSP) as the single derivation
-authority, following the `lille` prototype, or to derive state in conventional
-ECS systems.
+spread, structure membership, social aggregates
+([design](../thysalion-design.md) §10.2). Deriving such state imperatively
+across ECS systems scatters invalidation logic and breeds stale-cache bugs; the
+question is whether to adopt an incremental view maintenance engine (DBSP) as
+the single derivation authority, following the `lille` prototype, or to derive
+state in conventional ECS systems.
 
 ## Decision drivers
 

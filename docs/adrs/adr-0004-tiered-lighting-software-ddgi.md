@@ -15,7 +15,7 @@ ray-tracing dependency.
 
 The reference art demands warm local lights against cool ambient fill,
 day/night and weather moods, and believable interior bounce
-([design](thysalion-design.md) §9), on mid-range GPUs without ray-tracing
+([design](../thysalion-design.md) §9), on mid-range GPUs without ray-tracing
 hardware (design §2.2). Candidate mechanisms: Bevy's experimental
 hardware-raytraced Solari, voxel cone tracing, flood-fill lighting alone, or an
 irradiance-probe system with software ray generation.

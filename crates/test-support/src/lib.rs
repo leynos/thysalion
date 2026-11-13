@@ -9,7 +9,7 @@
 //! # Scope and re-use policy
 //!
 //! This crate is *test tooling* in
-//! ADR 005's sense (`docs/adr-005-workspace-crate-layout.md`), beside
+//! ADR 005's sense (`docs/adrs/adr-0005-workspace-crate-layout.md`), beside
 //! `thysalion-harness` rather than beside a plane crate. Three rules follow,
 //! and each has a mechanism behind it:
 //!

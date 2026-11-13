@@ -8,26 +8,26 @@ documentation set.
 - [Thysalion technical design](thysalion-design.md) explains the four-plane
   architecture (state, logic, knowledge, presentation), the voxel world model,
   rendering, tiered lighting, simulation, and verification commitments.
-- [ADR 001: meshed voxel rendering pipeline](adr-001-meshed-voxel-rendering-pipeline.md)
+- [ADR 001: meshed voxel rendering pipeline](adrs/adr-0001-meshed-voxel-rendering-pipeline.md)
   records the choice of greedy-meshed rasterization over raymarching.
-- [ADR 002: DBSP as the logic authority](adr-002-dbsp-as-logic-authority.md)
+- [ADR 002: DBSP as the logic authority](adrs/adr-0002-dbsp-as-logic-authority.md)
   records the choice of an incremental dataflow circuit for all derived game
   state.
-- [ADR 003: oxigraph as the knowledge plane](adr-003-oxigraph-knowledge-plane.md)
+- [ADR 003: oxigraph as the knowledge plane](adrs/adr-0003-oxigraph-knowledge-plane.md)
   records the choice of an event-queried RDF store for lore, beliefs, and
   quests.
-- [ADR 004: tiered lighting with software-ray-marched DDGI](adr-004-tiered-lighting-software-ddgi.md)
+- [ADR 004: tiered lighting with software-ray-marched DDGI](adrs/adr-0004-tiered-lighting-software-ddgi.md)
   records the three-tier lighting architecture without hardware ray tracing.
-- [ADR 005: workspace crate layout](adr-005-workspace-crate-layout.md)
+- [ADR 005: workspace crate layout](adrs/adr-0005-workspace-crate-layout.md)
   records the crate-per-plane workspace, the layering and release-scoping
   rules, and the demo harness contract.
-- [ADR 006: the scene document model](adr-006-scene-document-model.md)
+- [ADR 006: the scene document model](adrs/adr-0006-scene-document-model.md)
   records the two-stage document/domain scene model, the canonical byte form,
   and the compatibility policy for scene documents.
-- [ADR 007: adopt the shared CV-005 contract library](adr-007-adopt-the-shared-cv005-contract-library.md)
+- [ADR 007: adopt the shared CV-005 contract library](adrs/adr-0007-adopt-the-shared-cv005-contract-library.md)
   records the move from a local copy of the CV-005 contract to the pinned
   shared check.
-- [ADR 008: the replay record format](adr-008-replay-record-format.md)
+- [ADR 008: the replay record format](adrs/adr-0008-replay-record-format.md)
   records the versioned replay session envelope, its uninhabited payload, the
   same-build byte-identity promise, and the deferrals of raw input capture and
   columnar storage.
