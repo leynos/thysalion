@@ -183,7 +183,7 @@ lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
 # and the installer's directory leads `PATH`. An inherited
 # `CARGO_ENCODED_RUSTFLAGS` outranks `RUSTFLAGS`, so it is cleared first.
 lint-whitaker: ## Run the installer-managed rolling Whitaker suite
-	unset CARGO_ENCODED_RUSTFLAGS && PATH="$${XDG_BIN_HOME:-$(HOME)/.local/bin}:$(PATH)" CARGO_UNSTABLE_CODEGEN_BACKEND=true CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm RUSTFLAGS="-D warnings" whitaker --all -- $(CARGO_FLAGS)
+	env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) PATH="$${XDG_BIN_HOME:-$(HOME)/.local/bin}:$(PATH)" CARGO_UNSTABLE_CODEGEN_BACKEND=true CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm RUSTFLAGS="-D warnings" whitaker --all -- $(CARGO_FLAGS)
 
 typecheck: check-build-tools ## Type-check without building
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS)

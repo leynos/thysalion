@@ -61,10 +61,20 @@ fn release_build_is_scoped_to_the_root_package() {
         step_name: "Build release binary",
     })
     .expect("release.yml must define the release build");
+    let command: Vec<&str> = step
+        .iter()
+        .filter_map(|line| line.trim_start().strip_prefix("run:"))
+        .flat_map(str::split_whitespace)
+        .collect();
+    let packages: Vec<&str> = command
+        .iter()
+        .zip(command.iter().skip(1))
+        .filter(|(flag, _)| **flag == "-p")
+        .map(|(_, package)| *package)
+        .collect();
     assert!(
-        step.iter()
-            .any(|line| line.contains("cross build --release -p thysalion")),
-        "the release build must remain scoped to the root package"
+        command.starts_with(&["cross", "build", "--release"]) && packages == ["thysalion"],
+        "the release build must remain scoped to the root package alone: {command:?}"
     );
     assert!(
         step.iter().any(|line| line.trim() == "RUSTFLAGS: \"\""),
