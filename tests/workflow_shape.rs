@@ -51,16 +51,10 @@ fn step_and_run_lines<'workflow>(
     Some((step, run))
 }
 
-/// Checks that the release build stays scoped to the root package: the demo crates
-/// must never enter the release build graph (ADR-005).
-#[test]
-fn release_build_is_scoped_to_the_root_package() {
-    let workflow = read_workflow("release.yml").expect("read release.yml");
-    let step = named_step_lines(&WorkflowStep {
-        workflow: &workflow,
-        step_name: "Build release binary",
-    })
-    .expect("release.yml must define the release build");
+/// Returns whether a release step's `run:` command is `cross build --release` scoped to the
+/// root package alone: exactly one `-p`, naming `thysalion` and no other package. Only a `run:`
+/// line counts, so a commented-out command satisfies nothing.
+fn release_command_is_scoped(step: &[&str]) -> bool {
     let command: Vec<&str> = step
         .iter()
         .filter_map(|line| line.trim_start().strip_prefix("run:"))
@@ -72,14 +66,58 @@ fn release_build_is_scoped_to_the_root_package() {
         .filter(|(flag, _)| **flag == "-p")
         .map(|(_, package)| *package)
         .collect();
+    command.starts_with(&["cross", "build", "--release"]) && packages == ["thysalion"]
+}
+
+/// Checks that the release build stays scoped to the root package: the demo crates
+/// must never enter the release build graph (ADR-005).
+#[test]
+fn release_build_is_scoped_to_the_root_package() {
+    let workflow = read_workflow("release.yml").expect("read release.yml");
+    let step = named_step_lines(&WorkflowStep {
+        workflow: &workflow,
+        step_name: "Build release binary",
+    })
+    .expect("release.yml must define the release build");
     assert!(
-        command.starts_with(&["cross", "build", "--release"]) && packages == ["thysalion"],
-        "the release build must remain scoped to the root package alone: {command:?}"
+        release_command_is_scoped(&step),
+        "the release build must remain scoped to the root package alone: {step:?}"
     );
     assert!(
         step.iter().any(|line| line.trim() == "RUSTFLAGS: \"\""),
         "the release step must clear development rustflags"
     );
+}
+
+/// Release commands that reach the demo crates, or are not commands at all, must be refused.
+#[test]
+fn release_scope_refuses_demo_packages_and_commented_commands() {
+    for (run, scoped) in [
+        (
+            "        run: cross build --release -p thysalion --target x",
+            true,
+        ),
+        (
+            "        run: cross build --release -p thysalion-demos --target x",
+            false,
+        ),
+        (
+            "        run: cross build --release -p thysalion -p thysalion-demos",
+            false,
+        ),
+        ("        run: cross build --release --workspace", false),
+        (
+            "        # run: cross build --release -p thysalion --target x",
+            false,
+        ),
+        ("        run: cross build --release", false),
+    ] {
+        assert_eq!(
+            release_command_is_scoped(&[run]),
+            scoped,
+            "wrong verdict for: {run}"
+        );
+    }
 }
 
 #[test]
