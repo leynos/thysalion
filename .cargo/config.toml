@@ -10,10 +10,8 @@
 # is therefore repeated in each source, and the Makefile restates them where it
 # assigns `RUSTFLAGS` for the gate targets.
 
-# No `codegen-backend` key belongs here: release.yml builds with
-# `cross +stable`, and stable Cargo refuses a configuration that names one
-# ("feature `codegen-backend` is required"). Development builds therefore
-# stay on LLVM; `tests/stable_release_config.rs` holds this.
+# The backend selection (Cranelift for the dev profile) is at the foot of this
+# file. Release builds use the pinned nightly too and keep LLVM.
 
 [build]
 rustflags = ["-Zthreads=8"]
@@ -32,3 +30,11 @@ rustflags = ["-Zthreads=8", "-C", "link-arg=-fuse-ld=mold"]
 # coordinates metadata output itself; no raw rustc metadata flags are used.
 [unstable]
 embed-metadata = false
+codegen-backend = true
+
+# Cranelift trades runtime performance for compile speed, so it applies to the
+# dev profile only. Release builds keep LLVM, and coverage selects LLVM
+# explicitly. Stable Cargo refuses both keys, so only the pinned nightly may
+# read this file.
+[profile.dev]
+codegen-backend = "cranelift"

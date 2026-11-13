@@ -28,8 +28,6 @@ use rstest::rstest;
 mod install_tools;
 #[path = "workflow_suite/reading.rs"]
 mod reading;
-#[path = "workflow_suite/whitaker.rs"]
-mod whitaker;
 
 use reading::{Command, Job, Manifest, Workflow, manifest_dir, workflows};
 

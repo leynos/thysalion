@@ -151,14 +151,13 @@ project:
   installs the pinned `mold` binary and required components for the pinned
   nightly toolchain; `make check-build-tools` is the preflight used by build,
   test, lint, coverage, typecheck, and demo targets. Install `clang` separately.
-- Bare Cargo development commands discover `.cargo/config.toml`. It leaves
-  Cargo's LLVM backend in effect, enables `-Zthreads=8`, and uses `mold` on
-  Linux. Make recipes that set `RUSTFLAGS` restate those flags and the warnings
-  policy; they also clear inherited backend overrides. Release and coverage
-  routes explicitly clear or replace development settings. The release workflow
-  invokes stable Cargo from outside the repository with an absolute manifest
-  path, but Cross loads the checkout configuration inside its container; that
-  config therefore omits `codegen-backend` keys.
+- Bare Cargo development commands discover `.cargo/config.toml`. It selects
+  the Cranelift backend for the dev profile, enables `-Zthreads=8`, and uses
+  `mold` on Linux. Make recipes that set `RUSTFLAGS` restate those flags and
+  the warnings policy; they also clear inherited backend overrides. Release and
+  coverage routes explicitly clear or replace development settings. The release
+  workflow builds on the pinned nightly with LLVM, because `[profile.dev]` does
+  not reach the release profile; coverage and Whitaker select LLVM explicitly.
 - The authoritative lint tables are in the root `Cargo.toml`; the root package
   and every workspace member inherit them. See the `Lint baseline` section of
   the developers' guide for thresholds, environment restrictions and toolchain
