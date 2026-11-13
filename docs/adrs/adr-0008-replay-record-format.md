@@ -334,7 +334,7 @@ is better met by a dumping tool than by a second writer that can drift.
   places `thysalion-test-support` as tooling rather than as a plane
 - [roadmap.md](../roadmap.md) §1.3.2 for the task and its success criterion
 - [The 1.3 execution plan](
-  execplans/1-3-stand-up-headless-ci-and-the-verification-spine.md) for the
+  ../execplans/1-3-stand-up-headless-ci-and-the-verification-spine.md) for the
   decision log behind these choices
 
 ## Version history
