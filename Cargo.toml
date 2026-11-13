@@ -9,7 +9,7 @@ license = "ISC"
 repository = "https://github.com/leynos/thysalion"
 
 # Shared dependency pins. `[workspace.dependencies]` is the single source of
-# truth for version literals (see docs/adr-005-workspace-crate-layout.md).
+# truth for version literals (see docs/adrs/adr-0005-workspace-crate-layout.md).
 # The bevy feature list is curated: umbrella features (`2d`, `3d`, `ui`)
 # hard-include gamepad (libudev) and Wayland system dependencies, so the
 # fine-grained set below composes 3-D PBR rendering, UI text, PNG

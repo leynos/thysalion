@@ -3,7 +3,7 @@
 This document describes the Thysalion repository layout. It is the canonical
 reference for where source code, tests, configuration, automation, and
 long-lived documentation belong. The workspace shape is decided in
-[ADR 005](adr-005-workspace-crate-layout.md); this document records the
+[ADR 005](adrs/adr-0005-workspace-crate-layout.md); this document records the
 resulting tree.
 
 ## Top-level tree

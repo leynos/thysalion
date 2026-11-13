@@ -18,12 +18,12 @@ rendering at phase 2, lighting at phase 3, simulation at phase 4, knowledge at
 phase 5, and save archives at phase 8 — so the shape fixed here is expensive to
 change afterwards.
 
-[thysalion-design.md](thysalion-design.md) §7.2 and §7.3 specify the format at
-the level of a field list. They leave open the encoding's canonical byte form,
-the module boundary, the validation contract, the compatibility policy, and
-what happens when a hand-edited document is hostile rather than merely wrong.
-This record fixes those, and resolves the open question
-[ADR 005](adr-005-workspace-crate-layout.md) forwarded to this step.
+[thysalion-design.md](../thysalion-design.md) §7.2 and §7.3 specify the format
+at the level of a field list. They leave open the encoding's canonical byte
+form, the module boundary, the validation contract, the compatibility policy,
+and what happens when a hand-edited document is hostile rather than merely
+wrong. This record fixes those, and resolves the open question
+[ADR 005](adr-0005-workspace-crate-layout.md) forwarded to this step.
 
 ## Decision drivers
 
@@ -374,11 +374,11 @@ Recorded there as worth revisiting rather than dismissed.
 
 ## References
 
-- [thysalion-design.md](thysalion-design.md) §7.1–§7.4, §9.2–§9.4, §10.5,
+- [thysalion-design.md](../thysalion-design.md) §7.1–§7.4, §9.2–§9.4, §10.5,
   §12.3, §13
-- [ADR 005](adr-005-workspace-crate-layout.md), whose forwarded open question
+- [ADR 005](adr-0005-workspace-crate-layout.md), whose forwarded open question
   this record resolves
-- [world-plane-architecture.md](world-plane-architecture.md) for the module
+- [world-plane-architecture.md](../world-plane-architecture.md) for the module
   tree, the format reference, and the version-history table
-- [The 1.2 execution plan](execplans/1-2-deliver-the-scene-format-and-fixture-scenes.md)
+- [The 1.2 execution plan](../execplans/1-2-deliver-the-scene-format-and-fixture-scenes.md)
   for the measurements and the decision log behind these choices

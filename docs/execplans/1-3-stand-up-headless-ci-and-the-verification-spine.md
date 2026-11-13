@@ -77,8 +77,8 @@ Orient with these before each stage:
 - [Developer guide](../developers-guide.md) — the commit gates, the headless
   testing and coverage boundary, and the workflow-pin policy that constrains
   Stage C3.
-- [ADR 005](../adr-005-workspace-crate-layout.md) — layering rules the new
-  crate must respect; [ADR 006](../adr-006-scene-document-model.md) — the
+- [ADR 005](../adrs/adr-0005-workspace-crate-layout.md) — layering rules the new
+  crate must respect; [ADR 006](../adrs/adr-0006-scene-document-model.md) — the
   versioning pattern Stage C4's format copies.
 - [Roadmap](../roadmap.md) §1.3 — the two tasks and their success criteria;
   design §14 for the invariant catalogue behind them.
@@ -94,7 +94,7 @@ Orient with these before each stage:
 Hard invariants that must hold throughout implementation. Violation requires
 escalation, not workarounds.
 
-- The layering rules in [ADR 005](../adr-005-workspace-crate-layout.md)
+- The layering rules in [ADR 005](../adrs/adr-0005-workspace-crate-layout.md)
   govern crate edges. `thysalion-world` remains the dependency sink among plane
   crates; `thysalion-presentation` must never depend on `thysalion-harness`.
   The new `thysalion-test-support` crate is demo/test tooling in ADR 005's
@@ -751,7 +751,7 @@ the current workflow tree.
 In `crates/test-support/src/replay/`, define the wire types (`format.rs`), the
 version probe (`probe.rs`), and the recorder/replayer pair (`session.rs`) per
 `Interfaces and dependencies` below. Write
-`docs/adr-008-replay-record-format.md` covering: the envelope shape; the
+`docs/adrs/adr-0008-replay-record-format.md` covering: the envelope shape; the
 `{major, minor}` rule and probe copied from ADR 006; the same-build
 byte-identity promise and its explicit non-promise of cross-version
 byte-determinism; the deliberately uninhabited payload and its first variants,
@@ -872,7 +872,7 @@ Acceptance, as verified:
    criterion. Separately, the populated-session round-trip test records ticks 3
    and 11, each with an empty input list. Together these cover empty sessions
    and sessions containing tick records, without input values.
-4. `docs/adr-008-replay-record-format.md` exists, is linked from
+4. `docs/adrs/adr-0008-replay-record-format.md` exists, is linked from
    `contents.md`, and `make markdownlint` reports `Summary: 0 error(s)`.
 
 Supporting layering checks: `cargo tree -p thysalion-world -e normal,dev`
@@ -890,7 +890,7 @@ Acceptance, phrased as behaviour:
 3. The empty-session golden test preserves roadmap 1.3.2's byte-identity
    criterion. The populated-session round-trip test separately covers ticks 3
    and 11, each with an empty input list.
-4. `docs/adr-008-replay-record-format.md` exists, is linked from
+4. `docs/adrs/adr-0008-replay-record-format.md` exists, is linked from
    `contents.md`, and `make markdownlint` passes.
 
 ## Idempotence and recovery

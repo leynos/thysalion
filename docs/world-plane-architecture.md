@@ -5,11 +5,11 @@ The crate `thysalion-world` is the *state* plane
 component values, the voxel grid, and material fields, and never deriving rule
 consequences. It is also the workspace's dependency sink — other plane crates
 may depend on it, never the reverse
-([ADR 005](adr-005-workspace-crate-layout.md)).
+([ADR 005](adrs/adr-0005-workspace-crate-layout.md)).
 
 This document describes its internally facing interfaces. The decisions behind
 them, and the alternatives rejected, are recorded in
-[ADR 006](adr-006-scene-document-model.md).
+[ADR 006](adrs/adr-0006-scene-document-model.md).
 
 ## Module tree
 

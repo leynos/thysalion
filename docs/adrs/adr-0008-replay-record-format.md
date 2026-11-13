@@ -10,7 +10,7 @@ Accepted
 
 ## Context and problem statement
 
-[thysalion-design.md](thysalion-design.md) §14 defines correctness by named
+[thysalion-design.md](../thysalion-design.md) §14 defines correctness by named
 invariants. The first of them, I1 (simulation determinism), is verified two
 ways: property-based tests over randomized input scenarios, and "a replay
 harness [that] re-executes recorded play sessions in CI". The same section
@@ -41,7 +41,7 @@ the first byte when the payload it will eventually carry does not exist.
   boundary, not over window or device events.
 - Roadmap 1.3.2 requires byte-identical record/replay and a harness invoked
   from continuous integration.
-- [ADR 006](adr-006-scene-document-model.md) already solved canonical
+- [ADR 006](adr-0006-scene-document-model.md) already solved canonical
   encoding, versioning, and wire-shape enforcement for this workspace, and its
   discipline is enforced by tests that exist.
 - `thysalion-sim` is empty until phase 4, so any record vocabulary invented now
@@ -326,13 +326,13 @@ is better met by a dumping tool than by a second writer that can drift.
 
 ## References
 
-- [thysalion-design.md](thysalion-design.md) §6.2 (the input phase), §14
+- [thysalion-design.md](../thysalion-design.md) §6.2 (the input phase), §14
   (invariant I1 and the replay corpus)
-- [ADR 006](adr-006-scene-document-model.md), whose canonical-encoding
+- [ADR 006](adr-0006-scene-document-model.md), whose canonical-encoding
   discipline this record adopts wholesale and whose Arrow deferral it answers
-- [ADR 005](adr-005-workspace-crate-layout.md) for the crate taxonomy that
+- [ADR 005](adr-0005-workspace-crate-layout.md) for the crate taxonomy that
   places `thysalion-test-support` as tooling rather than as a plane
-- [roadmap.md](roadmap.md) §1.3.2 for the task and its success criterion
+- [roadmap.md](../roadmap.md) §1.3.2 for the task and its success criterion
 - [The 1.3 execution plan](
   execplans/1-3-stand-up-headless-ci-and-the-verification-spine.md) for the
   decision log behind these choices
