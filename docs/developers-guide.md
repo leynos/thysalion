@@ -116,11 +116,11 @@ lint rule `nested-cargo-offline-tests` checks all three.
 
 Bare Cargo development builds discover `.cargo/config.toml`, which enables the
 parallel `rustc` frontend (`-Zthreads=8`) and uses `mold` for Linux linking. It
-also selects the Cranelift backend for the `dev` profile (see "Cranelift"
-below). Cargo selects one `rustflags` source rather than merging them. Make
-recipes that assign `RUSTFLAGS` therefore restate the development flags and
-warnings policy. The build-routing contracts cover direct Cargo defaults and
-the evaluated Make recipes.
+leaves the `dev` profile on the default LLVM backend (see "Cranelift" below).
+Cargo selects one `rustflags` source rather than merging them. Make recipes
+that assign `RUSTFLAGS` therefore restate the development flags and warnings
+policy. The build-routing contracts cover direct Cargo defaults and the
+evaluated Make recipes.
 
 On Linux, run `make install-build-tools` to install the pinned `mold` 2.41.0
 binary and the components listed for the pinned toolchain in
@@ -153,8 +153,7 @@ dropped.
 Release builds clear development flags and build on the pinned nightly with
 LLVM: `make release` and the release workflow's `cross build --release`. Cross
 runs Cargo inside the build container rooted at `/project`, where Cargo reads
-the repository's `.cargo/config.toml`; the `[profile.dev]` Cranelift selection
-does not reach the release profile.
+the repository's `.cargo/config.toml`, which no longer selects Cranelift.
 
 Install `python3` and `cargo-audit` as well when running the full generated
 workflow locally.
@@ -166,15 +165,18 @@ the immutable CI action pin
 
 ### Cranelift
 
-Cranelift is the default backend for development builds, set in
-`.cargo/config.toml` (`[profile.dev] codegen-backend = "cranelift"`) on the
-nightly pinned in `rust-toolchain.toml`. The release workflow builds on the
-same pinned nightly with LLVM, because the dev profile does not reach the
-release profile. Coverage and Whitaker select LLVM explicitly, since Cranelift
-cannot instrument coverage and Whitaker's installer-managed toolchain does not
-take the Cranelift default. The suite passes under Cranelift (measured on
-`nightly-2026-11-05`: 356 of 357 tests passed, and the one failure was the
-contract test of the removed stable-release shape).
+The estate standard is LLVM, so LLVM is the default backend here. The Cranelift
+selection in `.cargo/config.toml` is commented out; the
+`[unstable] codegen-backend` key and the `rustc-codegen-cranelift-preview`
+component stay for an opt-in. See the
+[concordat decision record](https://github.com/leynos/concordat/blob/main/docs/adrs/adr-0004-cranelift-is-not-part-of-the-rust-build-standard.md),
+with review due 14 May 2027. An inherited `CARGO_PROFILE_*_CODEGEN_BACKEND`
+variable can still select Cranelift outside the Make recipes, which clear it,
+and Cranelift does not run destructors while unwinding, so under an opt-in no
+test may rely on a caught panic releasing a guard. The release workflow builds
+on the pinned nightly. Coverage and Whitaker select LLVM explicitly, since
+Cranelift cannot instrument coverage and Whitaker's installer-managed toolchain
+does not take a Cranelift opt-in.
 
 ### Development build footprint
 
