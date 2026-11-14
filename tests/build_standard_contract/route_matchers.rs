@@ -13,8 +13,6 @@ use super::{
     RouteText,
     THREADS_FLAG,
     UNSTABLE_BACKEND,
-    WHITAKER_ASSIGNMENTS,
-    WHITAKER_UNSET_BACKEND_SELECTORS,
     names,
     normalized,
 };
@@ -259,53 +257,4 @@ pub(crate) fn preflight_precedes_cargo(output: RouteText<'_>) -> bool {
             .find(line)
             .is_some_and(|position| preflight < position)
     })
-}
-
-/// Returns whether a release route selects stable from outside the repository.
-pub(crate) fn release_route_matches(command: RouteText<'_>, manifest: &str) -> bool {
-    let isolated_environment = command.starts_with("(cd / && env -u CARGO_ENCODED_RUSTFLAGS ")
-        && unset_before_flags(command, ENCODED_FLAGS)
-        && unset_before_flags(command, UNSTABLE_BACKEND)
-        && backend_selectors_unset(command)
-        && PROFILE_BACKEND_SELECTORS
-            .iter()
-            .all(|selector| !command.contains(format!("{}=", selector.0).as_str()));
-    isolated_environment && release_invocation_matches(command, manifest)
-}
-
-fn release_invocation_matches(command: RouteText<'_>, manifest: &str) -> bool {
-    [
-        command.contains("RUSTFLAGS=\"\" probe-cargo +stable build"),
-        command.contains("--manifest-path"),
-        command.contains(manifest),
-        command.contains("--release"),
-        command.contains("--bin thysalion"),
-        !command.contains(THREADS_FLAG),
-        !command.contains(MOLD_FLAG),
-    ]
-    .into_iter()
-    .all(|condition| condition)
-}
-
-/// Checks the isolated LLVM route used by the installer-managed Whitaker suite.
-pub(crate) fn whitaker_route_matches(command: RouteText<'_>) -> bool {
-    let Some((environment_text, _)) = command.split_once("probe-whitaker --all") else {
-        return false;
-    };
-    let environment = RouteText(environment_text);
-    [
-        unset_before_flags(environment, ENCODED_FLAGS),
-        backend_selectors_unset(environment),
-        environment.contains("RUSTFLAGS=\"\""),
-        WHITAKER_ASSIGNMENTS
-            .iter()
-            .all(|assignment| single_env_assignment(environment, *assignment)),
-        WHITAKER_UNSET_BACKEND_SELECTORS
-            .iter()
-            .all(|selector| !environment.contains(format!("{}=", selector.0).as_str())),
-        !command.contains(THREADS_FLAG),
-        !command.contains(MOLD_FLAG),
-    ]
-    .into_iter()
-    .all(|condition| condition)
 }

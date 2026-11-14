@@ -39,12 +39,13 @@ BACKEND_PROFILE_ENV_UNSETS = \
 	-u CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND \
 	-u CARGO_PROFILE_BENCH_CODEGEN_BACKEND \
 	-u CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND
-# Keep development on Cargo's LLVM default even when callers export a
-# different backend through their shell environment.
+# Development builds take the repository's backend (Cranelift, from
+# `.cargo/config.toml`) and ignore any backend a caller exports through their
+# shell environment.
 DEVELOPMENT_CARGO_ENV = env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) -u CARGO_UNSTABLE_CODEGEN_BACKEND
-# Release builds take neither development flag. Cross runs stable Cargo inside
-# the checkout, so the committed config must omit codegen-backend settings.
-# The host invocation uses an external directory and explicit manifest path.
+# Release builds take neither development flag, and keep LLVM: the Cranelift
+# selection is in `[profile.dev]`, which the release profile does not reach.
+# They run on the nightly pinned in `rust-toolchain.toml`, like every build.
 RELEASE_RUSTFLAGS = env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) -u CARGO_UNSTABLE_CODEGEN_BACKEND RUSTFLAGS=""
 RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
 # --workspace is load-bearing: with a root package present, Cargo would
@@ -85,7 +86,6 @@ TYPOS_CONFIG_BUILDER_VERSION ?= v0.1.3
 TYPOS_CONFIG_BUILDER = uv tool run --python 3.14 --from \
 	"git+https://github.com/leynos/typos-config-builder.git@$(TYPOS_CONFIG_BUILDER_VERSION)" \
 	typos-config-builder
-WHITAKER ?= whitaker
 SCENE_BUILDER ?= uv run --script scripts/build_fixture_scenes.py
 
 UV ?= uv
@@ -104,7 +104,7 @@ test-workflow-contracts: ## Check the CV-005 CodeScene workflow contracts
 build: check-build-tools ## Build debug binary
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) build $(BUILD_JOBS) --bin $(TARGET)
 release: ## Build release binary with production Cargo routing
-	(cd / && $(RELEASE_RUSTFLAGS) $(CARGO) +stable build --manifest-path "$(abspath Cargo.toml)" $(BUILD_JOBS) --release --bin $(TARGET))
+	$(RELEASE_RUSTFLAGS) $(CARGO) build $(BUILD_JOBS) --release --bin $(TARGET)
 
 all: ## Perform a comprehensive check of code, sequentially
 	+$(MAKE) check-fmt
@@ -176,14 +176,14 @@ lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
 
 # Make 4.4 serializes these prerequisites even under `make -j lint`. Keep the
-# Whitaker leaf independent so its failure path can be checked without Cargo.
+# Whitaker leaf independent so it can run without Cargo's other gates. It runs
+# under the toolchain its installer manages, so it takes none of the
+# development standard: the literal `RUSTFLAGS` displaces the `rustflags`
+# tables, the LLVM override keeps it off the repository's Cranelift default,
+# and the installer's directory leads `PATH`. An inherited
+# `CARGO_ENCODED_RUSTFLAGS` outranks `RUSTFLAGS`, so it is cleared first.
 lint-whitaker: ## Run the installer-managed rolling Whitaker suite
-	@command -v "$(WHITAKER)" >/dev/null 2>&1 || { \
-		printf 'Whitaker is unavailable; install it with the shared installer before make lint.\n' >&2; \
-		exit 1; \
-	}
-	@echo "Whitaker binary: $(WHITAKER)"
-	env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) RUSTFLAGS="" CARGO_UNSTABLE_CODEGEN_BACKEND=true CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm CARGO_PROFILE_TEST_CODEGEN_BACKEND=llvm CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND=llvm CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND=llvm $(WHITAKER) --all -- $(CARGO_FLAGS)
+	env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) PATH="$${XDG_BIN_HOME:-$(HOME)/.local/bin}:$(PATH)" CARGO_UNSTABLE_CODEGEN_BACKEND=true CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm RUSTFLAGS="-D warnings" whitaker --all -- $(CARGO_FLAGS)
 
 typecheck: check-build-tools ## Type-check without building
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS)

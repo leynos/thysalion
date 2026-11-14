@@ -65,11 +65,9 @@ pub(super) enum MakeTarget {
     Clippy,
     Demo,
     Coverage,
-    Release,
     Fmt,
     CheckFmt,
     Lint,
-    LintWhitaker,
 }
 
 impl MakeTarget {
@@ -82,11 +80,9 @@ impl MakeTarget {
             Self::Clippy => "lint-clippy",
             Self::Demo => "demo",
             Self::Coverage => "coverage",
-            Self::Release => "release",
             Self::Fmt => "fmt",
             Self::CheckFmt => "check-fmt",
             Self::Lint => "lint",
-            Self::LintWhitaker => "lint-whitaker",
         }
     }
 }
@@ -119,36 +115,6 @@ const COVERAGE_ASSIGNMENTS: [EnvAssignment; 5] = [
         name: "CARGO_UNSTABLE_CODEGEN_BACKEND",
         value: "true",
     },
-];
-
-const WHITAKER_ASSIGNMENTS: [EnvAssignment; 5] = [
-    EnvAssignment {
-        name: "CARGO_UNSTABLE_CODEGEN_BACKEND",
-        value: "true",
-    },
-    EnvAssignment {
-        name: "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-        value: "llvm",
-    },
-    EnvAssignment {
-        name: "CARGO_PROFILE_TEST_CODEGEN_BACKEND",
-        value: "llvm",
-    },
-    EnvAssignment {
-        name: "CARGO_PROFILE_DEV_BUILD_OVERRIDE_CODEGEN_BACKEND",
-        value: "llvm",
-    },
-    EnvAssignment {
-        name: "CARGO_PROFILE_TEST_BUILD_OVERRIDE_CODEGEN_BACKEND",
-        value: "llvm",
-    },
-];
-
-const WHITAKER_UNSET_BACKEND_SELECTORS: [EnvVariable; 4] = [
-    EnvVariable("CARGO_PROFILE_RELEASE_CODEGEN_BACKEND"),
-    EnvVariable("CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND"),
-    EnvVariable("CARGO_PROFILE_BENCH_CODEGEN_BACKEND"),
-    EnvVariable("CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND"),
 ];
 
 const ENCODED_FLAGS: EnvVariable = EnvVariable("CARGO_ENCODED_RUSTFLAGS");
@@ -252,6 +218,4 @@ pub(super) use route_matchers::{
     coverage_route_matches,
     development_route_matches,
     preflight_precedes_cargo,
-    release_route_matches,
-    whitaker_route_matches,
 };

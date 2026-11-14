@@ -4,8 +4,6 @@
 use std::io;
 
 use cap_std::{ambient_authority, fs_utf8::Dir};
-#[path = "workflow_shape/backend_env.rs"]
-mod backend_env;
 #[path = "workflow_shape/coverage_isolation.rs"]
 mod coverage_isolation;
 #[path = "workflow_shape/release_linker.rs"]
@@ -53,90 +51,73 @@ fn step_and_run_lines<'workflow>(
     Some((step, run))
 }
 
-/// Checks the cached tool route before installing `cross` with stable Cargo.
-#[test]
-fn cross_install_uses_the_stable_external_route() {
-    let workflow = read_workflow("release.yml").expect("read release.yml");
-    let cache = workflow
-        .find("      - name: Cache cross binary")
-        .expect("release.yml must cache the cross binary");
-    let install = workflow
-        .find("      - name: Install cross")
-        .expect("release.yml must define the cross installer");
-    let build = workflow
-        .find("      - name: Build release binary")
-        .expect("release.yml must define the release build");
-    assert!(
-        cache < install && install < build,
-        "the cross cache and installer must precede the release build"
-    );
-    let (step, run_lines) = step_and_run_lines(&workflow, "Install cross")
-        .expect("the cross installer must have a shell run block");
-    let run = run_lines.join("\n");
-    let cache_test = run
-        .find("if [ -x \"$HOME/.cargo/bin/cross\" ]; then")
-        .expect("the installer must check the cached cross binary");
-    let cache_exit = run
-        .find("exit 0")
-        .expect("the installer must skip installation on a cache hit");
-    let cache_end = run
-        .find("\nfi\n")
-        .expect("the cache check must end before installation");
-    let unset =
-        backend_env::cleanup_end(&run).expect("the installer must clear inherited Cargo settings");
-    let cd = run
-        .find("cd /")
-        .expect("the installer must leave the repository before using stable Cargo");
-    let install_command = run
-        .find(concat!(
-            "cargo +stable install cross --git ",
-            "https://github.com/cross-rs/cross --rev ",
-            "\"${CROSS_REVISION}\""
-        ))
-        .expect("the installer must use stable Cargo and the pinned cross revision");
-    assert!(
-        cache_test < cache_exit
-            && cache_exit < cache_end
-            && cache_end < unset
-            && unset < cd
-            && cd < install_command,
-        "check the cache, clear inherited settings, leave the repository, then install cross"
-    );
-    assert!(
-        step.iter().any(|line| line.trim() == "RUSTFLAGS: \"\""),
-        "the installer step must clear development rustflags"
-    );
+/// Returns whether a release step's `run:` command is `cross build --release` scoped to the
+/// root package alone: exactly one `-p`, naming `thysalion` and no other package. Only a `run:`
+/// line counts, so a commented-out command satisfies nothing.
+fn release_command_is_scoped(step: &[&str]) -> bool {
+    let command: Vec<&str> = step
+        .iter()
+        .filter_map(|line| line.trim_start().strip_prefix("run:"))
+        .flat_map(str::split_whitespace)
+        .collect();
+    let packages: Vec<&str> = command
+        .iter()
+        .zip(command.iter().skip(1))
+        .filter(|(flag, _)| **flag == "-p")
+        .map(|(_, package)| *package)
+        .collect();
+    command.starts_with(&["cross", "build", "--release"]) && packages == ["thysalion"]
 }
 
-/// Checks the stable release build from outside the workspace.
+/// Checks that the release build stays scoped to the root package: the demo crates
+/// must never enter the release build graph (ADR-005).
 #[test]
-fn release_build_uses_the_stable_external_manifest_route() {
+fn release_build_is_scoped_to_the_root_package() {
     let workflow = read_workflow("release.yml").expect("read release.yml");
-    let (step, run_lines) = step_and_run_lines(&workflow, "Build release binary")
-        .expect("release build must define a shell run block");
-    let run = run_lines.join("\n");
-    let unset =
-        backend_env::cleanup_end(&run).expect("release build must clear inherited Cargo settings");
-    let cd = run
-        .find("cd /")
-        .expect("release build must run outside the repository");
-    let build = run
-        .find("cross +stable build --manifest-path")
-        .expect("release build must select stable and pass the manifest to cross");
-    let manifest = run
-        .find("--manifest-path \"${GITHUB_WORKSPACE}/Cargo.toml\"")
-        .expect("release build must select the workspace manifest explicitly");
-    let package_scope = run
-        .find("--release -p thysalion")
-        .expect("release build must remain scoped to the root package");
+    let step = named_step_lines(&WorkflowStep {
+        workflow: &workflow,
+        step_name: "Build release binary",
+    })
+    .expect("release.yml must define the release build");
     assert!(
-        unset < cd && cd < build && build < manifest && manifest < package_scope,
-        "clear inherited settings, change to /, then build with stable and explicit root scope"
+        release_command_is_scoped(&step),
+        "the release build must remain scoped to the root package alone: {step:?}"
     );
     assert!(
         step.iter().any(|line| line.trim() == "RUSTFLAGS: \"\""),
         "the release step must clear development rustflags"
     );
+}
+
+/// Release commands that reach the demo crates, or are not commands at all, must be refused.
+#[test]
+fn release_scope_refuses_demo_packages_and_commented_commands() {
+    for (run, scoped) in [
+        (
+            "        run: cross build --release -p thysalion --target x",
+            true,
+        ),
+        (
+            "        run: cross build --release -p thysalion-demos --target x",
+            false,
+        ),
+        (
+            "        run: cross build --release -p thysalion -p thysalion-demos",
+            false,
+        ),
+        ("        run: cross build --release --workspace", false),
+        (
+            "        # run: cross build --release -p thysalion --target x",
+            false,
+        ),
+        ("        run: cross build --release", false),
+    ] {
+        assert_eq!(
+            release_command_is_scoped(&[run]),
+            scoped,
+            "wrong verdict for: {run}"
+        );
+    }
 }
 
 #[test]

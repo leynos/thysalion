@@ -115,15 +115,12 @@ lint rule `nested-cargo-offline-tests` checks all three.
 ## Tooling
 
 Bare Cargo development builds discover `.cargo/config.toml`, which enables the
-parallel `rustc` frontend (`-Zthreads=8`) and uses `mold` for Linux linking.
-The configuration contains no `codegen-backend` setting: development builds use
-LLVM on the pinned nightly because the release workflow uses stable Cargo,
-which rejects that setting. The stable-release exception is covered by
-`tests/stable_release_config.rs`, which checks both the configuration and a
-real stable Cargo invocation. Cargo selects one `rustflags` source rather than
-merging them. Make recipes that assign `RUSTFLAGS` therefore restate the
-development flags and warnings policy. The build-routing contracts cover direct
-Cargo defaults and the evaluated Make recipes.
+parallel `rustc` frontend (`-Zthreads=8`) and uses `mold` for Linux linking. It
+also selects the Cranelift backend for the `dev` profile (see "Cranelift"
+below). Cargo selects one `rustflags` source rather than merging them. Make
+recipes that assign `RUSTFLAGS` therefore restate the development flags and
+warnings policy. The build-routing contracts cover direct Cargo defaults and
+the evaluated Make recipes.
 
 On Linux, run `make install-build-tools` to install the pinned `mold` 2.41.0
 binary and the components listed for the pinned toolchain in
@@ -137,8 +134,9 @@ Coverage and Whitaker use explicit LLVM routing. Coverage replaces the
 development linker flags with `lld` and sets LLVM for dev, test, and build
 override profiles; its build-tool preflight still runs first. The linker path
 falls back to the `ld.lld` shipped with the selected Rust toolchain when a
-system `lld` is not on `PATH`. Whitaker clears inherited Rust flags and sets
-LLVM for its Cargo driver. CI installs the pinned build tools before the
+system `lld` is not on `PATH`. Whitaker clears inherited Rust flags, assigns
+the literal `RUSTFLAGS="-D warnings"`, puts `~/.local/bin` first on `PATH` and
+sets LLVM for its Cargo driver. CI installs the pinned build tools before the
 coverage test suite because tests can reach the same Make preflight. The shared
 `install-whitaker` action provisions its toolchain; the lint suite remains
 rolling and does not use the repository's development flags.
@@ -152,12 +150,11 @@ flag and `-D warnings`, because an assigned `RUSTFLAGS` replaces every
 reads that step, scoped to the step itself, and fails if any of the three is
 dropped.
 
-Release builds clear development flags and invoke `cross +stable` from outside
-the repository with an explicit manifest path. Cross runs Cargo inside the
-build container rooted at `/project`, where Cargo reads the repository's
-`.cargo/config.toml`; the external host working directory does not isolate that
-container configuration. The release workflow's stable Cargo therefore needs
-the configuration to omit `codegen-backend`.
+Release builds clear development flags and build on the pinned nightly with
+LLVM: `make release` and the release workflow's `cross build --release`. Cross
+runs Cargo inside the build container rooted at `/project`, where Cargo reads
+the repository's `.cargo/config.toml`; the `[profile.dev]` Cranelift selection
+does not reach the release profile.
 
 Install `python3` and `cargo-audit` as well when running the full generated
 workflow locally.
@@ -167,29 +164,17 @@ install `markdownlint-cli2` 0.22.1 with Bun. This exact package version matches
 the immutable CI action pin
 `DavidAnson/markdownlint-cli2-action@2df9e28eb87988518ef3880c34edad45d65b1668`.
 
-### Cranelift exception
+### Cranelift
 
-The estate build standard uses Cranelift for the development profile where the
-suite passes under it. Thysalion uses LLVM because `release.yml` builds release
-binaries with `cross +stable`, and stable Cargo reads `.cargo/config.toml` in
-that build. Stable Cargo refuses a configuration naming a `codegen-backend` key:
-
-```text
-error: config profile `dev` is not valid (defined in `.cargo/config.toml`)
-
-Caused by:
-  feature `codegen-backend` is required
-```
-
-Accordingly, `.cargo/config.toml` names no backend and development builds use
-LLVM on the nightly toolchain pinned in `rust-toolchain.toml`.
-`tests/stable_release_config.rs` fails if a `codegen-backend` key returns while
-releases build on stable. Revisit the exception if releases move to the pinned
-nightly.
-
-Recorded state: the pin is `nightly-2026-11-05` and the suite has not been
-measured under Cranelift on it, because the exception rests on the stable
-release build and not on test results. The review is deferred to 1 April 2027.
+Cranelift is the default backend for development builds, set in
+`.cargo/config.toml` (`[profile.dev] codegen-backend = "cranelift"`) on the
+nightly pinned in `rust-toolchain.toml`. The release workflow builds on the
+same pinned nightly with LLVM, because the dev profile does not reach the
+release profile. Coverage and Whitaker select LLVM explicitly, since Cranelift
+cannot instrument coverage and Whitaker's installer-managed toolchain does not
+take the Cranelift default. The suite passes under Cranelift (measured on
+`nightly-2026-11-05`: 356 of 357 tests passed, and the one failure was the
+contract test of the removed stable-release shape).
 
 ### Development build footprint
 

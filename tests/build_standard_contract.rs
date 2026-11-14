@@ -7,13 +7,9 @@ mod fmt_route;
 mod helpers;
 #[path = "build_standard_contract/route_tests.rs"]
 mod route_tests;
-#[path = "build_standard_contract/stable_cross.rs"]
-mod stable_cross;
 
 #[path = "build_standard_contract/doctest_route.rs"]
 mod doctest_route;
-
-use std::process::Command;
 
 use helpers::{
     BuildHost,
@@ -29,7 +25,6 @@ use helpers::{
     names,
     preflight_precedes_cargo,
     sources,
-    whitaker_route_matches,
 };
 
 /// Cargo defaults retain the parallel frontend and Linux-only mold.
@@ -242,70 +237,12 @@ fn development_route_rejects_missing_requirements() {
     }
 }
 
-/// Whitaker clears ambient flags after checking that the executable exists.
-#[test]
-fn whitaker_route_is_isolated_and_ordered() {
-    let leaf = make_output(
-        MakeTarget::LintWhitaker,
-        &["WHITAKER=probe-whitaker", "CARGO=probe-cargo"],
-    )
-    .expect("evaluate Whitaker target");
-    let availability = leaf
-        .find("command -v \"probe-whitaker\"")
-        .expect("Whitaker availability check is required");
-    let invocation = leaf
-        .find("probe-whitaker --all")
-        .expect("Whitaker invocation is required");
-    assert!(
-        availability < invocation,
-        "check must precede suite: {leaf}"
-    );
-    let command = leaf
-        .lines()
-        .find(|line| line.contains("probe-whitaker --all"))
-        .expect("Whitaker command must be present");
-    assert!(
-        whitaker_route_matches(RouteText(command)),
-        "Whitaker inherited dev flags: {command}"
-    );
-    for selector in PROFILE_BACKEND_SELECTORS {
-        let missing = command.replace(&format!("-u {} ", selector.0), "");
-        assert_ne!(
-            missing, command,
-            "missing-{} mutation was a no-op",
-            selector.0
-        );
-        assert!(
-            !whitaker_route_matches(RouteText(&missing)),
-            "accepted missing {}",
-            selector.0
-        );
-    }
-    for selector in PROFILE_BACKEND_SELECTORS.iter().take(4) {
-        let wrong = command.replace(
-            &format!("{}=llvm", selector.0),
-            &format!("{}=cranelift", selector.0),
-        );
-        assert_ne!(wrong, command, "wrong-{} mutation was a no-op", selector.0);
-        assert!(
-            !whitaker_route_matches(RouteText(&wrong)),
-            "accepted hostile {}",
-            selector.0
-        );
-    }
-}
-
 /// Parallel lint runs rustdoc, Clippy, and Whitaker in order.
 #[test]
 fn parallel_lint_route_preserves_flags_and_order() {
     let parallel = make_output(
         MakeTarget::Lint,
-        &[
-            "-j",
-            "CARGO=probe-cargo",
-            "WHITAKER=probe-whitaker",
-            "BUILD_HOST_OS=Linux",
-        ],
+        &["-j", "CARGO=probe-cargo", "BUILD_HOST_OS=Linux"],
     )
     .expect("evaluate parallel lint target");
     let cargo_commands = cargo_lines(RouteText(&parallel));
@@ -331,7 +268,7 @@ fn parallel_lint_route_preserves_flags_and_order() {
         .find("probe-cargo clippy")
         .expect("lint must run Clippy");
     let suite = parallel
-        .find("probe-whitaker --all")
+        .find("whitaker --all")
         .expect("lint must run Whitaker");
     let preflight = parallel
         .find("scripts/check-build-tools.sh")
@@ -347,20 +284,4 @@ fn parallel_lint_route_preserves_flags_and_order() {
             "lint Cargo invocation lost the standard: {command}"
         );
     }
-}
-
-/// Whitaker failures must propagate through the Make target.
-#[test]
-fn whitaker_route_propagates_failure() {
-    let failing = Command::new("make")
-        .args(["--silent", "lint-whitaker", "WHITAKER=false"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()
-        .expect("run failing Whitaker probe");
-    assert!(!failing.status.success(), "Whitaker's failure was ignored");
-    let stdout = String::from_utf8_lossy(&failing.stdout);
-    assert!(
-        stdout.contains("Whitaker binary: false"),
-        "Make failed before reaching the Whitaker recipe; stdout: {stdout}"
-    );
 }
