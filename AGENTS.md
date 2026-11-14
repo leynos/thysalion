@@ -67,7 +67,7 @@
   the PR or execution record.
 - **Decision history:** Preserve accepted ADR decisions; record subsequent
   changes through the
-  [ADR amendment and supersession process](docs/documentation-style-guide.md#architectural-decision-records-adrs).
+  [ADR amendment and status guidance](docs/documentation-style-guide.md#architectural-decision-records-adrs).
   Capture proof-driven API, representation, and invariant decisions in the
   design documentation.
 - **Completed execplans:** Completed execplans are historical documents and
@@ -214,9 +214,10 @@ project:
   - `make lint` runs the Python docstring gate (`interrogate`, which requires
     complete docstring coverage of `scripts`), then rustdoc, then Clippy, then
     the installer-managed Whitaker suite. Rustdoc defaults to
-    `RUSTDOC_FLAGS="--cfg docsrs -D warnings"`. Clippy runs
-    `cargo clippy --workspace --all-targets --all-features -- -D warnings` (the
-    `CARGO_FLAGS` default) with warnings denied through `RUSTFLAGS`.
+    `RUSTDOC_FLAGS="--cfg docsrs -D warnings"`. Clippy runs `cargo clippy` with
+    `CLIPPY_FLAGS`, which default to `CARGO_FLAGS`
+    (`--workspace --all-targets --all-features`) followed by `-- -D warnings`
+    from `RUST_FLAGS`; `RUSTFLAGS` carries the same warnings policy.
   - `make test` runs the workspace suite with `cargo nextest run` when
     `cargo nextest` is installed and `cargo test` otherwise, using the
     `--workspace --all-targets --all-features` defaults and warnings denied
@@ -354,8 +355,9 @@ project:
   must not reach for `std::env::var`/`var_os` outside that composition root.
   This repository does not use `mockable`: `clippy.toml` bans `std::env::var*`,
   `set_var`, and `remove_var`, so an injected seam is the accepted form, and
-  tests that spawn child processes with `std::process::Command` configure them
-  through `Command::env` under the subprocess exemption.
+  end-to-end tests that run the application as a child process with
+  `std::process::Command` (`assert_cmd` is not used) may set its environment
+  through `Command::env`.
 - **Process-wide locks are not an escape hatch.** Serializing environment
   mutation behind a shared `Mutex`, `OnceLock`, or `serial_test` attribute is
   not an accepted fallback. It serializes the suite, defeats property-based
