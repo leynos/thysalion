@@ -39,13 +39,12 @@ BACKEND_PROFILE_ENV_UNSETS = \
 	-u CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_CODEGEN_BACKEND \
 	-u CARGO_PROFILE_BENCH_CODEGEN_BACKEND \
 	-u CARGO_PROFILE_BENCH_BUILD_OVERRIDE_CODEGEN_BACKEND
-# Development builds take the repository's backend (Cranelift, from
-# `.cargo/config.toml`) and ignore any backend a caller exports through their
-# shell environment.
+# Development builds take the repository's backend (LLVM, the default, unless
+# `.cargo/config.toml` opts into Cranelift) and ignore any backend a caller
+# exports through their shell environment.
 DEVELOPMENT_CARGO_ENV = env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) -u CARGO_UNSTABLE_CODEGEN_BACKEND
-# Release builds take neither development flag, and keep LLVM: the Cranelift
-# selection is in `[profile.dev]`, which the release profile does not reach.
-# They run on the nightly pinned in `rust-toolchain.toml`, like every build.
+# Release builds take neither development flag, and keep LLVM, the estate
+# standard. They run on the nightly pinned in `rust-toolchain.toml`, like every build.
 RELEASE_RUSTFLAGS = env -u CARGO_ENCODED_RUSTFLAGS $(BACKEND_PROFILE_ENV_UNSETS) -u CARGO_UNSTABLE_CODEGEN_BACKEND RUSTFLAGS=""
 RUSTDOC_FLAGS ?= --cfg docsrs -D warnings
 # --workspace is load-bearing: with a root package present, Cargo would
@@ -179,7 +178,7 @@ lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
 # Whitaker leaf independent so it can run without Cargo's other gates. It runs
 # under the toolchain its installer manages, so it takes none of the
 # development standard: the literal `RUSTFLAGS` displaces the `rustflags`
-# tables, the LLVM override keeps it off the repository's Cranelift default,
+# tables, the LLVM override keeps it off any Cranelift opt-in,
 # and the installer's directory leads `PATH`. An inherited
 # `CARGO_ENCODED_RUSTFLAGS` outranks `RUSTFLAGS`, so it is cleared first.
 lint-whitaker: ## Run the installer-managed rolling Whitaker suite

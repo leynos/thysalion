@@ -10,7 +10,7 @@
 # is therefore repeated in each source, and the Makefile restates them where it
 # assigns `RUSTFLAGS` for the gate targets.
 
-# The backend selection (Cranelift for the dev profile) is at the foot of this
+# The backend selection (disabled; LLVM is the default) is at the foot of this
 # file. Release builds use the pinned nightly too and keep LLVM.
 
 [build]
@@ -32,9 +32,9 @@ rustflags = ["-Zthreads=8", "-C", "link-arg=-fuse-ld=mold"]
 embed-metadata = false
 codegen-backend = true
 
-# Cranelift trades runtime performance for compile speed, so it applies to the
-# dev profile only. Release builds keep LLVM, and coverage selects LLVM
-# explicitly. Stable Cargo refuses both keys, so only the pinned nightly may
-# read this file.
-[profile.dev]
-codegen-backend = "cranelift"
+# Development builds use LLVM, the estate standard. Stable Cargo refuses both
+# keys, so only the pinned nightly may read this file.
+# Cranelift disabled estate-wide on 14 November 2026 (concordat ADR; review 14 May 2027). Uncomment to opt back in.
+# [profile.dev]
+# codegen-backend = "cranelift"
+# One-off opt-in: --config 'profile.dev.codegen-backend="cranelift"'

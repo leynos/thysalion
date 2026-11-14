@@ -5,12 +5,37 @@ use super::helpers::{
     PROFILE_BACKEND_SELECTORS,
     RouteText,
     build_override_mutations,
+    cargo_config,
     cargo_lines,
     coverage_mutations,
     coverage_route_matches,
     make_output,
     preflight_precedes_cargo,
 };
+
+/// The Cargo configuration leaves Cranelift unselected and keeps the opt-in key.
+#[test]
+fn cargo_config_does_not_select_cranelift_for_development() {
+    let config = cargo_config().expect("read the Cargo configuration");
+    let selected = config
+        .get("profile")
+        .and_then(|profiles| profiles.get("dev"))
+        .and_then(|dev| dev.get("codegen-backend"))
+        .and_then(toml::Value::as_str);
+    assert_ne!(
+        selected,
+        Some("cranelift"),
+        "[profile.dev] must not select Cranelift by default"
+    );
+    assert_eq!(
+        config
+            .get("unstable")
+            .and_then(|unstable| unstable.get("codegen-backend"))
+            .and_then(toml::Value::as_bool),
+        Some(true),
+        "the [unstable] codegen-backend key stays for an opt-in"
+    );
+}
 
 /// Coverage explicitly selects LLVM, lld, and no development flags.
 #[test]

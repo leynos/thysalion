@@ -77,8 +77,7 @@ jobs:
             ${{ runner.os }}-cargo-${{ matrix.target }}-
       - name: Build release binary
         # The release builds on the nightly pinned in rust-toolchain.toml with
-        # the LLVM backend: [profile.dev]'s Cranelift setting does not reach the
-        # release profile.
+        # the LLVM backend, the estate standard.
         env:
           # An empty value excludes the development rustflags.
           RUSTFLAGS: ""

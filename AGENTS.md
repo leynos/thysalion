@@ -152,12 +152,14 @@ project:
   nightly toolchain; `make check-build-tools` is the preflight used by build,
   test, lint, coverage, typecheck, and demo targets. Install `clang` separately.
 - Bare Cargo development commands discover `.cargo/config.toml`. It selects
-  the Cranelift backend for the dev profile, enables `-Zthreads=8`, and uses
-  `mold` on Linux. Make recipes that set `RUSTFLAGS` restate those flags and
-  the warnings policy; they also clear inherited backend overrides. Release and
-  coverage routes explicitly clear or replace development settings. The release
-  workflow builds on the pinned nightly with LLVM, because `[profile.dev]` does
-  not reach the release profile; coverage and Whitaker select LLVM explicitly.
+  no Cranelift backend for the dev profile (LLVM is the default; see the
+  [concordat decision record](https://github.com/leynos/concordat/blob/main/docs/adrs/adr-0004-cranelift-is-not-part-of-the-rust-build-standard.md),
+  review due 14 May 2027), enables `-Zthreads=8`, and uses `mold` on Linux.
+  Make recipes that set `RUSTFLAGS` restate those flags and the warnings
+  policy; they also clear inherited backend overrides. Release and coverage
+  routes explicitly clear or replace development settings. The release workflow
+  builds on the pinned nightly with LLVM, because `[profile.dev]` does not
+  reach the release profile; coverage and Whitaker select LLVM explicitly.
 - The authoritative lint tables are in the root `Cargo.toml`; the root package
   and every workspace member inherit them. See the `Lint baseline` section of
   the developers' guide for thresholds, environment restrictions and toolchain
