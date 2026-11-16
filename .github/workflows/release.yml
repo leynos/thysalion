@@ -47,7 +47,7 @@ jobs:
           persist-credentials: false
       # No toolchain input: setup-rust installs the nightly that
       # rust-toolchain.toml pins, and cross builds with it.
-      - uses: leynos/shared-actions/.github/actions/setup-rust@6cec89bac47a21cf756d68d638a9a510998e57f8
+      - uses: leynos/shared-actions/.github/actions/setup-rust@1123a35f1cc7810f65bfffa5ea4c8b981d6c0090
         with:
           expect-cache: any
       - name: Cache cross binary
