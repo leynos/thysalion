@@ -129,7 +129,7 @@ test: check-build-tools fetch ## Run tests with warnings treated as errors
 	# a plain `--no-run` leaves trybuild's own build tree (the Bevy graph) empty.
 	# `--workspace --all-features` keeps Cargo's feature unification the same as
 	# the run's, which trybuild reads.
-	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(TEST_FLAGS) --no-run $(BUILD_JOBS)
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --no-run $(BUILD_JOBS) $(TEST_FLAGS)
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --workspace --all-features --test compile_time_contracts --test passability_ui --test compile_fail $(BUILD_JOBS)
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --doc --workspace --all-features $(BUILD_JOBS)

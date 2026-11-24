@@ -170,14 +170,28 @@ fn assert_test_cargo_routes(commands: &[&str], expected_first: &str) {
 
 /// The warm-up builds the test binaries, then runs the trybuild binaries once.
 fn assert_warm_up_routes(warm_build: &str, warm_run: &str) {
+    // `--no-run` has to come before any caller-supplied `--` separator, or Cargo
+    // hands it to the test harness instead of building only.
     assert!(
-        warm_build.contains("--no-run"),
+        warm_build.contains("test --no-run"),
         "the warm-up must build the test binaries first: {warm_build}"
     );
     assert!(
-        warm_run.contains("--test compile_time_contracts"),
-        "the warm-up must run the trybuild tests once: {warm_run}"
+        !warm_run.contains("--no-run"),
+        "the trybuild run must execute the tests, not only build them: {warm_run}"
     );
+    for target in ["compile_time_contracts", "passability_ui", "compile_fail"] {
+        assert!(
+            warm_run.contains(&format!("--test {target}")),
+            "the warm-up must run the {target} trybuild binary: {warm_run}"
+        );
+    }
+    for selection in ["--workspace", "--all-features"] {
+        assert!(
+            warm_run.contains(selection),
+            "the warm-up must keep the run's feature unification ({selection}): {warm_run}"
+        );
+    }
 }
 
 fn assert_default_feature_contract(command: &str) {
