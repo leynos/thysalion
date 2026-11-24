@@ -168,6 +168,38 @@ fn assert_test_cargo_routes(commands: &[&str], expected_first: &str) {
     }
 }
 
+/// Launcher-specific flags and a `--` separator in `TEST_FLAGS` reach the warm-up
+/// build through the suite's launcher, with `--no-run` ahead of the separator.
+#[test]
+fn warm_up_build_keeps_launcher_flags_and_orders_no_run_before_the_separator() {
+    let output = make_output(
+        MakeTarget::Test,
+        &[
+            "CARGO=probe-cargo",
+            "BUILD_HOST_OS=Linux",
+            "TEST_CMD=nextest run",
+            "TEST_FLAGS=--workspace --all-targets --all-features --retries=1 -- --nocapture",
+        ],
+    )
+    .expect("evaluate Make test target with launcher flags");
+    let commands = cargo_lines(RouteText(&output));
+    let warm_build = commands.first().expect("the warm-up build comes first");
+    assert!(
+        warm_build.contains("probe-cargo nextest run --no-run"),
+        "the warm-up must build through the suite's launcher: {warm_build}"
+    );
+    assert!(
+        warm_build.contains("--retries=1"),
+        "launcher flags must reach the launcher that understands them: {warm_build}"
+    );
+    let no_run = warm_build.find("--no-run").expect("--no-run is present");
+    let separator = warm_build.find(" -- ").expect("the separator is kept");
+    assert!(
+        no_run < separator,
+        "--no-run must precede the caller's separator: {warm_build}"
+    );
+}
+
 /// The warm-up builds the test binaries, then runs the trybuild binaries once.
 fn assert_warm_up_routes(warm_build: &str, warm_run: &str, launcher: &str) {
     // `--no-run` has to come before any caller-supplied `--` separator, or Cargo
