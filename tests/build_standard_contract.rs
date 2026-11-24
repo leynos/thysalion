@@ -142,12 +142,20 @@ fn test_make_routes_restate_flags_and_run_preflight_first() {
 fn assert_test_cargo_routes(commands: &[&str], expected_first: &str) {
     assert_eq!(
         commands.len(),
-        3,
-        "suite, doctest, and feature contract must invoke Cargo: {commands:?}"
+        5,
+        "warm-up, suite, doctest, and feature contract must invoke Cargo: {commands:?}"
     );
-    let [suite, doctest, feature_contract] = commands else {
+    let [warm_build, warm_run, suite, doctest, feature_contract] = commands else {
         return;
     };
+    assert!(
+        warm_build.contains("--no-run"),
+        "the warm-up must build the test binaries first: {warm_build}"
+    );
+    assert!(
+        warm_run.contains("--test compile_time_contracts"),
+        "the warm-up must run the trybuild tests once: {warm_run}"
+    );
     assert!(suite.contains(expected_first), "wrong suite route: {suite}");
     assert!(
         doctest.contains("probe-cargo test --doc"),
