@@ -112,6 +112,17 @@ before any test starts, and to run the nested call offline:
 Prepare a direct or offline run with `cargo fetch --locked` first. The estate
 lint rule `nested-cargo-offline-tests` checks all three.
 
+The trybuild binaries (`compile_time_contracts`, `passability_ui` and
+`compile_fail`) compile the Bevy dependency graph inside their own timed test
+on a cold target directory (about 290 s for `compile_fail` alone). `make test`
+therefore prepares them first: it builds the test binaries with the suite's own
+launcher, flags and `RUSTFLAGS` (`--no-run`, placed before `TEST_FLAGS` so a
+caller's `--` separator still ends the arguments), then runs the three trybuild
+binaries once under `--workspace --all-features`, the feature unification the
+suite uses. `--no-run` alone leaves trybuild's own build tree empty. The
+build-standard contract checks both commands. The estate lint rule
+`nested-cargo-cold-build` (NC-010) checks the declaration.
+
 ## Tooling
 
 Bare Cargo development builds discover `.cargo/config.toml`, which enables the
