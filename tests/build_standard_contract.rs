@@ -148,14 +148,7 @@ fn assert_test_cargo_routes(commands: &[&str], expected_first: &str) {
     let [warm_build, warm_run, suite, doctest, feature_contract] = commands else {
         return;
     };
-    assert!(
-        warm_build.contains("--no-run"),
-        "the warm-up must build the test binaries first: {warm_build}"
-    );
-    assert!(
-        warm_run.contains("--test compile_time_contracts"),
-        "the warm-up must run the trybuild tests once: {warm_run}"
-    );
+    assert_warm_up_routes(warm_build, warm_run);
     assert!(suite.contains(expected_first), "wrong suite route: {suite}");
     assert!(
         doctest.contains("probe-cargo test --doc"),
@@ -173,6 +166,18 @@ fn assert_test_cargo_routes(commands: &[&str], expected_first: &str) {
             "test route loses its standard flags: {command}; result: {route_matches:?}"
         );
     }
+}
+
+/// The warm-up builds the test binaries, then runs the trybuild binaries once.
+fn assert_warm_up_routes(warm_build: &str, warm_run: &str) {
+    assert!(
+        warm_build.contains("--no-run"),
+        "the warm-up must build the test binaries first: {warm_build}"
+    );
+    assert!(
+        warm_run.contains("--test compile_time_contracts"),
+        "the warm-up must run the trybuild tests once: {warm_run}"
+    );
 }
 
 fn assert_default_feature_contract(command: &str) {
