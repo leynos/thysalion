@@ -140,30 +140,8 @@ pub(crate) fn inspect(files: &[(String, String)]) -> Result<Report, String> {
     Ok(report)
 }
 
-/// Parses one workflow file and inspects every job in it.
-fn inspect_workflow(workflow_name: &str, source: &str, report: &mut Report) -> Result<(), String> {
-    let document = single_document(workflow_name, source)?;
-    let jobs = field(&document, WorkflowField::Jobs)
-        .and_then(Yaml::as_hash)
-        .ok_or_else(|| format!("{workflow_name} has no jobs mapping"))?;
-    if jobs.is_empty() {
-        return Err(format!("{workflow_name} has an empty jobs mapping"));
-    }
-    for (job_key, job_value) in jobs {
-        let job_name = job_key
-            .as_str()
-            .ok_or_else(|| format!("{workflow_name} has a non-string job key"))?;
-        let location = JobLocation {
-            workflow: workflow_name,
-            name: job_name,
-        };
-        inspect_job(location, job_value, report)?;
-    }
-    Ok(())
-}
-
-/// Loads the one YAML document a workflow file must hold.
-fn single_document(workflow_name: &str, source: &str) -> Result<Yaml, String> {
+/// Parses a workflow file into its single YAML document.
+fn parse_single_document(workflow_name: &str, source: &str) -> Result<Yaml, String> {
     let mut documents = YamlLoader::load_from_str(source)
         .map_err(|error| format!("cannot parse {workflow_name}: {error}"))?;
     if documents.len() != 1 {
@@ -175,6 +153,31 @@ fn single_document(workflow_name: &str, source: &str) -> Result<Yaml, String> {
     documents
         .pop()
         .ok_or_else(|| format!("{workflow_name} has no YAML document"))
+}
+
+/// Inspects every job of one workflow, adding what it finds to the report.
+fn inspect_workflow(workflow_name: &str, source: &str, report: &mut Report) -> Result<(), String> {
+    let document = parse_single_document(workflow_name, source)?;
+    let jobs = field(&document, WorkflowField::Jobs)
+        .and_then(Yaml::as_hash)
+        .ok_or_else(|| format!("{workflow_name} has no jobs mapping"))?;
+    if jobs.is_empty() {
+        return Err(format!("{workflow_name} has an empty jobs mapping"));
+    }
+    for (job_key, job_value) in jobs {
+        let job_name = job_key
+            .as_str()
+            .ok_or_else(|| format!("{workflow_name} has a non-string job key"))?;
+        inspect_job(
+            JobLocation {
+                workflow: workflow_name,
+                name: job_name,
+            },
+            job_value,
+            report,
+        )?;
+    }
+    Ok(())
 }
 
 #[path = "install_tools/inspection.rs"]
