@@ -3,7 +3,7 @@
 //!
 //! The checks that must walk a chunk's runs share one traversal, but as an
 //! iterator feeding single-purpose accumulators rather than as one function
-//! doing four jobs — `clippy.toml` caps cognitive complexity at nine, and a
+//! doing four jobs — `dylint.toml` caps cognitive complexity at nine, and a
 //! function checking volume, canonicality, zero lengths, and palette bounds at
 //! once breaches it by construction.
 //!

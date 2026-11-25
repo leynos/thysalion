@@ -206,17 +206,18 @@ The authoritative workspace Clippy, Rust and rustdoc tables live in
 stricter `unexpected_cfgs` check and `doc-valid-idents` list. The approved
 environment-method policy is in `clippy.toml`.
 
-`clippy.toml` sets thresholds of 9 for cognitive complexity, 4 arguments, 70
-lines and 4 nested levels. Its disallowed-method list requires environment
-reads to use an injected reader and tests to use a stub environment instead of
-mutating process-global variables. It requires an injected base-directory seam
-instead of changing the process directory; subprocesses may use
-`Command::current_dir`. The seven methods come from the maintainer-approved
-[Netsuke policy revision][netsuke-policy], tracked for Concordat publication in
-[concordat #157](https://github.com/leynos/concordat/issues/157).
-The frozen Concordat revision does not yet contain that list. The required
-components in `rust-toolchain.toml` include `clippy`, `rustfmt`, and
-`rust-analyzer`; coverage also uses `llvm-tools-preview`.
+`clippy.toml` sets thresholds of 4 arguments, 70 lines and 4 nested levels;
+`dylint.toml` sets the cognitive complexity ceiling of 9. Its disallowed-method
+list requires environment reads to use an injected reader and tests to use a
+stub environment instead of mutating process-global variables. It requires an
+injected base-directory seam instead of changing the process directory;
+subprocesses may use `Command::current_dir`. The seven methods come from the
+maintainer-approved [Netsuke policy revision][netsuke-policy], tracked for
+Concordat publication in
+[concordat #157](https://github.com/leynos/concordat/issues/157). The frozen
+Concordat revision does not yet contain that list. The required components in
+`rust-toolchain.toml` include `clippy`, `rustfmt`, and `rust-analyzer`;
+coverage also uses `llvm-tools-preview`.
 
 Fix findings at source. Never add `#[allow]`. Use `#[expect]` only for
 macro-expansion artefacts or floating-point arithmetic, with a reason. The
