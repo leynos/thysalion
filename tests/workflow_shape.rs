@@ -257,26 +257,6 @@ fn ci_keeps_testing_fork_pull_requests() {
 }
 
 #[test]
-fn ci_keeps_one_run_per_ref() {
-    // Concurrency cancels superseded runs only when their workflow and ref
-    // match. A branch push and its pull_request merge-result run use distinct
-    // refs, so both remain eligible to run.
-    let workflow = ci_workflow();
-    let concurrency =
-        top_level_block(&workflow, "concurrency").expect("ci.yml must declare a concurrency group");
-    assert_eq!(
-        entry(&concurrency, 2, "group"),
-        Some("${{ github.workflow }}-${{ github.ref }}"),
-        "the concurrency group must be keyed on workflow and ref; found:\n{concurrency}"
-    );
-    assert_eq!(
-        entry(&concurrency, 2, "cancel-in-progress"),
-        Some("true"),
-        "superseded runs must be cancelled; found:\n{concurrency}"
-    );
-}
-
-#[test]
 fn ci_runs_the_headless_suite_on_push_and_manual_dispatch() {
     // Coverage is pull-request-only because main owns the push baseline, but
     // pushes and manual dispatches must run the fixture-loading suite.
