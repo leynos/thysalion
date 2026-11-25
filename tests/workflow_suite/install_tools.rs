@@ -132,41 +132,52 @@ pub(crate) fn inspect(files: &[(String, String)]) -> Result<Report, String> {
         if !seen_workflows.insert(workflow_name) {
             return Err(format!("duplicate workflow file name {workflow_name:?}"));
         }
-        let mut documents = YamlLoader::load_from_str(source)
-            .map_err(|error| format!("cannot parse {workflow_name}: {error}"))?;
-        if documents.len() != 1 {
-            return Err(format!(
-                "{workflow_name} has {} YAML documents; expected one",
-                documents.len()
-            ));
-        }
-        let document = documents
-            .pop()
-            .ok_or_else(|| format!("{workflow_name} has no YAML document"))?;
-        let jobs = field(&document, WorkflowField::Jobs)
-            .and_then(Yaml::as_hash)
-            .ok_or_else(|| format!("{workflow_name} has no jobs mapping"))?;
-        if jobs.is_empty() {
-            return Err(format!("{workflow_name} has an empty jobs mapping"));
-        }
-        for (job_key, job_value) in jobs {
-            let job_name = job_key
-                .as_str()
-                .ok_or_else(|| format!("{workflow_name} has a non-string job key"))?;
-            inspect_job(
-                JobLocation {
-                    workflow: workflow_name,
-                    name: job_name,
-                },
-                job_value,
-                &mut report,
-            )?;
-        }
+        inspect_workflow(workflow_name, source, &mut report)?;
     }
     if report.linux_suite_entries == 0 {
         return Err("workflow scan found no Linux suite entries".to_owned());
     }
     Ok(report)
+}
+
+/// Parses a workflow file into its single YAML document.
+fn parse_single_document(workflow_name: &str, source: &str) -> Result<Yaml, String> {
+    let mut documents = YamlLoader::load_from_str(source)
+        .map_err(|error| format!("cannot parse {workflow_name}: {error}"))?;
+    if documents.len() != 1 {
+        return Err(format!(
+            "{workflow_name} has {} YAML documents; expected one",
+            documents.len()
+        ));
+    }
+    documents
+        .pop()
+        .ok_or_else(|| format!("{workflow_name} has no YAML document"))
+}
+
+/// Inspects every job of one workflow, adding what it finds to the report.
+fn inspect_workflow(workflow_name: &str, source: &str, report: &mut Report) -> Result<(), String> {
+    let document = parse_single_document(workflow_name, source)?;
+    let jobs = field(&document, WorkflowField::Jobs)
+        .and_then(Yaml::as_hash)
+        .ok_or_else(|| format!("{workflow_name} has no jobs mapping"))?;
+    if jobs.is_empty() {
+        return Err(format!("{workflow_name} has an empty jobs mapping"));
+    }
+    for (job_key, job_value) in jobs {
+        let job_name = job_key
+            .as_str()
+            .ok_or_else(|| format!("{workflow_name} has a non-string job key"))?;
+        inspect_job(
+            JobLocation {
+                workflow: workflow_name,
+                name: job_name,
+            },
+            job_value,
+            report,
+        )?;
+    }
+    Ok(())
 }
 
 #[path = "install_tools/inspection.rs"]
