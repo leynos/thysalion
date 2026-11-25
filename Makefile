@@ -124,6 +124,13 @@ fetch: ## Download the locked dependencies once, so nested cargo runs offline
 	$(CARGO) fetch --locked --target "$${CARGO_BUILD_TARGET:-host-tuple}"
 
 test: check-build-tools fetch ## Run tests with warnings treated as errors
+	# Pay for the nested builds before the timed run: build the test binaries
+	# under the run's own flags, then run the three trybuild binaries once, because
+	# a plain `--no-run` leaves trybuild's own build tree (the Bevy graph) empty.
+	# `--workspace --all-features` keeps Cargo's feature unification the same as
+	# the run's, which trybuild reads.
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) $(TEST_CMD) --no-run $(BUILD_JOBS) $(TEST_FLAGS)
+	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --workspace --all-features --test compile_time_contracts --test passability_ui --test compile_fail $(BUILD_JOBS)
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --doc --workspace --all-features $(BUILD_JOBS)
 	$(DEVELOPMENT_CARGO_ENV) RUSTFLAGS="$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test -p thysalion-test-support --no-default-features --test compile_time_contracts bevy_harness_is_hidden_without_feature $(BUILD_JOBS)

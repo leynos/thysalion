@@ -142,12 +142,13 @@ fn test_make_routes_restate_flags_and_run_preflight_first() {
 fn assert_test_cargo_routes(commands: &[&str], expected_first: &str) {
     assert_eq!(
         commands.len(),
-        3,
-        "suite, doctest, and feature contract must invoke Cargo: {commands:?}"
+        5,
+        "warm-up, suite, doctest, and feature contract must invoke Cargo: {commands:?}"
     );
-    let [suite, doctest, feature_contract] = commands else {
+    let [warm_build, warm_run, suite, doctest, feature_contract] = commands else {
         return;
     };
+    assert_warm_up_routes(warm_build, warm_run, expected_first);
     assert!(suite.contains(expected_first), "wrong suite route: {suite}");
     assert!(
         doctest.contains("probe-cargo test --doc"),
@@ -163,6 +164,73 @@ fn assert_test_cargo_routes(commands: &[&str], expected_first: &str) {
         assert!(
             matches!(&route_matches, Ok(true)),
             "test route loses its standard flags: {command}; result: {route_matches:?}"
+        );
+    }
+}
+
+/// Launcher-specific flags and a `--` separator in `TEST_FLAGS` reach the warm-up
+/// build through the suite's launcher, with `--no-run` ahead of the separator.
+#[test]
+fn warm_up_build_keeps_launcher_flags_and_orders_no_run_before_the_separator() {
+    let output = make_output(
+        MakeTarget::Test,
+        &[
+            "CARGO=probe-cargo",
+            "BUILD_HOST_OS=Linux",
+            "TEST_CMD=nextest run",
+            "TEST_FLAGS=--workspace --all-targets --all-features --retries=1 -- --nocapture",
+        ],
+    )
+    .expect("evaluate Make test target with launcher flags");
+    let commands = cargo_lines(RouteText(&output));
+    let warm_build = commands.first().expect("the warm-up build comes first");
+    assert!(
+        warm_build.contains("probe-cargo nextest run --no-run"),
+        "the warm-up must build through the suite's launcher: {warm_build}"
+    );
+    assert!(
+        warm_build.contains("--retries=1"),
+        "launcher flags must reach the launcher that understands them: {warm_build}"
+    );
+    let no_run = warm_build.find("--no-run").expect("--no-run is present");
+    let separator = warm_build.find(" -- ").expect("the separator is kept");
+    assert!(
+        no_run < separator,
+        "--no-run must precede the caller's separator: {warm_build}"
+    );
+}
+
+/// The warm-up builds the test binaries, then runs the trybuild binaries once.
+fn assert_warm_up_routes(warm_build: &str, warm_run: &str, launcher: &str) {
+    // `--no-run` has to come before any caller-supplied `--` separator, or Cargo
+    // hands it to the test harness instead of building only. The build uses the
+    // suite's own launcher, so launcher-specific flags in `TEST_FLAGS` reach a
+    // command that understands them, and the suite's own scope, so it builds
+    // the units the suite runs.
+    assert!(
+        warm_build.contains(&format!("{} --no-run", launcher.trim_end())),
+        "the warm-up must build the test binaries with the suite's launcher: {warm_build}"
+    );
+    for selection in ["--workspace", "--all-targets", "--all-features"] {
+        assert!(
+            warm_build.contains(selection),
+            "the warm-up build must share the suite's scope ({selection}): {warm_build}"
+        );
+    }
+    assert!(
+        !warm_run.contains("--no-run"),
+        "the trybuild run must execute the tests, not only build them: {warm_run}"
+    );
+    for target in ["compile_time_contracts", "passability_ui", "compile_fail"] {
+        assert!(
+            warm_run.contains(&format!("--test {target}")),
+            "the warm-up must run the {target} trybuild binary: {warm_run}"
+        );
+    }
+    for selection in ["--workspace", "--all-features"] {
+        assert!(
+            warm_run.contains(selection),
+            "the warm-up must keep the run's feature unification ({selection}): {warm_run}"
         );
     }
 }
