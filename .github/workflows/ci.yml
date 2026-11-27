@@ -1,4 +1,3 @@
-
 name: CI
 
 'on':
@@ -97,6 +96,8 @@ jobs:
           cranelift: true
       - name: Audit dependencies
         run: make audit
+      - name: Install the YAML lint tools
+        uses: leynos/shared-actions/.github/actions/install-yaml-lint@a108423efa7fb83565089449f2647d34286a48a4
       - name: Lint
         run: make lint
       - name: Log coverage linker configuration
